@@ -16,6 +16,7 @@ const detailSections = `
 <section class="section logo-story"><div class="logo-showcase"><img src="assets/logo.svg" alt="Co-Chat logo"/><div><p class="kicker">THE CO‑CHAT MARK</p><h2>A little <i>spark</i> for every conversation.</h2><p>Our logo is a C, a conversation bubble, and two people meeting in the middle. It represents a simple idea: connection should feel natural.</p></div></div></section>
 <section class="section community-guide"><div><p class="kicker">OUR COMMUNITY</p><h2>Come curious.<br/><i>Leave kinder.</i></h2></div><div class="rules"><div><span>01</span><strong>Share ideas, not pressure.</strong></div><div><span>02</span><strong>Respect every voice.</strong></div><div><span>03</span><strong>Help us build in the open.</strong></div><a class="button whatsapp" href="https://chat.whatsapp.com/EggFAYsKcKxHFJjhPtErfx" target="_blank" rel="noopener">Join the WhatsApp community <span>↗</span></a></div></section>`
 document.querySelector('main')?.insertAdjacentHTML('beforeend', detailSections)
+document.querySelectorAll('a[href*="chat.whatsapp.com"]').forEach(link => link.setAttribute('href', communityUrl))
 menu?.addEventListener('click', () => nav?.classList.toggle('open'))
 nav?.querySelectorAll('a').forEach(link => link.addEventListener('click', () => nav.classList.remove('open')))
 const year = document.querySelector('#year')
