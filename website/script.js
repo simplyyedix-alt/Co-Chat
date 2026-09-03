@@ -9,6 +9,9 @@ document.querySelector('.site-header')?.after(communityBanner)
 const communityUrl = 'https://whatsapp.com/channel/0029Vb8ytL14tRs06vJo5Z3B'
 document.querySelectorAll('a[href*="chat.whatsapp.com"]').forEach(link => link.setAttribute('href', communityUrl))
 document.querySelectorAll('.marquee span').forEach((item, index) => { item.textContent = ['REAL-TIME MESSAGING', 'STORIES & MOMENTS', 'VOICE & VIDEO', 'COMMUNITY FIRST'][index] || 'CO-CHAT' })
+document.querySelector('.marquee')?.remove()
+const hero = document.querySelector('.hero')
+if (hero) hero.insertAdjacentHTML('afterend', '<section class="ad-video section" aria-label="Co-Chat app preview"><div class="ad-copy"><p class="kicker">A QUICK LOOK AT CO‑CHAT</p><h2>One place.<br/><i>Every connection.</i></h2><p>See how simple it feels to message your people, share a moment, and stay in the loop.</p><a class="button whatsapp" href="' + communityUrl + '" target="_blank" rel="noopener">Join the WhatsApp community <span>↗</span></a></div><div class="video-stage"><div class="video-ui"><div class="video-bar"><span>Co‑Chat</span><span>● ● ●</span></div><div class="video-screen"><div class="video-avatar">MP</div><div class="video-message">Hey! You joining us? ✨</div><div class="video-message right">Of course — I’m in!</div><div class="video-play">▶</div></div><div class="video-caption"><span>Co‑Chat app preview</span><small>Messaging made easy</small></div></div></div></section>')
 const detailSections = `
 <section class="section details" aria-label="How Co-Chat works">
   <div class="section-heading"><p class="kicker">HOW IT WORKS</p><h2>Simple to start.<br/><i>Made to stay.</i></h2><p class="section-intro">Co‑Chat keeps the important things close and the complicated things out of the way.</p></div>
