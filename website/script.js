@@ -1,7 +1,7 @@
 const menu = document.querySelector('.menu-toggle')
 const nav = document.querySelector('.site-header nav')
 const headline = document.querySelector('.hero h1')
-if (headline) headline.innerHTML = 'Chat light.<br><span>Feel right.</span>'
+if (headline) headline.innerHTML = 'Chat bright.<br><span>Feel right.</span>'
 const communityBanner = document.createElement('div')
 communityBanner.className = 'community-banner'
 communityBanner.innerHTML = '<span>✦ We’re building Co‑Chat in public</span><a href="https://whatsapp.com/channel/0029Vb8ytL14tRs06vJo5Z3B" target="_blank" rel="noopener">Join the WhatsApp community&nbsp; ↗</a>'
