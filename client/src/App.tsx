@@ -1,31 +1,28 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import SplashPage from './pages/SplashPage'
-import LoginPage from './pages/LoginPage'
-import HomePage from './pages/HomePage'
-import ChatWindow from './pages/ChatWindow'
-import CallsPage from './pages/CallsPage'
-import StoriesPage from './pages/StoriesPage'
-import ProfilePage from './pages/ProfilePage'
-import SettingsPage from './pages/SettingsPage'
-import AIAssistantPage from './pages/AIAssistantPage'
-import './App.css'
+import { FormEvent, useMemo, useState } from 'react'
+import './index.css'
 
-function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<SplashPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/home" element={<HomePage />} />
-        <Route path="/chat/:id" element={<ChatWindow />} />
-        <Route path="/calls" element={<CallsPage />} />
-        <Route path="/stories" element={<StoriesPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/ai-assistant" element={<AIAssistantPage />} />
-      </Routes>
-    </BrowserRouter>
-  )
+type Chat = { id: number; name: string; avatar: string; preview: string; time: string; messages: { from: 'me' | 'them'; text: string; time: string }[] }
+const starterChats: Chat[] = [
+  { id: 1, name: 'Maya Patel', avatar: 'MP', preview: 'That sounds perfect — see you there!', time: '10:42', messages: [{ from: 'them', text: 'Are we still on for coffee this afternoon?', time: '10:37' }, { from: 'me', text: 'Absolutely! I’ll be there at 4.', time: '10:40' }, { from: 'them', text: 'That sounds perfect — see you there!', time: '10:42' }] },
+  { id: 2, name: 'Design Crew', avatar: 'DC', preview: 'Leo: I added the final screens.', time: '09:15', messages: [{ from: 'them', text: 'I added the final screens. What do you think?', time: '09:15' }] },
+  { id: 3, name: 'Jordan Kim', avatar: 'JK', preview: 'Thanks for sharing that!', time: 'Yesterday', messages: [{ from: 'them', text: 'Thanks for sharing that!', time: 'Yesterday' }] },
+]
+const Nav = ({ page, setPage }: { page: string; setPage: (page: string) => void }) => <nav className="bottom-nav">{[['chats', '💬', 'Chats'], ['calls', '📞', 'Calls'], ['stories', '◉', 'Stories'], ['ai', '✦', 'Assist'], ['profile', '☺', 'Profile']].map(([id, icon, label]) => <button key={id} className={page === id ? 'active' : ''} onClick={() => setPage(id)}><span>{icon}</span>{label}</button>)}</nav>
+
+export default function App() {
+  const savedUser = localStorage.getItem('cochat-user')
+  const [user, setUser] = useState<{ name: string; username: string } | null>(savedUser ? JSON.parse(savedUser) : null)
+  const [page, setPage] = useState('chats'); const [chats, setChats] = useState(starterChats); const [selectedChat, setSelectedChat] = useState<Chat | null>(null); const [message, setMessage] = useState(''); const [search, setSearch] = useState(''); const [aiText, setAiText] = useState(''); const [language, setLanguage] = useState('Spanish')
+  const visibleChats = useMemo(() => chats.filter(chat => chat.name.toLowerCase().includes(search.toLowerCase())), [chats, search])
+  const signIn = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const data = new FormData(event.currentTarget); const next = { name: String(data.get('name')), username: String(data.get('username')) }; localStorage.setItem('cochat-user', JSON.stringify(next)); setUser(next) }
+  const send = (event: FormEvent) => { event.preventDefault(); if (!message.trim() || !selectedChat) return; const nextMessage = { from: 'me' as const, text: message.trim(), time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }; setChats(old => old.map(chat => chat.id === selectedChat.id ? { ...chat, preview: nextMessage.text, time: nextMessage.time, messages: [...chat.messages, nextMessage] } : chat)); setSelectedChat(old => old ? { ...old, preview: nextMessage.text, time: nextMessage.time, messages: [...old.messages, nextMessage] } : old); setMessage('') }
+  if (!user) return <main className="auth"><section className="auth-card"><div className="brand-mark">C</div><h1>Co Chat</h1><p>A quieter place to stay close.</p><form onSubmit={signIn}><label>Display name<input name="name" required placeholder="Your name" /></label><label>Username<input name="username" required pattern="[A-Za-z0-9_]+" placeholder="e.g. alex_99" /></label><button className="primary">Start chatting</button></form><small>No account, server, or payment needed for this private demo.</small></section></main>
+  if (selectedChat) return <main className="app"><header className="chat-header"><button className="icon" onClick={() => setSelectedChat(null)}>←</button><div className="avatar">{selectedChat.avatar}</div><div><strong>{selectedChat.name}</strong><small>Online</small></div><button className="icon">☎</button><button className="icon">⋮</button></header><section className="messages">{selectedChat.messages.map((item, i) => <div className={`bubble ${item.from}`} key={i}>{item.text}<small>{item.time}</small></div>)}</section><form className="composer" onSubmit={send}><input value={message} onChange={e => setMessage(e.target.value)} placeholder="Write a message" /><button className="primary">Send</button></form></main>
+  return <main className="app"><header className="topbar"><div><div className="eyebrow">WELCOME BACK</div><h1>{page === 'chats' ? 'Messages' : page === 'ai' ? 'Co Assist' : page[0].toUpperCase() + page.slice(1)}</h1></div><button className="avatar profile-button" onClick={() => setPage('profile')}>{user.name.split(' ').map(x => x[0]).join('').slice(0, 2)}</button></header><section className="content">
+    {page === 'chats' && <><input className="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search messages" /><div className="section-title">RECENT CONVERSATIONS</div><div className="list">{visibleChats.map(chat => <button className="chat-row" key={chat.id} onClick={() => setSelectedChat(chat)}><span className="avatar">{chat.avatar}</span><span className="chat-copy"><strong>{chat.name}</strong><span>{chat.preview}</span></span><small>{chat.time}</small></button>)}</div><button className="fab" onClick={() => alert('New conversations will be connected to a free Supabase backend in the next milestone.')}>＋</button></>}
+    {page === 'calls' && <><div className="hero-card"><span>📞</span><h2>Call your people</h2><p>Audio and video calling are planned for the online version. Your recent activity will appear here.</p><button className="secondary">Invite a friend</button></div><div className="section-title">RECENT</div>{['Maya Patel — outgoing · 12 min', 'Jordan Kim — missed · Yesterday'].map(x => <div className="activity" key={x}>☎ <span>{x}</span></div>)}</>}
+    {page === 'stories' && <><div className="story-grid"><button className="story mine"><b>＋</b><span>Your story</span></button>{['Maya', 'Jordan', 'Design Crew'].map((x, i) => <button className="story" key={x}><div className={`story-art a${i}`}>{x[0]}</div><span>{x}</span></button>)}</div><div className="hero-card"><span>◉</span><h2>Share a moment</h2><p>Stories are a fun way to post a short update that disappears after 24 hours.</p><button className="primary" onClick={() => alert('Story publishing needs the free online backend — this preview is ready for its UI.')}>Create story</button></div></>}
+    {page === 'ai' && <><div className="notice">✦ Co Assist works offline here: nothing you type leaves this browser.</div><label className="field-label">Paste a message or conversation</label><textarea value={aiText} onChange={e => setAiText(e.target.value)} placeholder="Try: Hey, can we move our meeting to Friday?" /><div className="tool-grid"><article><h3>Quick summary</h3><p>{aiText ? `Main point: ${aiText.split(/[.!?]/)[0]}.` : 'Add text to make a concise takeaway.'}</p></article><article><h3>Translate to {language}</h3><select value={language} onChange={e => setLanguage(e.target.value)}><option>Spanish</option><option>French</option><option>Hindi</option><option>Japanese</option></select><p>{aiText ? 'Connect a free translation API later for live translations.' : 'Enter text first.'}</p></article><article><h3>Reply ideas</h3><p>{aiText ? '“Sounds good!” · “Thanks for letting me know.” · “Can we talk about it tomorrow?”' : 'Suggestions appear here.'}</p></article></div></>}
+    {page === 'profile' && <><div className="profile-card"><div className="avatar large">{user.name.split(' ').map(x => x[0]).join('').slice(0, 2)}</div><h2>{user.name}</h2><p>@{user.username}</p><button className="secondary">Edit profile</button></div><div className="settings"><button>🔔 Notifications <span>›</span></button><button>◐ Appearance <span>›</span></button><button>🔒 Privacy <span>›</span></button><button onClick={() => { localStorage.removeItem('cochat-user'); setUser(null) }}>↪ Sign out <span>›</span></button></div></>}
+  </section><Nav page={page} setPage={setPage} /></main>
 }
-
-export default App

@@ -5,14 +5,15 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
+    "dev": "npm run dev:client",
     "dev:client": "cd client && npm run dev",
     "dev:server": "cd server && npm run dev",
-    "build": "npm run build:client && npm run build:server",
+    "build": "npm run build:client",
     "build:client": "cd client && npm run build",
     "build:server": "cd server && npm run build",
-    "start": "node server/dist/index.js",
-    "test": "concurrently \"npm run test:client\" \"npm run test:server\""
+    "start": "npm run preview --prefix client",
+    "test": "npm run test:client",
+    "test:client": "npm test --prefix client"
   },
   "keywords": ["chat", "messaging", "communication", "ai"],
   "author": "simplyyedix-alt",
