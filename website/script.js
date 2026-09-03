@@ -29,6 +29,9 @@ const adCopy = document.querySelector('.ad-copy>p:not(.kicker)')
 if (adCopy) adCopy.textContent = 'Our app tutorial is coming soon. We’ll walk through real accounts, instant messages, groups, stories, and calls as each feature becomes ready.'
 const videoCaption = document.querySelector('.video-caption span')
 if (videoCaption) videoCaption.textContent = 'Co‑Chat app tutorial — coming soon'
+document.querySelector('.site-header .nav-cta')?.remove()
+document.querySelector('.vision-card .whatsapp')?.remove()
+document.querySelector('.community-guide .whatsapp')?.remove()
 menu?.addEventListener('click', () => nav?.classList.toggle('open'))
 nav?.querySelectorAll('a').forEach(link => link.addEventListener('click', () => nav.classList.remove('open')))
 const year = document.querySelector('#year')
