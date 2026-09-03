@@ -6,6 +6,14 @@ const communityBanner = document.createElement('div')
 communityBanner.className = 'community-banner'
 communityBanner.innerHTML = '<span>✦ We’re building Co‑Chat in public</span><a href="https://chat.whatsapp.com/EggFAYsKcKxHFJjhPtErfx" target="_blank" rel="noopener">Join the WhatsApp community&nbsp; ↗</a>'
 document.querySelector('.site-header')?.after(communityBanner)
+const detailSections = `
+<section class="section details" aria-label="How Co-Chat works">
+  <div class="section-heading"><p class="kicker">HOW IT WORKS</p><h2>Simple to start.<br/><i>Made to stay.</i></h2><p class="section-intro">Co‑Chat keeps the important things close and the complicated things out of the way.</p></div>
+  <div class="steps"><article><b>01</b><span class="step-icon">✦</span><h3>Create your space</h3><p>Choose a name, find your people, and make Co‑Chat feel like yours.</p></article><article><b>02</b><span class="step-icon">↗</span><h3>Start a conversation</h3><p>Send a message, share a moment, or open a group chat in seconds.</p></article><article><b>03</b><span class="step-icon">♡</span><h3>Stay connected</h3><p>Come back when you want to. Your conversations are waiting for you.</p></article></div>
+</section>
+<section class="section logo-story"><div class="logo-showcase"><img src="assets/logo.svg" alt="Co-Chat logo"/><div><p class="kicker">THE CO‑CHAT MARK</p><h2>A little <i>spark</i> for every conversation.</h2><p>Our logo is a C, a conversation bubble, and two people meeting in the middle. It represents a simple idea: connection should feel natural.</p></div></div></section>
+<section class="section community-guide"><div><p class="kicker">OUR COMMUNITY</p><h2>Come curious.<br/><i>Leave kinder.</i></h2></div><div class="rules"><div><span>01</span><strong>Share ideas, not pressure.</strong></div><div><span>02</span><strong>Respect every voice.</strong></div><div><span>03</span><strong>Help us build in the open.</strong></div><a class="button whatsapp" href="https://chat.whatsapp.com/EggFAYsKcKxHFJjhPtErfx" target="_blank" rel="noopener">Join the WhatsApp community <span>↗</span></a></div></section>`
+document.querySelector('main')?.insertAdjacentHTML('beforeend', detailSections)
 menu?.addEventListener('click', () => nav?.classList.toggle('open'))
 nav?.querySelectorAll('a').forEach(link => link.addEventListener('click', () => nav.classList.remove('open')))
 const year = document.querySelector('#year')
