@@ -26,9 +26,24 @@ if (emailForm) emailForm.outerHTML = '<div class="community-panel"><span>✦</sp
 const adTitle = document.querySelector('.ad-copy h2')
 if (adTitle) adTitle.innerHTML = 'See how Co‑Chat<br/><i>will feel.</i>'
 const adCopy = document.querySelector('.ad-copy>p:not(.kicker)')
-if (adCopy) adCopy.textContent = 'Our app tutorial is coming soon. We’ll walk through real accounts, instant messages, groups, stories, and calls as each feature becomes ready.'
+if (adCopy) adCopy.textContent = 'Press play for a quick concept tour of real accounts, instant messages, groups, stories, and calls—the experience we are building next.'
 const videoCaption = document.querySelector('.video-caption span')
-if (videoCaption) videoCaption.textContent = 'Co‑Chat app tutorial — coming soon'
+if (videoCaption) videoCaption.textContent = 'Interactive Co‑Chat concept tour'
+const videoScreen = document.querySelector('.video-screen')
+const playButton = document.querySelector('.video-play')
+if (videoScreen && playButton) {
+  playButton.setAttribute('role', 'button'); playButton.setAttribute('tabindex', '0'); playButton.setAttribute('aria-label', 'Play Co-Chat concept video')
+  const scenes = [{ one: 'Hey! You joining us? ✨', two: 'Of course — I’m in!' }, { one: 'New group: Weekend plans', two: '3 people are online' }, { one: 'Story shared with your circle', two: 'Your people are up to date' }, { one: 'Co‑Chat — made for your people', two: 'See you in the community' }]
+  let scene = 0; let timer; let audioTimer; let audioContext
+  const play = () => {
+    if (videoScreen.classList.contains('playing')) { videoScreen.classList.remove('playing'); playButton.textContent = '▶'; clearInterval(timer); clearInterval(audioTimer); return }
+    videoScreen.classList.add('playing'); playButton.textContent = 'Ⅱ'; scene = 0
+    const update = () => { const current = scenes[scene % scenes.length]; const messages = videoScreen.querySelectorAll('.video-message'); messages[0].textContent = current.one; messages[1].textContent = current.two; scene++ }
+    update(); timer = setInterval(update, 1800)
+    try { audioContext = audioContext || new AudioContext(); const tone = () => { const oscillator = audioContext.createOscillator(); const gain = audioContext.createGain(); oscillator.frequency.value = [392, 494, 587][scene % 3]; gain.gain.setValueAtTime(.035, audioContext.currentTime); gain.gain.exponentialRampToValueAtTime(.001, audioContext.currentTime + .35); oscillator.connect(gain).connect(audioContext.destination); oscillator.start(); oscillator.stop(audioContext.currentTime + .35) }; tone(); audioTimer = setInterval(tone, 1800) } catch (_) { /* Audio is optional and browser-dependent. */ }
+  }
+  playButton.addEventListener('click', play); playButton.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); play() } })
+}
 document.querySelector('.site-header .nav-cta')?.remove()
 document.querySelector('.vision-card .whatsapp')?.remove()
 document.querySelector('.community-guide .whatsapp')?.remove()
