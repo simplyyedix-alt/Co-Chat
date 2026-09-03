@@ -24,9 +24,9 @@ document.querySelectorAll('a[href*="chat.whatsapp.com"]').forEach(link => link.s
 const emailForm = document.querySelector('#join-form')
 if (emailForm) emailForm.outerHTML = '<div class="community-panel"><span>✦</span><strong>Bring your ideas.</strong><p>Join the channel to share feedback, see progress, and help shape Co‑Chat.</p><a class="button whatsapp" href="' + communityUrl + '" target="_blank" rel="noopener">Join the WhatsApp channel <span>↗</span></a></div>'
 const adTitle = document.querySelector('.ad-copy h2')
-if (adTitle) adTitle.innerHTML = 'See how Co‑Chat<br/><i>will feel.</i>'
+if (adTitle) adTitle.innerHTML = 'A 20-second tour<br/><i>of Co‑Chat.</i>'
 const adCopy = document.querySelector('.ad-copy>p:not(.kicker)')
-if (adCopy) adCopy.textContent = 'Press play for a quick concept tour of real accounts, instant messages, groups, stories, and calls—the experience we are building next.'
+if (adCopy) adCopy.textContent = 'Press play to meet Co‑Chat: create your space, message your people, share moments, make calls, and choose your privacy settings.'
 const videoCaption = document.querySelector('.video-caption span')
 if (videoCaption) videoCaption.textContent = 'Interactive Co‑Chat concept tour'
 const videoScreen = document.querySelector('.video-screen')
@@ -40,8 +40,8 @@ if (videoScreen && playButton) {
     if (videoScreen.classList.contains('playing')) { videoScreen.classList.remove('playing'); playButton.textContent = '▶'; clearInterval(timer); clearInterval(audioTimer); return }
     videoScreen.classList.add('playing'); playButton.textContent = 'Ⅱ'; scene = 0
     const update = () => { const current = scenes[scene]; const messages = videoScreen.querySelectorAll('.video-message'); messages[0].textContent = current.one; messages[1].textContent = current.two; videoScreen.dataset.scene = current.kind; videoScreen.setAttribute('aria-label', current.title); const label = videoScreen.querySelector('.scene-label'); if (label) label.textContent = current.title; scene++; if (scene >= scenes.length) { clearInterval(timer); setTimeout(() => { videoScreen.classList.remove('playing'); playButton.textContent = '↻'; clearInterval(audioTimer) }, 3000) } }
-    update(); timer = setInterval(update, 3000)
-    try { audioContext = audioContext || new AudioContext(); const tone = () => { const oscillator = audioContext.createOscillator(); const gain = audioContext.createGain(); oscillator.frequency.value = [392, 494, 587, 659, 523, 440][scene % 6]; gain.gain.setValueAtTime(.035, audioContext.currentTime); gain.gain.exponentialRampToValueAtTime(.001, audioContext.currentTime + .35); oscillator.connect(gain).connect(audioContext.destination); oscillator.start(); oscillator.stop(audioContext.currentTime + .35) }; tone(); audioTimer = setInterval(tone, 900) } catch (_) { /* Audio is optional and browser-dependent. */ }
+    update(); timer = setInterval(update, 3200)
+    try { audioContext = audioContext || new AudioContext(); const tone = () => { const oscillator = audioContext.createOscillator(); const gain = audioContext.createGain(); oscillator.frequency.value = [392, 494, 587, 659, 523, 440][scene % 6]; gain.gain.setValueAtTime(.035, audioContext.currentTime); gain.gain.exponentialRampToValueAtTime(.001, audioContext.currentTime + .35); oscillator.connect(gain).connect(audioContext.destination); oscillator.start(); oscillator.stop(audioContext.currentTime + .35) }; tone(); audioTimer = setInterval(tone, 800) } catch (_) { /* Audio is optional and browser-dependent. */ }
   }
   playButton.addEventListener('click', play); playButton.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); play() } })
 }
