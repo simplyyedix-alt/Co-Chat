@@ -4,10 +4,11 @@ const headline = document.querySelector('.hero h1')
 if (headline) headline.innerHTML = 'Chat bright.<br><span>Feel right.</span>'
 const communityBanner = document.createElement('div')
 communityBanner.className = 'community-banner'
-communityBanner.innerHTML = '<span>✦ We’re building Co‑Chat in public</span><a href="https://whatsapp.com/channel/0029Vb8ytL14tRs06vJo5Z3B" target="_blank" rel="noopener">Join the WhatsApp community&nbsp; ↗</a>'
+communityBanner.innerHTML = '<span>✦ Better conversations start together</span><a href="https://whatsapp.com/channel/0029Vb8ytL14tRs06vJo5Z3B" target="_blank" rel="noopener">Join our WhatsApp channel&nbsp; ↗</a>'
 document.querySelector('.site-header')?.after(communityBanner)
 const communityUrl = 'https://whatsapp.com/channel/0029Vb8ytL14tRs06vJo5Z3B'
 document.querySelectorAll('a[href*="chat.whatsapp.com"]').forEach(link => link.setAttribute('href', communityUrl))
+document.querySelectorAll('.marquee span').forEach((item, index) => { item.textContent = ['REAL-TIME MESSAGING', 'STORIES & MOMENTS', 'VOICE & VIDEO', 'COMMUNITY FIRST'][index] || 'CO-CHAT' })
 const detailSections = `
 <section class="section details" aria-label="How Co-Chat works">
   <div class="section-heading"><p class="kicker">HOW IT WORKS</p><h2>Simple to start.<br/><i>Made to stay.</i></h2><p class="section-intro">Co‑Chat keeps the important things close and the complicated things out of the way.</p></div>
@@ -17,6 +18,8 @@ const detailSections = `
 <section class="section community-guide"><div><p class="kicker">OUR COMMUNITY</p><h2>Come curious.<br/><i>Leave kinder.</i></h2></div><div class="rules"><div><span>01</span><strong>Share ideas, not pressure.</strong></div><div><span>02</span><strong>Respect every voice.</strong></div><div><span>03</span><strong>Help us build in the open.</strong></div><a class="button whatsapp" href="https://chat.whatsapp.com/EggFAYsKcKxHFJjhPtErfx" target="_blank" rel="noopener">Join the WhatsApp community <span>↗</span></a></div></section>`
 document.querySelector('main')?.insertAdjacentHTML('beforeend', detailSections)
 document.querySelectorAll('a[href*="chat.whatsapp.com"]').forEach(link => link.setAttribute('href', communityUrl))
+const emailForm = document.querySelector('#join-form')
+if (emailForm) emailForm.outerHTML = '<div class="community-panel"><span>✦</span><strong>Bring your ideas.</strong><p>Join the channel to share feedback, see progress, and help shape Co‑Chat.</p><a class="button whatsapp" href="' + communityUrl + '" target="_blank" rel="noopener">Join the WhatsApp channel <span>↗</span></a></div>'
 menu?.addEventListener('click', () => nav?.classList.toggle('open'))
 nav?.querySelectorAll('a').forEach(link => link.addEventListener('click', () => nav.classList.remove('open')))
 const year = document.querySelector('#year')
