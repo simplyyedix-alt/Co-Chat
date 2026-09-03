@@ -4,8 +4,10 @@ const headline = document.querySelector('.hero h1')
 if (headline) headline.innerHTML = 'Chat light.<br><span>Feel right.</span>'
 const communityBanner = document.createElement('div')
 communityBanner.className = 'community-banner'
-communityBanner.innerHTML = '<span>✦ We’re building Co‑Chat in public</span><a href="https://chat.whatsapp.com/EggFAYsKcKxHFJjhPtErfx" target="_blank" rel="noopener">Join the WhatsApp community&nbsp; ↗</a>'
+communityBanner.innerHTML = '<span>✦ We’re building Co‑Chat in public</span><a href="https://whatsapp.com/channel/0029Vb8ytL14tRs06vJo5Z3B" target="_blank" rel="noopener">Join the WhatsApp community&nbsp; ↗</a>'
 document.querySelector('.site-header')?.after(communityBanner)
+const communityUrl = 'https://whatsapp.com/channel/0029Vb8ytL14tRs06vJo5Z3B'
+document.querySelectorAll('a[href*="chat.whatsapp.com"]').forEach(link => link.setAttribute('href', communityUrl))
 const detailSections = `
 <section class="section details" aria-label="How Co-Chat works">
   <div class="section-heading"><p class="kicker">HOW IT WORKS</p><h2>Simple to start.<br/><i>Made to stay.</i></h2><p class="section-intro">Co‑Chat keeps the important things close and the complicated things out of the way.</p></div>

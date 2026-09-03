@@ -4,5 +4,6 @@
   "description": "A real-time messaging app for friends, families, and communities.",
   "status": "Early prototype",
   "contact": "hello@co-chat.example",
+  "communityUrl": "https://whatsapp.com/channel/0029Vb8ytL14tRs06vJo5Z3B",
   "publishing": { "frontend": "client", "hosting": "GitHub Pages or Cloudflare Pages" }
 }
