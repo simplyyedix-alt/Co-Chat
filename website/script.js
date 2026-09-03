@@ -23,6 +23,12 @@ document.querySelector('main')?.insertAdjacentHTML('beforeend', detailSections)
 document.querySelectorAll('a[href*="chat.whatsapp.com"]').forEach(link => link.setAttribute('href', communityUrl))
 const emailForm = document.querySelector('#join-form')
 if (emailForm) emailForm.outerHTML = '<div class="community-panel"><span>✦</span><strong>Bring your ideas.</strong><p>Join the channel to share feedback, see progress, and help shape Co‑Chat.</p><a class="button whatsapp" href="' + communityUrl + '" target="_blank" rel="noopener">Join the WhatsApp channel <span>↗</span></a></div>'
+const adTitle = document.querySelector('.ad-copy h2')
+if (adTitle) adTitle.innerHTML = 'See how Co‑Chat<br/><i>will feel.</i>'
+const adCopy = document.querySelector('.ad-copy>p:not(.kicker)')
+if (adCopy) adCopy.textContent = 'Our app tutorial is coming soon. We’ll walk through real accounts, instant messages, groups, stories, and calls as each feature becomes ready.'
+const videoCaption = document.querySelector('.video-caption span')
+if (videoCaption) videoCaption.textContent = 'Co‑Chat app tutorial — coming soon'
 menu?.addEventListener('click', () => nav?.classList.toggle('open'))
 nav?.querySelectorAll('a').forEach(link => link.addEventListener('click', () => nav.classList.remove('open')))
 const year = document.querySelector('#year')
