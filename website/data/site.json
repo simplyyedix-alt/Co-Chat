@@ -1,0 +1,8 @@
+{
+  "brand": "Co-Chat Publications",
+  "tagline": "Stay close, simply.",
+  "description": "Thoughtful tools for conversations that matter.",
+  "status": "Early prototype",
+  "contact": "hello@co-chat.example",
+  "publishing": { "frontend": "client", "hosting": "GitHub Pages or Cloudflare Pages" }
+}
