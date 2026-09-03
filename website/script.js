@@ -1,5 +1,7 @@
 const menu = document.querySelector('.menu-toggle')
 const nav = document.querySelector('.site-header nav')
+const headline = document.querySelector('.hero h1')
+if (headline) headline.innerHTML = 'Chat light.<br><span>Feel right.</span>'
 menu?.addEventListener('click', () => nav?.classList.toggle('open'))
 nav?.querySelectorAll('a').forEach(link => link.addEventListener('click', () => nav.classList.remove('open')))
 const year = document.querySelector('#year')
