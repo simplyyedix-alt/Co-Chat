@@ -39,23 +39,9 @@ jobs:
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-          cache: gradle
-      - name: Build Android APK
-        working-directory: client
-        run: |
-          ./node_modules/.bin/cap sync android
-          chmod +x android/gradlew
-          ./android/gradlew assembleDebug --stacktrace --no-daemon
       - name: Include app in website
         run: |
           cp -r client/dist website/app
-          mkdir -p website/downloads
-          cp client/android/app/build/outputs/apk/debug/app-debug.apk website/downloads/Co-Chat-debug.apk
       - name: Configure Pages
         uses: actions/configure-pages@v5
         with:
