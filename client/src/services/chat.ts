@@ -52,7 +52,7 @@ async function reserveUsername(uid: string, requested: string, fallback: string)
 }
 
 export async function ensureUserProfile(uid: string, profile: Partial<UserProfile>) {
-  if (!db) return
+  if (!db) return false
   const ref = doc(db, 'users', uid)
   const current = await getDoc(ref)
   const displayName = profile.displayName || profile.email?.split('@')[0] || 'Co-Chat member'
@@ -60,8 +60,10 @@ export async function ensureUserProfile(uid: string, profile: Partial<UserProfil
     let username = normalizeUsername(displayName) || `user${uid.slice(0, 8).toLowerCase()}`
     try { username = await reserveUsername(uid, username, `user${uid.slice(0, 8).toLowerCase()}`) } catch { username = await reserveUsername(uid, `user${uid.slice(0, 8).toLowerCase()}`, `user${uid.slice(0, 8).toLowerCase()}`) }
     await setDoc(ref, { displayName, email: profile.email || '', username, photoURL: profile.photoURL || '', notificationsEnabled: true, discoverable: true, createdAt: serverTimestamp() })
+    return true
   }
   else await updateDoc(ref, { displayName, email: profile.email || current.data().email || '', photoURL: profile.photoURL || current.data().photoURL || '' })
+  return !normalizeUsername(String(current.data().username || ''))
 }
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
@@ -82,8 +84,8 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
 
 export function watchMessages(conversationId: string, callback: (items: ChatMessage[]) => void): Unsubscribe | undefined {
   if (!db) return undefined
-  const q = query(collection(db, 'conversations', conversationId, 'messages'), orderBy('createdAt', 'asc'))
-  return onSnapshot(q, snapshot => callback(snapshot.docs.map(item => { const data = item.data(); return { id: item.id, text: String(data.text || ''), senderId: String(data.senderId || ''), createdAt: asTimestamp(data.createdAt), attachment: data.attachment ? { name: String(data.attachment.name || 'file'), url: String(data.attachment.url || ''), type: String(data.attachment.type || ''), size: Number(data.attachment.size || 0) } : null } })))
+  const q = query(collection(db, 'conversations', conversationId, 'messages'))
+  return onSnapshot(q, snapshot => callback(snapshot.docs.map(item => { const data = item.data(); return { id: item.id, text: String(data.text || ''), senderId: String(data.senderId || ''), createdAt: asTimestamp(data.createdAt), attachment: data.attachment ? { name: String(data.attachment.name || 'file'), url: String(data.attachment.url || ''), type: String(data.attachment.type || ''), size: Number(data.attachment.size || 0) } : null } }).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0))))
 }
 
 export async function sendMessage(conversationId: string, senderId: string, text: string, file?: File) {
