@@ -34,6 +34,8 @@ export type Conversation = {
   avatar: string
   active?: boolean
   unreadCount?: number
+  type?: 'direct' | 'group'
+  adminId?: string
 }
 export type ChatAttachment = { name: string; url: string; type: string; size: number }
 export type ChatMessage = { id: string; text: string; senderId: string; createdAt?: Timestamp | null; attachment?: ChatAttachment | null; replyTo?: { id: string; text: string; senderId: string } | null; seenBy?: string[] }
@@ -87,9 +89,9 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
       const memberIds = Array.isArray(data.memberIds) ? data.memberIds.map(String) : []
       const otherId = memberIds.find(memberId => memberId !== uid)
       const other = otherId ? await getUserProfile(otherId) : null
-      const name = other?.displayName || String(data.name || 'Conversation')
+      const name = String(data.type || '') === 'group' ? String(data.name || 'Group chat') : (other?.displayName || String(data.name || 'Conversation'))
       const lastSeen = other?.lastSeen?.toMillis() || 0
-      return { id: item.id, name, memberIds, lastMessage: String(data.lastMessage || ''), lastMessageAt: asTimestamp(data.lastMessageAt), avatar: initials(name), active: other?.activeStatus !== false && Date.now() - lastSeen < 90000, unreadCount: Number(data.unreadCounts?.[uid] || 0) }
+      return { id: item.id, name, memberIds, type: data.type === 'group' ? ('group' as const) : ('direct' as const), adminId: data.adminId ? String(data.adminId) : undefined, lastMessage: String(data.lastMessage || ''), lastMessageAt: asTimestamp(data.lastMessageAt), avatar: initials(name), active: other?.activeStatus !== false && Date.now() - lastSeen < 90000, unreadCount: Number(data.unreadCounts?.[uid] || 0) }
     })).then(items => callback(items.sort((a, b) => (b.lastMessageAt?.toMillis() || 0) - (a.lastMessageAt?.toMillis() || 0))))
   })
 }
@@ -202,6 +204,30 @@ export async function createConversation(uid: string, other: UserProfile) {
   const existing = await getDoc(ref)
   if (!existing.exists()) await setDoc(ref, { type: 'direct', name: other.displayName || other.username, memberIds: [uid, other.uid], createdBy: uid, lastMessage: '', lastMessageAt: serverTimestamp(), createdAt: serverTimestamp() })
   return id
+}
+
+export async function createGroup(uid: string, name: string, members: UserProfile[]) {
+  if (!db) return ''
+  const memberIds = [...new Set([uid, ...members.map(member => member.uid)])]
+  if (memberIds.length < 3) throw new Error('Choose at least two friends for a group.')
+  for (const member of members) if (await getFriendship(uid, member.uid) !== 'friends') throw new Error('Groups can only include your accepted friends.')
+  const ref = doc(collection(db, 'conversations'))
+  await setDoc(ref, { type: 'group', name: name.trim() || 'New group', memberIds, adminId: uid, lastMessage: '', lastMessageAt: serverTimestamp(), createdBy: uid, createdAt: serverTimestamp() })
+  return ref.id
+}
+
+export async function updateGroup(conversationId: string, uid: string, name: string) {
+  if (!db) return
+  const ref = doc(db, 'conversations', conversationId); const snapshot = await getDoc(ref)
+  if (!snapshot.exists() || snapshot.data().adminId !== uid) throw new Error('Only the group admin can edit this group.')
+  await updateDoc(ref, { name: name.trim().slice(0, 80) || 'Group chat' })
+}
+
+export async function removeGroupMember(conversationId: string, uid: string, memberUid: string) {
+  if (!db) return
+  const ref = doc(db, 'conversations', conversationId); const snapshot = await getDoc(ref); const data = snapshot.data()
+  if (!snapshot.exists() || data?.adminId !== uid) throw new Error('Only the group admin can remove members.')
+  await updateDoc(ref, { memberIds: (data.memberIds || []).filter((id: string) => id !== memberUid) })
 }
 
 export function watchStories(callback: (items: Story[]) => void): Unsubscribe | undefined {
