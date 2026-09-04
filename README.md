@@ -4,14 +4,14 @@
 
 ## Current status
 
-The client is now a working, browser-only product prototype: create a local profile, browse chats, send messages, explore calls and stories, and try offline assist tools. It deliberately does **not** claim real accounts, encryption, calls, or AI yet—those need a backend and security review.
+The client is a Firebase-backed messaging prototype with email/password and Google authentication, persistent user profiles, membership-aware conversations, realtime Firestore messages, story publishing with 24-hour expiry, and a branded preview mode. Calls, media attachments, notifications, and native packaging are the next delivery tracks. AI features are intentionally out of scope.
 
 ## Free-first roadmap
 
 1. **Prototype (complete):** React/Vite client with no services or costs.
-2. **Real messaging:** add Supabase's free tier for sign-in, database, file storage, and realtime updates.
-3. **Deploy:** host the frontend on Cloudflare Pages or Vercel's free tier.
-4. **Calls and AI:** add only after messaging works; both have recurring costs at scale, so they need clear limits and privacy design.
+2. **Messaging hardening:** finish contact discovery, conversation management, media attachments, and moderation rules.
+3. **Deploy:** publish the frontend through the included GitHub Pages workflow.
+4. **Calls and native app:** connect a WebRTC/media service, then package the web client as an Android APK.
 
 ## Features
 
@@ -27,10 +27,7 @@ The client is now a working, browser-only product prototype: create a local prof
 - Profile management with avatar upload
 - Push notifications
 
-🤖 **AI Features**
-- Chat summarization
-- Message translation
-- Smart reply suggestions
+AI features are intentionally not part of the current product scope.
 
 ## Getting Started
 
@@ -50,10 +47,14 @@ npm run dev
 
 Install [Node.js 20 LTS](https://nodejs.org/) first if `npm` is not available on your computer.
 
+### Firebase setup
+
+Copy `client/.env.example` to `client/.env` and fill in the Firebase web-app values. Enable Email/Password and Google providers in Firebase Authentication, create Firestore and Storage, and deploy both rules files (`firebase deploy --only firestore:rules,storage`). GitHub Pages uses the matching `VITE_FIREBASE_*` repository secrets during its build.
+
 ## Tech Stack
 
-**Frontend:** React 18, TypeScript, Vite, TailwindCSS, Socket.io
-**Backend:** Node.js, Express, Socket.io, MongoDB
+**Frontend:** React 18, TypeScript, Vite, CSS
+**Backend:** Firebase Authentication and Cloud Firestore
 
 ## License
 
