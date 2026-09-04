@@ -39,6 +39,7 @@ export type ChatAttachment = { name: string; url: string; type: string; size: nu
 export type ChatMessage = { id: string; text: string; senderId: string; createdAt?: Timestamp | null; attachment?: ChatAttachment | null; replyTo?: { id: string; text: string; senderId: string } | null; seenBy?: string[] }
 export type Story = { id: string; uid: string; displayName: string; text: string; createdAt?: Timestamp | null; expiresAt?: Timestamp | null }
 export type CallRecord = { id: string; type: 'audio' | 'video'; status: string; memberIds: string[]; callerId?: string; calleeId?: string; createdAt?: Timestamp | null }
+export type FriendRequest = { id: string; fromUid: string; toUid: string; status: 'pending' | 'accepted' | 'declined'; createdAt?: Timestamp | null }
 
 const initials = (name: string) => name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'U'
 const asTimestamp = (value: unknown) => value instanceof Timestamp ? value : null
@@ -141,11 +142,49 @@ export async function findUsers(search: string, currentUid: string): Promise<Use
   return snapshot.docs.filter(item => item.id !== currentUid && item.data().discoverable !== false).map(item => profileFromDoc(item.id, item.data()))
 }
 
+export async function getFriendship(uid: string, otherUid: string): Promise<'friends' | 'requested' | 'incoming' | 'none'> {
+  if (!db || !uid || !otherUid) return 'none'
+  const friendship = await getDoc(doc(db, 'friendships', [uid, otherUid].sort().join('_')))
+  if (friendship.exists() && friendship.data().status === 'accepted') return 'friends'
+  const outgoing = await getDoc(doc(db, 'friendRequests', `${uid}_${otherUid}`))
+  if (outgoing.exists() && outgoing.data().status === 'pending') return 'requested'
+  const incoming = await getDoc(doc(db, 'friendRequests', `${otherUid}_${uid}`))
+  if (incoming.exists() && incoming.data().status === 'pending') return 'incoming'
+  return 'none'
+}
+
+export async function sendFriendRequest(fromUid: string, toUid: string) {
+  if (!db || fromUid === toUid) return
+  await setDoc(doc(db, 'friendRequests', `${fromUid}_${toUid}`), { fromUid, toUid, status: 'pending', createdAt: serverTimestamp() })
+}
+
+export async function respondToFriendRequest(fromUid: string, toUid: string, accept: boolean) {
+  if (!db) return
+  const requestRef = doc(db, 'friendRequests', `${fromUid}_${toUid}`)
+  if (accept) {
+    const batch = writeBatch(db)
+    batch.update(requestRef, { status: 'accepted', respondedAt: serverTimestamp() })
+    batch.set(doc(db, 'friendships', [fromUid, toUid].sort().join('_')), { memberIds: [fromUid, toUid], status: 'accepted', createdAt: serverTimestamp() })
+    await batch.commit()
+  } else await updateDoc(requestRef, { status: 'declined', respondedAt: serverTimestamp() })
+}
+
+export function watchFriendRequests(uid: string, callback: (items: FriendRequest[]) => void): Unsubscribe | undefined {
+  if (!db) return undefined
+  let incoming: FriendRequest[] = []; let outgoing: FriendRequest[] = []
+  const emit = () => callback([...incoming, ...outgoing])
+  const incomingUnsub = onSnapshot(query(collection(db, 'friendRequests'), where('toUid', '==', uid)), snapshot => { incoming = snapshot.docs.filter(item => item.data().status === 'pending').map(item => ({ id: item.id, fromUid: String(item.data().fromUid), toUid: String(item.data().toUid), status: 'pending', createdAt: asTimestamp(item.data().createdAt) })); emit() })
+  const outgoingUnsub = onSnapshot(query(collection(db, 'friendRequests'), where('fromUid', '==', uid)), snapshot => { outgoing = snapshot.docs.filter(item => item.data().status === 'pending').map(item => ({ id: item.id, fromUid: String(item.data().fromUid), toUid: String(item.data().toUid), status: 'pending', createdAt: asTimestamp(item.data().createdAt) })); emit() })
+  return () => { incomingUnsub(); outgoingUnsub() }
+}
+
 function profileFromDoc(uid: string, data: DocumentData): UserProfile { return { uid, displayName: String(data.displayName || 'Co-Chat member'), email: String(data.email || ''), username: String(data.username || ''), photoURL: String(data.photoURL || ''), notificationsEnabled: data.notificationsEnabled !== false, discoverable: data.discoverable !== false, activeStatus: data.activeStatus !== false, lastSeen: asTimestamp(data.lastSeen) } }
 
 export async function createConversation(uid: string, other: UserProfile) {
   if (!db) return ''
   if (!uid || !other.uid || uid === other.uid) throw new Error('Choose another user to start a conversation.')
+  const relationship = await getFriendship(uid, other.uid)
+  if (relationship !== 'friends') throw new Error('You can message this person after they accept your friend request.')
   const id = [uid, other.uid].sort().join('_')
   const ref = doc(db, 'conversations', id)
   const existing = await getDoc(ref)
