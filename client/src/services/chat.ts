@@ -45,6 +45,12 @@ export async function ensureUserProfile(uid: string, profile: Partial<UserProfil
   else await updateDoc(ref, { displayName, email: profile.email || current.data().email || '', photoURL: profile.photoURL || current.data().photoURL || '' })
 }
 
+export async function getUserProfile(uid: string): Promise<UserProfile | null> {
+  if (!db) return null
+  const snapshot = await getDoc(doc(db, 'users', uid))
+  return snapshot.exists() ? profileFromDoc(uid, snapshot.data()) : null
+}
+
 export function watchConversations(uid: string, callback: (items: Conversation[]) => void): Unsubscribe | undefined {
   if (!db) return undefined
   const q = query(collection(db, 'conversations'), where('memberIds', 'array-contains', uid))

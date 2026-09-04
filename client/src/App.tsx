@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, signOut, updateProfile, type User } from 'firebase/auth'
 import { auth, firebaseReady, googleProvider } from './firebase'
-import { createCall, createConversation, createStory, ensureUserProfile, findUsers, saveProfile, sendMessage, watchCalls, watchConversations, watchMessages, watchStories, type CallRecord, type ChatMessage, type Conversation, type Story, type UserProfile } from './services/chat'
+import { createCall, createConversation, createStory, ensureUserProfile, findUsers, getUserProfile, saveProfile, sendMessage, watchCalls, watchConversations, watchMessages, watchStories, type CallRecord, type ChatMessage, type Conversation, type Story, type UserProfile } from './services/chat'
 import './index.css'
 
 const starterChats: Conversation[] = [
@@ -31,7 +31,7 @@ export default function App() {
   const [stories, setStories] = useState<Story[]>([]); const [activeStory, setActiveStory] = useState<Story | null>(null); const [calls, setCalls] = useState<CallRecord[]>([]); const [storyText, setStoryText] = useState(''); const [profileName, setProfileName] = useState(''); const [profileUsername, setProfileUsername] = useState(''); const [notificationsEnabled, setNotificationsEnabled] = useState(true); const [discoverable, setDiscoverable] = useState(true); const [profileSaved, setProfileSaved] = useState(false)
   const liveUser = preview ? ({ uid: 'preview', displayName: 'Preview user', email: 'preview@cochat.local' } as User) : user
   useEffect(() => { if (!auth) { setLoading(false); return }; return onAuthStateChanged(auth, next => { setUser(next); setLoading(false) }) }, [])
-  useEffect(() => { if (!liveUser || liveUser.uid === 'preview') return; ensureUserProfile(liveUser.uid, { displayName: liveUser.displayName || '', email: liveUser.email || '', photoURL: liveUser.photoURL || '' }).catch(() => setError('Could not load your profile.')); setProfileName(liveUser.displayName || ''); setProfileUsername((liveUser.displayName || liveUser.email?.split('@')[0] || '').toLowerCase().replace(/[^a-z0-9]/g, '')) }, [liveUser?.uid])
+  useEffect(() => { if (!liveUser || liveUser.uid === 'preview') return; const uid = liveUser.uid; ensureUserProfile(uid, { displayName: liveUser.displayName || '', email: liveUser.email || '', photoURL: liveUser.photoURL || '' }).then(() => getUserProfile(uid)).then(profile => { setProfileName(profile?.displayName || liveUser.displayName || ''); setProfileUsername(profile?.username || (liveUser.email?.split('@')[0] || '').toLowerCase().replace(/[^a-z0-9]/g, '')); setNotificationsEnabled(profile?.notificationsEnabled !== false); setDiscoverable(profile?.discoverable !== false) }).catch(() => setError('Could not load your profile.')) }, [liveUser?.uid])
   useEffect(() => { if (!liveUser || liveUser.uid === 'preview') return; const uid = liveUser.uid; return watchConversations(uid, items => setConversations(items)) }, [liveUser?.uid])
   useEffect(() => { if (!selected || selected.id.startsWith('preview-') || !liveUser || liveUser.uid === 'preview') { setMessages(selected ? starterMessages[selected.id] || [] : []); return }; return watchMessages(selected.id, setMessages) }, [selected?.id, liveUser?.uid])
   useEffect(() => { if (!liveUser || liveUser.uid === 'preview') return watchStories(setStories) }, [liveUser?.uid])
