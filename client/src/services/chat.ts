@@ -19,7 +19,7 @@ import {
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { db, storage } from '../firebase'
 
-export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string }
+export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; notificationsEnabled?: boolean; discoverable?: boolean }
 export type Conversation = {
   id: string
   name: string
@@ -41,7 +41,7 @@ export async function ensureUserProfile(uid: string, profile: Partial<UserProfil
   const ref = doc(db, 'users', uid)
   const current = await getDoc(ref)
   const displayName = profile.displayName || profile.email?.split('@')[0] || 'Co-Chat member'
-  if (!current.exists()) await setDoc(ref, { displayName, email: profile.email || '', username: displayName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 24), photoURL: profile.photoURL || '', createdAt: serverTimestamp() })
+  if (!current.exists()) await setDoc(ref, { displayName, email: profile.email || '', username: displayName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 24), photoURL: profile.photoURL || '', notificationsEnabled: true, discoverable: true, createdAt: serverTimestamp() })
   else await updateDoc(ref, { displayName, email: profile.email || current.data().email || '', photoURL: profile.photoURL || current.data().photoURL || '' })
 }
 
@@ -106,7 +106,7 @@ export async function createStory(uid: string, displayName: string, text: string
   await addDoc(collection(db, 'stories'), { uid, displayName, text, createdAt: serverTimestamp(), expiresAt: expires })
 }
 
-export async function saveProfile(uid: string, values: Pick<UserProfile, 'displayName' | 'username'>) {
+export async function saveProfile(uid: string, values: Pick<UserProfile, 'displayName' | 'username' | 'notificationsEnabled' | 'discoverable'>) {
   if (!db) return
   await updateDoc(doc(db, 'users', uid), { displayName: values.displayName.trim(), username: values.username.trim().toLowerCase(), updatedAt: serverTimestamp() })
 }
