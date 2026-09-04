@@ -265,7 +265,12 @@ export function watchCalls(uid: string, callback: (items: CallRecord[]) => void)
 
 export async function createCall(memberIds: string[], type: 'audio' | 'video') {
   if (!db) return
-  await addDoc(collection(db, 'calls'), { memberIds, type, status: 'requested', createdAt: serverTimestamp() })
+  const unique = [...new Set(memberIds)].sort()
+  if (unique.length !== 2) throw new Error('Calls are available between two people only.')
+  const callerId = unique[0]; const calleeId = unique[1]
+  const callId = unique.slice().sort().join('_')
+  await setDoc(doc(db, 'calls', callId), { memberIds: unique, callerId, calleeId, type, status: 'ringing', createdAt: serverTimestamp(), callerCandidates: [], calleeCandidates: [] })
+  return callId
 }
 
 export async function declineCall(callId: string) {
