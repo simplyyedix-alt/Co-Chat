@@ -47,7 +47,12 @@ export type BlockRecord = { id: string; blockerId: string; blockedId: string; cr
 
 export async function blockUser(blockerId: string, blockedId: string) {
   if (!db || !blockerId || !blockedId || blockerId === blockedId) return
-  await setDoc(doc(db, 'blocks', `${blockerId}_${blockedId}`), { blockerId, blockedId, createdAt: serverTimestamp() })
+  const batch = writeBatch(db)
+  batch.set(doc(db, 'blocks', `${blockerId}_${blockedId}`), { blockerId, blockedId, createdAt: serverTimestamp() })
+  batch.delete(doc(db, 'friendships', [blockerId, blockedId].sort().join('_')))
+  batch.delete(doc(db, 'friendRequests', `${blockerId}_${blockedId}`))
+  batch.delete(doc(db, 'friendRequests', `${blockedId}_${blockerId}`))
+  await batch.commit()
 }
 
 export async function unblockUser(blockerId: string, blockedId: string) {
@@ -137,6 +142,14 @@ export function watchMessages(conversationId: string, callback: (items: ChatMess
 export async function sendMessage(conversationId: string, senderId: string, text: string, file?: File, replyTo?: ChatMessage | null) {
   if (!db) return
   const conversationRef = doc(db, 'conversations', conversationId)
+  const conversationSnapshot = await getDoc(conversationRef)
+  if (!conversationSnapshot.exists()) throw new Error('This conversation no longer exists.')
+  const conversationData = conversationSnapshot.data()
+  if (!(conversationData.memberIds || []).includes(senderId)) throw new Error('You are not a member of this conversation.')
+  if (conversationData.type === 'direct') {
+    const otherUid = (conversationData.memberIds || []).find((id: string) => id !== senderId)
+    if (otherUid && await isBlockedBetween(senderId, otherUid)) throw new Error('You cannot message this user.')
+  }
   let attachment: ChatAttachment | null = null
   if (file) {
     if (!storage) throw new Error('Storage is not configured')
@@ -149,9 +162,9 @@ export async function sendMessage(conversationId: string, senderId: string, text
   if (attachment) messageData.attachment = attachment
   if (replyTo) messageData.replyTo = { id: replyTo.id, text: replyTo.text, senderId: replyTo.senderId }
   await addDoc(collection(conversationRef, 'messages'), { ...messageData, seenBy: [senderId] })
-  const conversation = await getDoc(conversationRef)
-  const recipientId = (conversation.data()?.memberIds || []).find((id: string) => id !== senderId)
-  await updateDoc(conversationRef, { lastMessage: attachment ? `📎 ${attachment.name}` : text, lastMessageAt: serverTimestamp(), ...(recipientId ? { [`unreadCounts.${recipientId}`]: increment(1) } : {}) })
+  const recipients = (conversationData.memberIds || []).filter((id: string) => id !== senderId)
+  const unreadUpdates = Object.fromEntries(recipients.map((id: string) => [`unreadCounts.${id}`, increment(1)]))
+  await updateDoc(conversationRef, { lastMessage: attachment ? `📎 ${attachment.name}` : text, lastMessageAt: serverTimestamp(), ...unreadUpdates })
 }
 
 export async function unsendMessage(conversationId: string, messageId: string) {
@@ -170,18 +183,26 @@ export async function deleteConversation(conversationId: string, uid: string) {
   if (!db) return
   const ref = doc(db, 'conversations', conversationId); const snapshot = await getDoc(ref)
   if (!snapshot.exists() || !(snapshot.data().memberIds || []).includes(uid)) throw new Error('You cannot delete this conversation.')
-  const messages = await getDocs(collection(ref, 'messages')); const batch = writeBatch(db)
-  messages.docs.forEach(message => batch.delete(message.ref)); batch.delete(ref); await batch.commit()
+  const messages = await getDocs(collection(ref, 'messages'))
+  for (let start = 0; start < messages.docs.length; start += 450) {
+    const batch = writeBatch(db)
+    messages.docs.slice(start, start + 450).forEach(message => batch.delete(message.ref))
+    await batch.commit()
+  }
+  await deleteDoc(ref)
 }
 
 export async function markConversationRead(conversationId: string, uid: string) {
   if (!db) return
   const conversationRef = doc(db, 'conversations', conversationId)
   const snapshot = await getDocs(collection(conversationRef, 'messages'))
-  const batch = writeBatch(db)
-  snapshot.docs.forEach(item => { if (!(item.data().seenBy || []).includes(uid)) batch.update(item.ref, { seenBy: arrayUnion(uid) }) })
-  batch.update(conversationRef, { [`unreadCounts.${uid}`]: 0 })
-  await batch.commit()
+  const unread = snapshot.docs.filter(item => !(item.data().seenBy || []).includes(uid))
+  for (let start = 0; start < unread.length; start += 450) {
+    const batch = writeBatch(db)
+    unread.slice(start, start + 450).forEach(item => batch.update(item.ref, { seenBy: arrayUnion(uid) }))
+    await batch.commit()
+  }
+  await updateDoc(conversationRef, { [`unreadCounts.${uid}`]: 0 })
 }
 
 export async function touchPresence(uid: string, activeStatus: boolean) {
@@ -220,16 +241,22 @@ export async function listFriends(uid: string): Promise<UserProfile[]> {
 export async function sendFriendRequest(fromUid: string, toUid: string) {
   if (!db || fromUid === toUid) return
   if (await isBlockedBetween(fromUid, toUid)) throw new Error('You cannot send a request to this user.')
+  const relationship = await getFriendship(fromUid, toUid)
+  if (relationship === 'friends') throw new Error('You are already friends.')
+  if (relationship === 'requested') throw new Error('Friend request already sent.')
+  if (relationship === 'incoming') throw new Error('This user already sent you a request. Open your requests to accept it.')
   await setDoc(doc(db, 'friendRequests', `${fromUid}_${toUid}`), { fromUid, toUid, status: 'pending', createdAt: serverTimestamp() })
 }
 
 export async function respondToFriendRequest(fromUid: string, toUid: string, accept: boolean) {
   if (!db) return
+  if (await isBlockedBetween(fromUid, toUid)) throw new Error('This request is no longer available.')
   const requestRef = doc(db, 'friendRequests', `${fromUid}_${toUid}`)
   if (accept) {
     const batch = writeBatch(db)
     batch.update(requestRef, { status: 'accepted', respondedAt: serverTimestamp() })
     batch.set(doc(db, 'friendships', [fromUid, toUid].sort().join('_')), { memberIds: [fromUid, toUid], status: 'accepted', createdAt: serverTimestamp() })
+    batch.set(doc(db, 'conversations', [fromUid, toUid].sort().join('_')), { type: 'direct', memberIds: [fromUid, toUid], createdBy: toUid, lastMessage: '', lastMessageAt: null, createdAt: serverTimestamp() }, { merge: true })
     await batch.commit()
   } else await updateDoc(requestRef, { status: 'declined', respondedAt: serverTimestamp() })
 }
@@ -320,8 +347,17 @@ export async function createCall(memberIds: string[], type: 'audio' | 'video', i
   const unique = [...new Set(memberIds)].sort()
   if (unique.length !== 2) throw new Error('Calls are available between two people only.')
   const callerId = initiatorId && unique.includes(initiatorId) ? initiatorId : unique[0]; const calleeId = unique.find(id => id !== callerId) || unique[1]
+  if (await isBlockedBetween(callerId, calleeId)) throw new Error('You cannot call this user.')
+  if (await getFriendship(callerId, calleeId) !== 'friends') throw new Error('You can call this person after becoming friends.')
   const callId = unique.slice().sort().join('_')
-  await setDoc(doc(db, 'calls', callId), { memberIds: unique, callerId, calleeId, type, status: 'ringing', createdAt: serverTimestamp(), callerCandidates: [], calleeCandidates: [] })
+  const callRef = doc(db, 'calls', callId)
+  await runTransaction(db, async transaction => {
+    const existing = await transaction.get(callRef)
+    if (existing.exists() && ['ringing', 'connected'].includes(String(existing.data().status || ''))) {
+      throw new Error('This conversation already has an active call.')
+    }
+    transaction.set(callRef, { memberIds: unique, callerId, calleeId, type, status: 'ringing', createdAt: serverTimestamp(), callerCandidates: [], calleeCandidates: [] })
+  })
   return callId
 }
 
