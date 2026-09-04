@@ -26,6 +26,7 @@ export default function VoiceCall({ uid, otherUid, otherName, onClose }: Props) 
         }
         unsub = onSnapshot(callDoc, async snap => {
           const data = snap.data(); if (!data || stopped) return
+          if (data.status === 'ended' || data.status === 'declined' || data.status === 'missed') { setStatus('Call ended'); onClose(); return }
           if (!caller && data.offer && !peer.currentRemoteDescription) { await peer.setRemoteDescription(data.offer); const answer = await peer.createAnswer(); await peer.setLocalDescription(answer); await updateDoc(callDoc, { answer: { type: answer.type, sdp: answer.sdp }, status: 'connected' }); setStatus('Connecting…') }
           if (caller && data.answer && !peer.currentRemoteDescription) await peer.setRemoteDescription(data.answer)
           const candidates = (caller ? data.calleeCandidates : data.callerCandidates) || []; for (const candidate of candidates) { try { await peer.addIceCandidate(candidate) } catch { /* duplicate candidates are harmless */ } }
@@ -35,6 +36,6 @@ export default function VoiceCall({ uid, otherUid, otherName, onClose }: Props) 
     start(); return () => { stopped = true; unsub?.(); streamRef.current?.getTracks().forEach(track => track.stop()); peerRef.current?.close() }
   }, [uid, otherUid])
   useEffect(() => { if (status !== 'Connected') return; const timer = window.setInterval(() => setElapsed(value => value + 1), 1000); return () => window.clearInterval(timer) }, [status])
-  const hangUp = async () => { if (db && callRef.current) await updateDoc(doc(db, 'calls', callRef.current), { status: 'ended', endedAt: serverTimestamp() }).catch(() => undefined); onClose() }
+  const hangUp = async () => { if (db && callRef.current) await updateDoc(doc(db, 'calls', callRef.current), { status: 'ended', endedAt: serverTimestamp() }).catch(() => undefined); streamRef.current?.getTracks().forEach(track => track.stop()); peerRef.current?.close(); onClose() }
   return <div className="call-backdrop"><section className="call-card"><div className="avatar large">{otherName.slice(0, 2).toUpperCase()}</div><p className="eyebrow">VOICE CALL</p><h2>{otherName}</h2><p>{error || status}</p>{status === 'Connected' && <strong className="call-duration">{String(Math.floor(elapsed / 60)).padStart(2, '0')}:{String(elapsed % 60).padStart(2, '0')}</strong>}<audio ref={remoteAudio} autoPlay /><div className="call-actions"><button className="secondary" onClick={() => { streamRef.current?.getAudioTracks().forEach(track => { track.enabled = muted }); setMuted(value => !value) }}>{muted ? 'Unmute' : 'Mute'}</button><button className="danger" onClick={hangUp}>End call</button></div></section></div>
 }
