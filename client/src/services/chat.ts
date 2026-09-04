@@ -55,6 +55,11 @@ export async function unblockUser(blockerId: string, blockedId: string) {
   await deleteDoc(doc(db, 'blocks', `${blockerId}_${blockedId}`))
 }
 
+export async function removeFriend(uid: string, otherUid: string) {
+  if (!db) return
+  await deleteDoc(doc(db, 'friendships', [uid, otherUid].sort().join('_')))
+}
+
 export async function listBlockedUsers(blockerId: string): Promise<BlockRecord[]> {
   if (!db) return []
   const snapshot = await getDocs(query(collection(db, 'blocks'), where('blockerId', '==', blockerId)))
