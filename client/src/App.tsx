@@ -32,10 +32,10 @@ export default function App() {
   const liveUser = preview ? ({ uid: 'preview', displayName: 'Preview user', email: 'preview@cochat.local' } as User) : user
   useEffect(() => { if (!auth) { setLoading(false); return }; return onAuthStateChanged(auth, next => { setUser(next); setLoading(false) }) }, [])
   useEffect(() => { if (!liveUser || liveUser.uid === 'preview') return; ensureUserProfile(liveUser.uid, { displayName: liveUser.displayName || '', email: liveUser.email || '', photoURL: liveUser.photoURL || '' }).catch(() => setError('Could not load your profile.')); setProfileName(liveUser.displayName || ''); setProfileUsername((liveUser.displayName || liveUser.email?.split('@')[0] || '').toLowerCase().replace(/[^a-z0-9]/g, '')) }, [liveUser?.uid])
-  useEffect(() => { if (!liveUser || liveUser.uid === 'preview') return watchConversations(liveUser.uid, items => setConversations(items)) }, [liveUser?.uid])
+  useEffect(() => { if (!liveUser || liveUser.uid === 'preview') return; const uid = liveUser.uid; return watchConversations(uid, items => setConversations(items)) }, [liveUser?.uid])
   useEffect(() => { if (!selected || selected.id.startsWith('preview-') || !liveUser || liveUser.uid === 'preview') { setMessages(selected ? starterMessages[selected.id] || [] : []); return }; return watchMessages(selected.id, setMessages) }, [selected?.id, liveUser?.uid])
   useEffect(() => { if (!liveUser || liveUser.uid === 'preview') return watchStories(setStories) }, [liveUser?.uid])
-  useEffect(() => { if (!liveUser || liveUser.uid === 'preview') return watchCalls(liveUser.uid, setCalls) }, [liveUser?.uid])
+  useEffect(() => { if (!liveUser || liveUser.uid === 'preview') return; const uid = liveUser.uid; return watchCalls(uid, setCalls) }, [liveUser?.uid])
   const visible = useMemo(() => conversations.filter(item => item.name.toLowerCase().includes(search.toLowerCase())), [conversations, search])
   if (loading) return <main className="auth"><section className="auth-card"><div className="brand-mark">C</div><h1>Co Chat</h1><p>Connecting your account…</p></section></main>
   if (!liveUser) return <AuthScreen onPreview={() => setPreview(true)} />

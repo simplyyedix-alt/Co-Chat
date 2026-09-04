@@ -69,7 +69,8 @@ export async function sendMessage(conversationId: string, senderId: string, text
     if (!storage) throw new Error('Storage is not configured')
     if (file.size > 10 * 1024 * 1024) throw new Error('Files must be smaller than 10 MB')
     const fileRef = ref(storage, `conversation-media/${conversationId}/${senderId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`)
-    attachment = { name: file.name, url: await getDownloadURL(await uploadBytes(fileRef, file)), type: file.type, size: file.size }
+    await uploadBytes(fileRef, file)
+    attachment = { name: file.name, url: await getDownloadURL(fileRef), type: file.type, size: file.size }
   }
   const messageData: { text: string; senderId: string; createdAt: ReturnType<typeof serverTimestamp>; attachment?: ChatAttachment } = { text, senderId, createdAt: serverTimestamp() }
   if (attachment) messageData.attachment = attachment
@@ -113,7 +114,7 @@ export async function saveProfile(uid: string, values: Pick<UserProfile, 'displa
 
 export function watchCalls(uid: string, callback: (items: CallRecord[]) => void): Unsubscribe | undefined {
   if (!db) return undefined
-  return onSnapshot(query(collection(db, 'calls'), where('memberIds', 'array-contains', uid), limit(50)), snapshot => callback(snapshot.docs.map(item => { const data = item.data(); return { id: item.id, type: data.type === 'video' ? 'video' : 'audio', status: String(data.status || 'completed'), memberIds: Array.isArray(data.memberIds) ? data.memberIds : [], createdAt: asTimestamp(data.createdAt) } }).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))))
+  return onSnapshot(query(collection(db, 'calls'), where('memberIds', 'array-contains', uid), limit(50)), snapshot => callback(snapshot.docs.map(item => { const data = item.data(); const type: CallRecord['type'] = data.type === 'video' ? 'video' : 'audio'; return { id: item.id, type, status: String(data.status || 'completed'), memberIds: Array.isArray(data.memberIds) ? data.memberIds : [], createdAt: asTimestamp(data.createdAt) } }).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))))
 }
 
 export async function createCall(memberIds: string[], type: 'audio' | 'video') {
