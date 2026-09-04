@@ -134,6 +134,14 @@ export async function unsendMessage(conversationId: string, messageId: string) {
   }
 }
 
+export async function deleteConversation(conversationId: string, uid: string) {
+  if (!db) return
+  const ref = doc(db, 'conversations', conversationId); const snapshot = await getDoc(ref)
+  if (!snapshot.exists() || !(snapshot.data().memberIds || []).includes(uid)) throw new Error('You cannot delete this conversation.')
+  const messages = await getDocs(collection(ref, 'messages')); const batch = writeBatch(db)
+  messages.docs.forEach(message => batch.delete(message.ref)); batch.delete(ref); await batch.commit()
+}
+
 export async function markConversationRead(conversationId: string, uid: string) {
   if (!db) return
   const conversationRef = doc(db, 'conversations', conversationId)
