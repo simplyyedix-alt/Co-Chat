@@ -51,6 +51,10 @@ Install [Node.js 20 LTS](https://nodejs.org/) first if `npm` is not available on
 
 Copy `client/.env.example` to `client/.env` and fill in the Firebase web-app values. Enable Email/Password and Google providers in Firebase Authentication, create Firestore and Storage, and deploy both rules files (`firebase deploy --only firestore:rules,storage`). GitHub Pages uses the matching `VITE_FIREBASE_*` repository secrets during its build.
 
+### Android APK
+
+The Capacitor Android project lives in `client/android`. Install Android Studio (including an Android SDK and JDK 17), then run `npm run android:build` from `client`. The signed release APK can be generated from Android Studio's **Build → Generate Signed Bundle / APK** and then copied to `website/downloads/` for a public download link.
+
 ## Tech Stack
 
 **Frontend:** React 18, TypeScript, Vite, CSS
