@@ -75,11 +75,16 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 export function watchConversations(uid: string, callback: (items: Conversation[]) => void): Unsubscribe | undefined {
   if (!db) return undefined
   const q = query(collection(db, 'conversations'), where('memberIds', 'array-contains', uid))
-  return onSnapshot(q, snapshot => callback(snapshot.docs.map(item => {
-    const data = item.data()
-    const name = String(data.name || 'Conversation')
-    return { id: item.id, name, memberIds: Array.isArray(data.memberIds) ? data.memberIds : [], lastMessage: String(data.lastMessage || ''), lastMessageAt: asTimestamp(data.lastMessageAt), avatar: initials(name) }
-  }).sort((a, b) => (b.lastMessageAt?.toMillis() || 0) - (a.lastMessageAt?.toMillis() || 0))))
+  return onSnapshot(q, snapshot => {
+    Promise.all(snapshot.docs.map(async item => {
+      const data = item.data()
+      const memberIds = Array.isArray(data.memberIds) ? data.memberIds.map(String) : []
+      const otherId = memberIds.find(memberId => memberId !== uid)
+      const other = otherId ? await getUserProfile(otherId) : null
+      const name = other?.displayName || String(data.name || 'Conversation')
+      return { id: item.id, name, memberIds, lastMessage: String(data.lastMessage || ''), lastMessageAt: asTimestamp(data.lastMessageAt), avatar: initials(name) }
+    })).then(items => callback(items.sort((a, b) => (b.lastMessageAt?.toMillis() || 0) - (a.lastMessageAt?.toMillis() || 0))))
+  })
 }
 
 export function watchMessages(conversationId: string, callback: (items: ChatMessage[]) => void): Unsubscribe | undefined {
