@@ -1,6 +1,7 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -8,6 +9,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   Timestamp,
@@ -35,13 +37,30 @@ export type CallRecord = { id: string; type: 'audio' | 'video'; status: string; 
 
 const initials = (name: string) => name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'U'
 const asTimestamp = (value: unknown) => value instanceof Timestamp ? value : null
+const normalizeUsername = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24)
+
+async function reserveUsername(uid: string, requested: string, fallback: string) {
+  if (!db) return normalizeUsername(requested || fallback)
+  const base = normalizeUsername(requested) || normalizeUsername(fallback) || `user${uid.slice(0, 8).toLowerCase()}`
+  const usernameRef = doc(db, 'usernames', base)
+  await runTransaction(db, async transaction => {
+    const existing = await transaction.get(usernameRef)
+    if (existing.exists() && existing.data().uid !== uid) throw new Error('That username is already taken.')
+    transaction.set(usernameRef, { uid, createdAt: existing.exists() ? existing.data().createdAt : serverTimestamp() }, { merge: true })
+  })
+  return base
+}
 
 export async function ensureUserProfile(uid: string, profile: Partial<UserProfile>) {
   if (!db) return
   const ref = doc(db, 'users', uid)
   const current = await getDoc(ref)
   const displayName = profile.displayName || profile.email?.split('@')[0] || 'Co-Chat member'
-  if (!current.exists()) await setDoc(ref, { displayName, email: profile.email || '', username: displayName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 24), photoURL: profile.photoURL || '', notificationsEnabled: true, discoverable: true, createdAt: serverTimestamp() })
+  if (!current.exists()) {
+    let username = normalizeUsername(displayName) || `user${uid.slice(0, 8).toLowerCase()}`
+    try { username = await reserveUsername(uid, username, `user${uid.slice(0, 8).toLowerCase()}`) } catch { username = await reserveUsername(uid, `user${uid.slice(0, 8).toLowerCase()}`, `user${uid.slice(0, 8).toLowerCase()}`) }
+    await setDoc(ref, { displayName, email: profile.email || '', username, photoURL: profile.photoURL || '', notificationsEnabled: true, discoverable: true, createdAt: serverTimestamp() })
+  }
   else await updateDoc(ref, { displayName, email: profile.email || current.data().email || '', photoURL: profile.photoURL || current.data().photoURL || '' })
 }
 
@@ -88,10 +107,10 @@ export async function findUsers(search: string, currentUid: string): Promise<Use
   if (!db || !search.trim()) return []
   const term = search.trim().toLowerCase()
   const snapshot = await getDocs(query(collection(db, 'users'), where('username', '>=', term), where('username', '<=', `${term}\uf8ff`), limit(12)))
-  return snapshot.docs.filter(item => item.id !== currentUid).map(item => profileFromDoc(item.id, item.data()))
+  return snapshot.docs.filter(item => item.id !== currentUid && item.data().discoverable !== false).map(item => profileFromDoc(item.id, item.data()))
 }
 
-function profileFromDoc(uid: string, data: DocumentData): UserProfile { return { uid, displayName: String(data.displayName || 'Co-Chat member'), email: String(data.email || ''), username: String(data.username || ''), photoURL: String(data.photoURL || '') } }
+function profileFromDoc(uid: string, data: DocumentData): UserProfile { return { uid, displayName: String(data.displayName || 'Co-Chat member'), email: String(data.email || ''), username: String(data.username || ''), photoURL: String(data.photoURL || ''), notificationsEnabled: data.notificationsEnabled !== false, discoverable: data.discoverable !== false } }
 
 export async function createConversation(uid: string, other: UserProfile) {
   if (!db) return ''
@@ -115,7 +134,18 @@ export async function createStory(uid: string, displayName: string, text: string
 
 export async function saveProfile(uid: string, values: Pick<UserProfile, 'displayName' | 'username' | 'notificationsEnabled' | 'discoverable'>) {
   if (!db) return
-  await updateDoc(doc(db, 'users', uid), { displayName: values.displayName.trim(), username: values.username.trim().toLowerCase(), updatedAt: serverTimestamp() })
+  const userRef = doc(db, 'users', uid)
+  const current = await getDoc(userRef)
+  const oldUsername = current.exists() ? normalizeUsername(String(current.data().username || '')) : ''
+  const username = normalizeUsername(values.username)
+  if (username.length < 3) throw new Error('Username must be at least 3 characters.')
+  await reserveUsername(uid, username, uid)
+  await updateDoc(userRef, { displayName: values.displayName.trim(), username, notificationsEnabled: values.notificationsEnabled, discoverable: values.discoverable, updatedAt: serverTimestamp() })
+  if (oldUsername && oldUsername !== username) {
+    const oldRef = doc(db, 'usernames', oldUsername)
+    const old = await getDoc(oldRef)
+    if (old.exists() && old.data().uid === uid) await deleteDoc(oldRef)
+  }
 }
 
 export function watchCalls(uid: string, callback: (items: CallRecord[]) => void): Unsubscribe | undefined {
