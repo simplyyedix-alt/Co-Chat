@@ -22,11 +22,15 @@ service cloud.firestore {
         && request.resource.data.memberIds == resource.data.memberIds;
       match /messages/{messageId} {
         allow read: if signedIn();
-        allow create: if signedIn()
-          && request.resource.data.senderId == request.auth.uid
-          && request.resource.data.text is string
-          && request.resource.data.text.size() <= 2000
-          && (!('attachment' in request.resource.data) || request.resource.data.attachment is map);
+          allow create: if signedIn()
+            && request.resource.data.senderId == request.auth.uid
+            && request.resource.data.text is string
+            && request.resource.data.text.size() <= 2000
+            && (!('attachment' in request.resource.data) || request.resource.data.attachment is map);
+          allow update: if signedIn()
+            && request.resource.data.senderId == resource.data.senderId
+            && request.resource.data.text == resource.data.text
+            && request.resource.data.seenBy is list;
       }
     }
     match /stories/{storyId} {

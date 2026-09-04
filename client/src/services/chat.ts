@@ -1,5 +1,7 @@
 import {
   addDoc,
+  arrayUnion,
+  increment,
   collection,
   deleteDoc,
   doc,
@@ -12,6 +14,7 @@ import {
   runTransaction,
   serverTimestamp,
   setDoc,
+  writeBatch,
   Timestamp,
   updateDoc,
   where,
@@ -21,7 +24,7 @@ import {
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { db, storage } from '../firebase'
 
-export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; notificationsEnabled?: boolean; discoverable?: boolean }
+export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; notificationsEnabled?: boolean; discoverable?: boolean; activeStatus?: boolean; lastSeen?: Timestamp | null }
 export type Conversation = {
   id: string
   name: string
@@ -29,9 +32,11 @@ export type Conversation = {
   lastMessage: string
   lastMessageAt?: Timestamp | null
   avatar: string
+  active?: boolean
+  unreadCount?: number
 }
 export type ChatAttachment = { name: string; url: string; type: string; size: number }
-export type ChatMessage = { id: string; text: string; senderId: string; createdAt?: Timestamp | null; attachment?: ChatAttachment | null; replyTo?: { id: string; text: string; senderId: string } | null }
+export type ChatMessage = { id: string; text: string; senderId: string; createdAt?: Timestamp | null; attachment?: ChatAttachment | null; replyTo?: { id: string; text: string; senderId: string } | null; seenBy?: string[] }
 export type Story = { id: string; uid: string; displayName: string; text: string; createdAt?: Timestamp | null; expiresAt?: Timestamp | null }
 export type CallRecord = { id: string; type: 'audio' | 'video'; status: string; memberIds: string[]; callerId?: string; calleeId?: string; createdAt?: Timestamp | null }
 
@@ -82,7 +87,8 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
       const otherId = memberIds.find(memberId => memberId !== uid)
       const other = otherId ? await getUserProfile(otherId) : null
       const name = other?.displayName || String(data.name || 'Conversation')
-      return { id: item.id, name, memberIds, lastMessage: String(data.lastMessage || ''), lastMessageAt: asTimestamp(data.lastMessageAt), avatar: initials(name) }
+      const lastSeen = other?.lastSeen?.toMillis() || 0
+      return { id: item.id, name, memberIds, lastMessage: String(data.lastMessage || ''), lastMessageAt: asTimestamp(data.lastMessageAt), avatar: initials(name), active: other?.activeStatus !== false && Date.now() - lastSeen < 90000, unreadCount: Number(data.unreadCounts?.[uid] || 0) }
     })).then(items => callback(items.sort((a, b) => (b.lastMessageAt?.toMillis() || 0) - (a.lastMessageAt?.toMillis() || 0))))
   })
 }
@@ -90,7 +96,7 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
 export function watchMessages(conversationId: string, callback: (items: ChatMessage[]) => void): Unsubscribe | undefined {
   if (!db) return undefined
   const q = query(collection(db, 'conversations', conversationId, 'messages'))
-  return onSnapshot(q, snapshot => callback(snapshot.docs.map(item => { const data = item.data(); return { id: item.id, text: String(data.text || ''), senderId: String(data.senderId || ''), createdAt: asTimestamp(data.createdAt), attachment: data.attachment ? { name: String(data.attachment.name || 'file'), url: String(data.attachment.url || ''), type: String(data.attachment.type || ''), size: Number(data.attachment.size || 0) } : null, replyTo: data.replyTo ? { id: String(data.replyTo.id || ''), text: String(data.replyTo.text || ''), senderId: String(data.replyTo.senderId || '') } : null } }).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0))))
+  return onSnapshot(q, snapshot => callback(snapshot.docs.map(item => { const data = item.data(); return { id: item.id, text: String(data.text || ''), senderId: String(data.senderId || ''), createdAt: asTimestamp(data.createdAt), attachment: data.attachment ? { name: String(data.attachment.name || 'file'), url: String(data.attachment.url || ''), type: String(data.attachment.type || ''), size: Number(data.attachment.size || 0) } : null, replyTo: data.replyTo ? { id: String(data.replyTo.id || ''), text: String(data.replyTo.text || ''), senderId: String(data.replyTo.senderId || '') } : null, seenBy: Array.isArray(data.seenBy) ? data.seenBy.map(String) : [] } }).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0))))
 }
 
 export async function sendMessage(conversationId: string, senderId: string, text: string, file?: File, replyTo?: ChatMessage | null) {
@@ -107,8 +113,25 @@ export async function sendMessage(conversationId: string, senderId: string, text
   const messageData: { text: string; senderId: string; createdAt: ReturnType<typeof serverTimestamp>; attachment?: ChatAttachment; replyTo?: { id: string; text: string; senderId: string } } = { text, senderId, createdAt: serverTimestamp() }
   if (attachment) messageData.attachment = attachment
   if (replyTo) messageData.replyTo = { id: replyTo.id, text: replyTo.text, senderId: replyTo.senderId }
-  await addDoc(collection(conversationRef, 'messages'), messageData)
-  await updateDoc(conversationRef, { lastMessage: attachment ? `📎 ${attachment.name}` : text, lastMessageAt: serverTimestamp() })
+  await addDoc(collection(conversationRef, 'messages'), { ...messageData, seenBy: [senderId] })
+  const conversation = await getDoc(conversationRef)
+  const recipientId = (conversation.data()?.memberIds || []).find((id: string) => id !== senderId)
+  await updateDoc(conversationRef, { lastMessage: attachment ? `📎 ${attachment.name}` : text, lastMessageAt: serverTimestamp(), ...(recipientId ? { [`unreadCounts.${recipientId}`]: increment(1) } : {}) })
+}
+
+export async function markConversationRead(conversationId: string, uid: string) {
+  if (!db) return
+  const conversationRef = doc(db, 'conversations', conversationId)
+  const snapshot = await getDocs(collection(conversationRef, 'messages'))
+  const batch = writeBatch(db)
+  snapshot.docs.forEach(item => { if (!(item.data().seenBy || []).includes(uid)) batch.update(item.ref, { seenBy: arrayUnion(uid) }) })
+  batch.update(conversationRef, { [`unreadCounts.${uid}`]: 0 })
+  await batch.commit()
+}
+
+export async function touchPresence(uid: string, activeStatus: boolean) {
+  if (!db) return
+  await updateDoc(doc(db, 'users', uid), { activeStatus, lastSeen: serverTimestamp() })
 }
 
 export async function findUsers(search: string, currentUid: string): Promise<UserProfile[]> {
@@ -118,7 +141,7 @@ export async function findUsers(search: string, currentUid: string): Promise<Use
   return snapshot.docs.filter(item => item.id !== currentUid && item.data().discoverable !== false).map(item => profileFromDoc(item.id, item.data()))
 }
 
-function profileFromDoc(uid: string, data: DocumentData): UserProfile { return { uid, displayName: String(data.displayName || 'Co-Chat member'), email: String(data.email || ''), username: String(data.username || ''), photoURL: String(data.photoURL || ''), notificationsEnabled: data.notificationsEnabled !== false, discoverable: data.discoverable !== false } }
+function profileFromDoc(uid: string, data: DocumentData): UserProfile { return { uid, displayName: String(data.displayName || 'Co-Chat member'), email: String(data.email || ''), username: String(data.username || ''), photoURL: String(data.photoURL || ''), notificationsEnabled: data.notificationsEnabled !== false, discoverable: data.discoverable !== false, activeStatus: data.activeStatus !== false, lastSeen: asTimestamp(data.lastSeen) } }
 
 export async function createConversation(uid: string, other: UserProfile) {
   if (!db) return ''
@@ -142,7 +165,7 @@ export async function createStory(uid: string, displayName: string, text: string
   await addDoc(collection(db, 'stories'), { uid, displayName, text, createdAt: serverTimestamp(), expiresAt: expires })
 }
 
-export async function saveProfile(uid: string, values: Pick<UserProfile, 'displayName' | 'username' | 'notificationsEnabled' | 'discoverable'>) {
+export async function saveProfile(uid: string, values: Pick<UserProfile, 'displayName' | 'username' | 'notificationsEnabled' | 'discoverable'> & { activeStatus?: boolean }) {
   if (!db) return
   const userRef = doc(db, 'users', uid)
   const current = await getDoc(userRef)
@@ -150,7 +173,7 @@ export async function saveProfile(uid: string, values: Pick<UserProfile, 'displa
   const username = normalizeUsername(values.username)
   if (username.length < 3) throw new Error('Username must be at least 3 characters.')
   await reserveUsername(uid, username, uid)
-  await updateDoc(userRef, { displayName: values.displayName.trim(), username, notificationsEnabled: values.notificationsEnabled, discoverable: values.discoverable, updatedAt: serverTimestamp() })
+  await updateDoc(userRef, { displayName: values.displayName.trim(), username, notificationsEnabled: values.notificationsEnabled, discoverable: values.discoverable, activeStatus: values.activeStatus !== false, updatedAt: serverTimestamp() })
   if (oldUsername && oldUsername !== username) {
     const oldRef = doc(db, 'usernames', oldUsername)
     const old = await getDoc(oldRef)
