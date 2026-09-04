@@ -48,9 +48,9 @@ jobs:
       - name: Build Android APK
         working-directory: client
         run: |
-          npx cap sync android
+          npx --no-install cap sync android
           chmod +x android/gradlew
-          android/gradlew assembleDebug
+          android/gradlew assembleDebug --stacktrace
       - name: Include app in website
         run: |
           cp -r client/dist website/app
