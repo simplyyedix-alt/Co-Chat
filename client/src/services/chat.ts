@@ -167,6 +167,14 @@ export async function getFriendship(uid: string, otherUid: string): Promise<'fri
   return 'none'
 }
 
+export async function listFriends(uid: string): Promise<UserProfile[]> {
+  if (!db) return []
+  const snapshot = await getDocs(query(collection(db, 'friendships'), where('memberIds', 'array-contains', uid)))
+  const ids = snapshot.docs.filter(item => item.data().status === 'accepted').flatMap(item => (item.data().memberIds || []).map(String)).filter(id => id !== uid)
+  const profiles = await Promise.all([...new Set(ids)].map(id => getUserProfile(id)))
+  return profiles.filter((profile): profile is UserProfile => Boolean(profile))
+}
+
 export async function sendFriendRequest(fromUid: string, toUid: string) {
   if (!db || fromUid === toUid) return
   await setDoc(doc(db, 'friendRequests', `${fromUid}_${toUid}`), { fromUid, toUid, status: 'pending', createdAt: serverTimestamp() })
