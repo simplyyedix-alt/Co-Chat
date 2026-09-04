@@ -31,7 +31,7 @@ export type Conversation = {
   avatar: string
 }
 export type ChatAttachment = { name: string; url: string; type: string; size: number }
-export type ChatMessage = { id: string; text: string; senderId: string; createdAt?: Timestamp | null; attachment?: ChatAttachment | null }
+export type ChatMessage = { id: string; text: string; senderId: string; createdAt?: Timestamp | null; attachment?: ChatAttachment | null; replyTo?: { id: string; text: string; senderId: string } | null }
 export type Story = { id: string; uid: string; displayName: string; text: string; createdAt?: Timestamp | null; expiresAt?: Timestamp | null }
 export type CallRecord = { id: string; type: 'audio' | 'video'; status: string; memberIds: string[]; createdAt?: Timestamp | null }
 
@@ -85,10 +85,10 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
 export function watchMessages(conversationId: string, callback: (items: ChatMessage[]) => void): Unsubscribe | undefined {
   if (!db) return undefined
   const q = query(collection(db, 'conversations', conversationId, 'messages'))
-  return onSnapshot(q, snapshot => callback(snapshot.docs.map(item => { const data = item.data(); return { id: item.id, text: String(data.text || ''), senderId: String(data.senderId || ''), createdAt: asTimestamp(data.createdAt), attachment: data.attachment ? { name: String(data.attachment.name || 'file'), url: String(data.attachment.url || ''), type: String(data.attachment.type || ''), size: Number(data.attachment.size || 0) } : null } }).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0))))
+  return onSnapshot(q, snapshot => callback(snapshot.docs.map(item => { const data = item.data(); return { id: item.id, text: String(data.text || ''), senderId: String(data.senderId || ''), createdAt: asTimestamp(data.createdAt), attachment: data.attachment ? { name: String(data.attachment.name || 'file'), url: String(data.attachment.url || ''), type: String(data.attachment.type || ''), size: Number(data.attachment.size || 0) } : null, replyTo: data.replyTo ? { id: String(data.replyTo.id || ''), text: String(data.replyTo.text || ''), senderId: String(data.replyTo.senderId || '') } : null } }).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0))))
 }
 
-export async function sendMessage(conversationId: string, senderId: string, text: string, file?: File) {
+export async function sendMessage(conversationId: string, senderId: string, text: string, file?: File, replyTo?: ChatMessage | null) {
   if (!db) return
   const conversationRef = doc(db, 'conversations', conversationId)
   let attachment: ChatAttachment | null = null
@@ -99,8 +99,9 @@ export async function sendMessage(conversationId: string, senderId: string, text
     await uploadBytes(fileRef, file)
     attachment = { name: file.name, url: await getDownloadURL(fileRef), type: file.type, size: file.size }
   }
-  const messageData: { text: string; senderId: string; createdAt: ReturnType<typeof serverTimestamp>; attachment?: ChatAttachment } = { text, senderId, createdAt: serverTimestamp() }
+  const messageData: { text: string; senderId: string; createdAt: ReturnType<typeof serverTimestamp>; attachment?: ChatAttachment; replyTo?: { id: string; text: string; senderId: string } } = { text, senderId, createdAt: serverTimestamp() }
   if (attachment) messageData.attachment = attachment
+  if (replyTo) messageData.replyTo = { id: replyTo.id, text: replyTo.text, senderId: replyTo.senderId }
   await addDoc(collection(conversationRef, 'messages'), messageData)
   await updateDoc(conversationRef, { lastMessage: attachment ? `📎 ${attachment.name}` : text, lastMessageAt: serverTimestamp() })
 }
