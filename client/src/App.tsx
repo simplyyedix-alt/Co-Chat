@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, signOut, updateProfile, User } from 'firebase/auth'
-import { auth, firebaseReady, googleProvider } from './firebase'
+import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore'
+import { auth, db, firebaseReady, googleProvider } from './firebase'
 import './index.css'
 
 type Chat = { id: number; name: string; avatar: string; preview: string; time: string; messages: { from: 'me' | 'them'; text: string; time: string }[] }
@@ -22,6 +23,14 @@ export default function App() {
     if (!auth) { setAuthLoading(false); return }
     return onAuthStateChanged(auth, next => { setUser(next); setAuthLoading(false) })
   }, [])
+  useEffect(() => {
+    if (!db || !user || user.uid === 'preview' || !selectedChat) return
+    const messagesQuery = query(collection(db, 'rooms', String(selectedChat.id), 'messages'), orderBy('createdAt', 'asc'))
+    return onSnapshot(messagesQuery, snapshot => {
+      const messages = snapshot.docs.map(doc => { const data = doc.data(); return { from: data.uid === user.uid ? 'me' as const : 'them' as const, text: String(data.text || ''), time: data.createdAt?.toDate?.().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || 'now' } })
+      if (messages.length) setSelectedChat(old => old ? { ...old, messages } : old)
+    })
+  }, [db, user, selectedChat?.id])
   const signIn = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setAuthError('')
     if (!auth) return
@@ -32,7 +41,7 @@ export default function App() {
     } catch (error) { setAuthError(error instanceof Error ? error.message.replace('Firebase: ', '').replace(/ \(auth\/[^)]+\)\.?$/, '') : 'Unable to sign in. Please check your details.') }
   }
   const googleSignIn = async () => { if (!auth) return; setAuthError(''); try { await signInWithPopup(auth, googleProvider) } catch (error) { setAuthError(error instanceof Error ? error.message.replace('Firebase: ', '') : 'Google sign-in could not be completed.') } }
-  const send = (event: FormEvent) => { event.preventDefault(); if (!message.trim() || !selectedChat) return; const nextMessage = { from: 'me' as const, text: message.trim(), time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }; setChats(old => old.map(chat => chat.id === selectedChat.id ? { ...chat, preview: nextMessage.text, time: nextMessage.time, messages: [...chat.messages, nextMessage] } : chat)); setSelectedChat(old => old ? { ...old, preview: nextMessage.text, time: nextMessage.time, messages: [...old.messages, nextMessage] } : old); setMessage('') }
+  const send = async (event: FormEvent) => { event.preventDefault(); if (!message.trim() || !selectedChat) return; const text = message.trim(); const nextMessage = { from: 'me' as const, text, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }; setChats(old => old.map(chat => chat.id === selectedChat.id ? { ...chat, preview: text, time: nextMessage.time, messages: [...chat.messages, nextMessage] } : chat)); setSelectedChat(old => old ? { ...old, preview: text, time: nextMessage.time, messages: [...old.messages, nextMessage] } : old); setMessage(''); if (db && user && user.uid !== 'preview') await addDoc(collection(db, 'rooms', String(selectedChat.id), 'messages'), { text, uid: user.uid, createdAt: serverTimestamp() }) }
   if (authLoading) return <main className="auth"><section className="auth-card"><div className="brand-mark">C</div><h1>Co Chat</h1><p>Connecting your account…</p></section></main>
   if (!user) return <main className="auth"><section className="auth-card"><div className="brand-mark">C</div><h1>Co Chat</h1><p>Chat bright. Feel right.</p>{!firebaseReady ? <><div className="hero-card"><h2>Online accounts are almost ready</h2><p>Add the Firebase keys from <code>client/.env</code> to enable real accounts. The local preview below is still available.</p><button className="secondary" onClick={() => setUser({ uid: 'preview', displayName: 'Preview user', email: 'preview@cochat.local' } as User)}>Continue preview</button></div></> : <><div className="auth-tabs"><button className={authMode === 'signin' ? 'active' : ''} onClick={() => setAuthMode('signin')}>Sign in</button><button className={authMode === 'signup' ? 'active' : ''} onClick={() => setAuthMode('signup')}>Create account</button></div><form onSubmit={signIn}>{authMode === 'signup' && <label>Display name<input name="name" required placeholder="Your name" /></label>}<label>Email<input name="email" type="email" required placeholder="you@example.com" /></label><label>Password<input name="password" type="password" minLength={6} required placeholder="At least 6 characters" /></label>{authError && <p className="error-text">{authError}</p>}<button className="primary">{authMode === 'signin' ? 'Sign in' : 'Create account'}</button></form><button className="google-button" onClick={googleSignIn}>Continue with Google</button><small>Your account will sync across devices. No phone number or OTP is required.</small></>}</section></main>
   if (selectedChat) return <main className="app"><header className="chat-header"><button className="icon" onClick={() => setSelectedChat(null)}>←</button><div className="avatar">{selectedChat.avatar}</div><div><strong>{selectedChat.name}</strong><small>Online</small></div><button className="icon">☎</button><button className="icon">⋮</button></header><section className="messages">{selectedChat.messages.map((item, i) => <div className={`bubble ${item.from}`} key={i}>{item.text}<small>{item.time}</small></div>)}</section><form className="composer" onSubmit={send}><input value={message} onChange={e => setMessage(e.target.value)} placeholder="Write a message" /><button className="primary">Send</button></form></main>
