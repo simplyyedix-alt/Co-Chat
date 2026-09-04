@@ -47,6 +47,7 @@ service cloud.firestore {
             && request.resource.data.senderId == resource.data.senderId
             && request.resource.data.text == resource.data.text
             && request.resource.data.seenBy is list;
+          allow delete: if signedIn() && resource.data.senderId == request.auth.uid;
       }
     }
     match /stories/{storyId} {

@@ -120,6 +120,11 @@ export async function sendMessage(conversationId: string, senderId: string, text
   await updateDoc(conversationRef, { lastMessage: attachment ? `📎 ${attachment.name}` : text, lastMessageAt: serverTimestamp(), ...(recipientId ? { [`unreadCounts.${recipientId}`]: increment(1) } : {}) })
 }
 
+export async function unsendMessage(conversationId: string, messageId: string) {
+  if (!db) return
+  await deleteDoc(doc(db, 'conversations', conversationId, 'messages', messageId))
+}
+
 export async function markConversationRead(conversationId: string, uid: string) {
   if (!db) return
   const conversationRef = doc(db, 'conversations', conversationId)
