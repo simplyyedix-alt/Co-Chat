@@ -123,6 +123,13 @@ export async function sendMessage(conversationId: string, senderId: string, text
 export async function unsendMessage(conversationId: string, messageId: string) {
   if (!db) return
   await deleteDoc(doc(db, 'conversations', conversationId, 'messages', messageId))
+  const remaining = await getDocs(query(collection(db, 'conversations', conversationId, 'messages'), orderBy('createdAt', 'desc'), limit(1)))
+  const conversationRef = doc(db, 'conversations', conversationId)
+  if (remaining.empty) await updateDoc(conversationRef, { lastMessage: '', lastMessageAt: null })
+  else {
+    const latest = remaining.docs[0].data()
+    await updateDoc(conversationRef, { lastMessage: String(latest.text || (latest.attachment ? `📎 ${latest.attachment.name || 'Attachment'}` : '')), lastMessageAt: latest.createdAt || null })
+  }
 }
 
 export async function markConversationRead(conversationId: string, uid: string) {
