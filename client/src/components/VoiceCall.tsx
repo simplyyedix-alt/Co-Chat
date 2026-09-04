@@ -5,7 +5,7 @@ import { db } from '../firebase'
 type Props = { uid: string; otherUid: string; otherName: string; onClose: () => void }
 
 export default function VoiceCall({ uid, otherUid, otherName, onClose }: Props) {
-  const [status, setStatus] = useState('Connecting…'); const [muted, setMuted] = useState(false); const [error, setError] = useState('')
+  const [status, setStatus] = useState('Connecting…'); const [muted, setMuted] = useState(false); const [error, setError] = useState(''); const [elapsed, setElapsed] = useState(0)
   const peerRef = useRef<RTCPeerConnection | null>(null); const streamRef = useRef<MediaStream | null>(null); const callRef = useRef<string | null>(null); const remoteAudio = useRef<HTMLAudioElement>(null)
   useEffect(() => {
     if (!db || !uid || !otherUid) { setError('Voice calling is unavailable.'); return }
@@ -34,6 +34,7 @@ export default function VoiceCall({ uid, otherUid, otherName, onClose }: Props) 
     }
     start(); return () => { stopped = true; unsub?.(); streamRef.current?.getTracks().forEach(track => track.stop()); peerRef.current?.close() }
   }, [uid, otherUid])
+  useEffect(() => { if (status !== 'Connected') return; const timer = window.setInterval(() => setElapsed(value => value + 1), 1000); return () => window.clearInterval(timer) }, [status])
   const hangUp = async () => { if (db && callRef.current) await updateDoc(doc(db, 'calls', callRef.current), { status: 'ended', endedAt: serverTimestamp() }).catch(() => undefined); onClose() }
-  return <div className="call-backdrop"><section className="call-card"><div className="avatar large">{otherName.slice(0, 2).toUpperCase()}</div><p className="eyebrow">VOICE CALL</p><h2>{otherName}</h2><p>{error || status}</p><audio ref={remoteAudio} autoPlay /><div className="call-actions"><button className="secondary" onClick={() => { streamRef.current?.getAudioTracks().forEach(track => { track.enabled = muted }); setMuted(value => !value) }}>{muted ? 'Unmute' : 'Mute'}</button><button className="danger" onClick={hangUp}>End call</button></div></section></div>
+  return <div className="call-backdrop"><section className="call-card"><div className="avatar large">{otherName.slice(0, 2).toUpperCase()}</div><p className="eyebrow">VOICE CALL</p><h2>{otherName}</h2><p>{error || status}</p>{status === 'Connected' && <strong className="call-duration">{String(Math.floor(elapsed / 60)).padStart(2, '0')}:{String(elapsed % 60).padStart(2, '0')}</strong>}<audio ref={remoteAudio} autoPlay /><div className="call-actions"><button className="secondary" onClick={() => { streamRef.current?.getAudioTracks().forEach(track => { track.enabled = muted }); setMuted(value => !value) }}>{muted ? 'Unmute' : 'Mute'}</button><button className="danger" onClick={hangUp}>End call</button></div></section></div>
 }

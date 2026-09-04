@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, signOut, updateProfile, type User } from 'firebase/auth'
 import { auth, firebaseReady, googleProvider } from './firebase'
 import { createCall, createConversation, createStory, declineCall, ensureUserProfile, findUsers, getUserProfile, saveProfile, sendMessage, watchCalls, watchConversations, watchMessages, watchStories, type CallRecord, type ChatMessage, type Conversation, type Story, type UserProfile } from './services/chat'
@@ -46,6 +46,7 @@ export default function App() {
   useEffect(() => { if (!liveUser || liveUser.uid === 'preview') return watchStories(setStories) }, [liveUser?.uid])
   useEffect(() => { if (!liveUser || liveUser.uid === 'preview') return; const uid = liveUser.uid; return watchCalls(uid, setCalls) }, [liveUser?.uid])
   useEffect(() => { const call = calls.find(item => item.status === 'ringing' && item.calleeId === liveUser?.uid); setIncomingCall(call || null) }, [calls, liveUser?.uid])
+  useEffect(() => { const container = document.querySelector('.messages'); if (container) container.scrollTop = container.scrollHeight }, [messages.length, selected?.id])
   const visible = useMemo(() => conversations.filter(item => item.name.toLowerCase().includes(search.toLowerCase())), [conversations, search])
   if (loading) return <main className="auth"><section className="auth-card"><div className="brand-mark">C</div><h1>Co Chat</h1><p>Connecting your account…</p></section></main>
   if (!liveUser) return <AuthScreen onPreview={() => setPreview(true)} />
