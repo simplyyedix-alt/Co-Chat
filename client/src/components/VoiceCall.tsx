@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { arrayUnion, doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
+import { arrayUnion, doc, getDoc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 
 type Props = { uid: string; otherUid: string; otherName: string; onClose: () => void }
@@ -19,9 +19,9 @@ export default function VoiceCall({ uid, otherUid, otherName, onClose }: Props) 
         if (turnUrl && turnUsername && turnCredential) iceServers.push({ urls: turnUrl, username: turnUsername, credential: turnCredential })
         const peer = new RTCPeerConnection({ iceServers }); peerRef.current = peer
         stream.getTracks().forEach(track => peer.addTrack(track, stream)); peer.ontrack = event => { if (remoteAudio.current) { remoteAudio.current.srcObject = event.streams[0]; remoteAudio.current.play().catch(() => undefined) } }; peer.onconnectionstatechange = () => { if (peer.connectionState === 'connected') setStatus('Connected'); if (['failed', 'disconnected', 'closed'].includes(peer.connectionState)) { setStatus('Call ended'); if (callRef.current && db) updateDoc(doc(db, 'calls', callRef.current), { status: 'ended', endedAt: serverTimestamp() }).catch(() => undefined) } }
-        const caller = uid < otherUid; const callId = [uid, otherUid].sort().join('_'); callRef.current = callId; const firestore = db; if (!firestore) throw new Error('Firestore is unavailable.'); const callDoc = doc(firestore, 'calls', callId)
+        const callId = [uid, otherUid].sort().join('_'); callRef.current = callId; const firestore = db; if (!firestore) throw new Error('Firestore is unavailable.'); const callDoc = doc(firestore, 'calls', callId); const existing = await getDoc(callDoc); const caller = existing.exists() ? existing.data().callerId === uid : true
         if (caller) {
-          await setDoc(callDoc, { type: 'audio', callerId: uid, calleeId: otherUid, memberIds: [uid, otherUid], status: 'ringing', createdAt: serverTimestamp(), callerCandidates: [], calleeCandidates: [] })
+          if (!existing.exists()) await setDoc(callDoc, { type: 'audio', callerId: uid, calleeId: otherUid, memberIds: [uid, otherUid], status: 'ringing', createdAt: serverTimestamp(), callerCandidates: [], calleeCandidates: [] })
           ringTimeout = window.setTimeout(() => { if (!stopped && db) { updateDoc(callDoc, { status: 'missed', endedAt: serverTimestamp() }).catch(() => undefined); onClose() } }, 45000)
           peer.onicecandidate = event => { if (event.candidate) updateDoc(callDoc, { callerCandidates: arrayUnion(event.candidate.toJSON()) }).catch(() => undefined) }
           const offer = await peer.createOffer(); await peer.setLocalDescription(offer); await updateDoc(callDoc, { offer: { type: offer.type, sdp: offer.sdp } }); setStatus('Calling…')

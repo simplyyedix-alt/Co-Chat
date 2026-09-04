@@ -55,6 +55,15 @@ export async function unblockUser(blockerId: string, blockedId: string) {
   await deleteDoc(doc(db, 'blocks', `${blockerId}_${blockedId}`))
 }
 
+async function isBlockedBetween(uid: string, otherUid: string) {
+  if (!db || !uid || !otherUid) return false
+  const [outgoing, incoming] = await Promise.all([
+    getDoc(doc(db, 'blocks', `${uid}_${otherUid}`)),
+    getDoc(doc(db, 'blocks', `${otherUid}_${uid}`)),
+  ])
+  return outgoing.exists() || incoming.exists()
+}
+
 export async function removeFriend(uid: string, otherUid: string) {
   if (!db) return
   await deleteDoc(doc(db, 'friendships', [uid, otherUid].sort().join('_')))
@@ -184,7 +193,9 @@ export async function findUsers(search: string, currentUid: string): Promise<Use
   if (!db || !search.trim()) return []
   const term = search.trim().toLowerCase()
   const snapshot = await getDocs(query(collection(db, 'users'), where('username', '>=', term), where('username', '<=', `${term}\uf8ff`), limit(12)))
-  return snapshot.docs.filter(item => item.id !== currentUid && item.data().discoverable !== false).map(item => profileFromDoc(item.id, item.data()))
+  const blocked = await listBlockedUsers(currentUid)
+  const blockedIds = new Set(blocked.map(item => item.blockedId))
+  return snapshot.docs.filter(item => item.id !== currentUid && !blockedIds.has(item.id) && item.data().discoverable !== false).map(item => profileFromDoc(item.id, item.data()))
 }
 
 export async function getFriendship(uid: string, otherUid: string): Promise<'friends' | 'requested' | 'incoming' | 'none'> {
@@ -208,6 +219,7 @@ export async function listFriends(uid: string): Promise<UserProfile[]> {
 
 export async function sendFriendRequest(fromUid: string, toUid: string) {
   if (!db || fromUid === toUid) return
+  if (await isBlockedBetween(fromUid, toUid)) throw new Error('You cannot send a request to this user.')
   await setDoc(doc(db, 'friendRequests', `${fromUid}_${toUid}`), { fromUid, toUid, status: 'pending', createdAt: serverTimestamp() })
 }
 
@@ -236,6 +248,7 @@ function profileFromDoc(uid: string, data: DocumentData): UserProfile { return {
 export async function createConversation(uid: string, other: UserProfile) {
   if (!db) return ''
   if (!uid || !other.uid || uid === other.uid) throw new Error('Choose another user to start a conversation.')
+  if (await isBlockedBetween(uid, other.uid)) throw new Error('You cannot message this user.')
   const relationship = await getFriendship(uid, other.uid)
   if (relationship !== 'friends') throw new Error('You can message this person after they accept your friend request.')
   const id = [uid, other.uid].sort().join('_')
@@ -302,11 +315,11 @@ export function watchCalls(uid: string, callback: (items: CallRecord[]) => void)
   return onSnapshot(query(collection(db, 'calls'), where('memberIds', 'array-contains', uid), limit(50)), snapshot => callback(snapshot.docs.map(item => { const data = item.data(); const type: CallRecord['type'] = data.type === 'video' ? 'video' : 'audio'; return { id: item.id, type, status: String(data.status || 'completed'), memberIds: Array.isArray(data.memberIds) ? data.memberIds : [], callerId: String(data.callerId || ''), calleeId: String(data.calleeId || ''), createdAt: asTimestamp(data.createdAt) } }).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))))
 }
 
-export async function createCall(memberIds: string[], type: 'audio' | 'video') {
+export async function createCall(memberIds: string[], type: 'audio' | 'video', initiatorId?: string) {
   if (!db) return
   const unique = [...new Set(memberIds)].sort()
   if (unique.length !== 2) throw new Error('Calls are available between two people only.')
-  const callerId = unique[0]; const calleeId = unique[1]
+  const callerId = initiatorId && unique.includes(initiatorId) ? initiatorId : unique[0]; const calleeId = unique.find(id => id !== callerId) || unique[1]
   const callId = unique.slice().sort().join('_')
   await setDoc(doc(db, 'calls', callId), { memberIds: unique, callerId, calleeId, type, status: 'ringing', createdAt: serverTimestamp(), callerCandidates: [], calleeCandidates: [] })
   return callId
