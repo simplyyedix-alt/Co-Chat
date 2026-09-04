@@ -116,9 +116,11 @@ function profileFromDoc(uid: string, data: DocumentData): UserProfile { return {
 
 export async function createConversation(uid: string, other: UserProfile) {
   if (!db) return ''
+  if (!uid || !other.uid || uid === other.uid) throw new Error('Choose another user to start a conversation.')
   const id = [uid, other.uid].sort().join('_')
   const ref = doc(db, 'conversations', id)
-  if (!(await getDoc(ref)).exists()) await setDoc(ref, { type: 'direct', name: other.displayName, memberIds: [uid, other.uid], createdBy: uid, lastMessage: '', lastMessageAt: serverTimestamp(), createdAt: serverTimestamp() })
+  const existing = await getDoc(ref)
+  if (!existing.exists()) await setDoc(ref, { type: 'direct', name: other.displayName || other.username, memberIds: [uid, other.uid], createdBy: uid, lastMessage: '', lastMessageAt: serverTimestamp(), createdAt: serverTimestamp() })
   return id
 }
 
