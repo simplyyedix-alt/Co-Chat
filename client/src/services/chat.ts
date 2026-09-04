@@ -24,7 +24,7 @@ import {
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { db, storage } from '../firebase'
 
-export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; notificationsEnabled?: boolean; discoverable?: boolean; activeStatus?: boolean; lastSeen?: Timestamp | null }
+export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; bio?: string; notificationsEnabled?: boolean; discoverable?: boolean; activeStatus?: boolean; lastSeen?: Timestamp | null }
 export type Conversation = {
   id: string
   name: string
@@ -42,6 +42,24 @@ export type ChatMessage = { id: string; text: string; senderId: string; createdA
 export type Story = { id: string; uid: string; displayName: string; text: string; createdAt?: Timestamp | null; expiresAt?: Timestamp | null }
 export type CallRecord = { id: string; type: 'audio' | 'video'; status: string; memberIds: string[]; callerId?: string; calleeId?: string; createdAt?: Timestamp | null }
 export type FriendRequest = { id: string; fromUid: string; toUid: string; status: 'pending' | 'accepted' | 'declined'; createdAt?: Timestamp | null }
+
+export type BlockRecord = { id: string; blockerId: string; blockedId: string; createdAt?: Timestamp | null }
+
+export async function blockUser(blockerId: string, blockedId: string) {
+  if (!db || !blockerId || !blockedId || blockerId === blockedId) return
+  await setDoc(doc(db, 'blocks', `${blockerId}_${blockedId}`), { blockerId, blockedId, createdAt: serverTimestamp() })
+}
+
+export async function unblockUser(blockerId: string, blockedId: string) {
+  if (!db) return
+  await deleteDoc(doc(db, 'blocks', `${blockerId}_${blockedId}`))
+}
+
+export async function listBlockedUsers(blockerId: string): Promise<BlockRecord[]> {
+  if (!db) return []
+  const snapshot = await getDocs(query(collection(db, 'blocks'), where('blockerId', '==', blockerId)))
+  return snapshot.docs.map(item => ({ id: item.id, blockerId, blockedId: String(item.data().blockedId || ''), createdAt: asTimestamp(item.data().createdAt) }))
+}
 
 const initials = (name: string) => name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'U'
 const asTimestamp = (value: unknown) => value instanceof Timestamp ? value : null
@@ -67,7 +85,7 @@ export async function ensureUserProfile(uid: string, profile: Partial<UserProfil
   if (!current.exists()) {
     let username = normalizeUsername(displayName) || `user${uid.slice(0, 8).toLowerCase()}`
     try { username = await reserveUsername(uid, username, `user${uid.slice(0, 8).toLowerCase()}`) } catch { username = await reserveUsername(uid, `user${uid.slice(0, 8).toLowerCase()}`, `user${uid.slice(0, 8).toLowerCase()}`) }
-    await setDoc(ref, { displayName, email: profile.email || '', username, photoURL: profile.photoURL || '', notificationsEnabled: true, discoverable: true, createdAt: serverTimestamp() })
+    await setDoc(ref, { displayName, email: profile.email || '', username, photoURL: profile.photoURL || '', bio: '', notificationsEnabled: true, discoverable: true, createdAt: serverTimestamp() })
     return true
   }
   else await updateDoc(ref, { displayName, email: profile.email || current.data().email || '', photoURL: profile.photoURL || current.data().photoURL || '' })
@@ -208,7 +226,7 @@ export function watchFriendRequests(uid: string, callback: (items: FriendRequest
   return () => { incomingUnsub(); outgoingUnsub() }
 }
 
-function profileFromDoc(uid: string, data: DocumentData): UserProfile { return { uid, displayName: String(data.displayName || 'Co-Chat member'), email: String(data.email || ''), username: String(data.username || ''), photoURL: String(data.photoURL || ''), notificationsEnabled: data.notificationsEnabled !== false, discoverable: data.discoverable !== false, activeStatus: data.activeStatus !== false, lastSeen: asTimestamp(data.lastSeen) } }
+function profileFromDoc(uid: string, data: DocumentData): UserProfile { return { uid, displayName: String(data.displayName || 'Co-Chat member'), email: String(data.email || ''), username: String(data.username || ''), photoURL: String(data.photoURL || ''), bio: String(data.bio || ''), notificationsEnabled: data.notificationsEnabled !== false, discoverable: data.discoverable !== false, activeStatus: data.activeStatus !== false, lastSeen: asTimestamp(data.lastSeen) } }
 
 export async function createConversation(uid: string, other: UserProfile) {
   if (!db) return ''
@@ -258,7 +276,7 @@ export async function createStory(uid: string, displayName: string, text: string
   await addDoc(collection(db, 'stories'), { uid, displayName, text, createdAt: serverTimestamp(), expiresAt: expires })
 }
 
-export async function saveProfile(uid: string, values: Pick<UserProfile, 'displayName' | 'username' | 'notificationsEnabled' | 'discoverable'> & { activeStatus?: boolean }) {
+export async function saveProfile(uid: string, values: Pick<UserProfile, 'displayName' | 'username' | 'bio' | 'notificationsEnabled' | 'discoverable'> & { activeStatus?: boolean }) {
   if (!db) return
   const userRef = doc(db, 'users', uid)
   const current = await getDoc(userRef)
@@ -266,7 +284,7 @@ export async function saveProfile(uid: string, values: Pick<UserProfile, 'displa
   const username = normalizeUsername(values.username)
   if (username.length < 3) throw new Error('Username must be at least 3 characters.')
   await reserveUsername(uid, username, uid)
-  await updateDoc(userRef, { displayName: values.displayName.trim(), username, notificationsEnabled: values.notificationsEnabled, discoverable: values.discoverable, activeStatus: values.activeStatus !== false, updatedAt: serverTimestamp() })
+  await updateDoc(userRef, { displayName: values.displayName.trim(), username, bio: String(values.bio || '').trim().slice(0, 280), notificationsEnabled: values.notificationsEnabled, discoverable: values.discoverable, activeStatus: values.activeStatus !== false, updatedAt: serverTimestamp() })
   if (oldUsername && oldUsername !== username) {
     const oldRef = doc(db, 'usernames', oldUsername)
     const old = await getDoc(oldRef)
