@@ -905,14 +905,7 @@ export default function App() {
             title="Start audio call"
             onClick={() => setShowVoiceCall(true)}
           >
-            ☎
-          </button>
-          <button
-            className="icon"
-            title="Start video call"
-            onClick={() => call("video")}
-          >
-            ▣
+            📲
           </button>
         </header>
         {showChatProfile && (
