@@ -385,9 +385,9 @@ export default function App() {
   const [messageMenu, setMessageMenu] = useState<ChatMessage | null>(null);
   const [forwardingMessage, setForwardingMessage] =
     useState<ChatMessage | null>(null);
-  const [darkMode, setDarkMode] = useState(
-    () => localStorage.getItem("cochat-theme") === "dark",
-  );
+  // The reference design uses the light lavender theme as the default.
+  // Users can still switch to dark mode from Settings.
+  const [darkMode, setDarkMode] = useState(false);
   const [conversationMenu, setConversationMenu] = useState<Conversation | null>(
     null,
   );
@@ -1175,11 +1175,9 @@ export default function App() {
             <strong>Co‑Chat</strong>
           </div>
           <div className="eyebrow">WELCOME BACK</div>
-          <h1>
-            {page === "chats"
-              ? "Messages"
-              : page[0].toUpperCase() + page.slice(1)}
-          </h1>
+          {page !== "chats" && (
+            <h1>{page[0].toUpperCase() + page.slice(1)}</h1>
+          )}
         </div>
         <div className="topbar-actions">
           {(page === "chats" || page === "communities") && (
