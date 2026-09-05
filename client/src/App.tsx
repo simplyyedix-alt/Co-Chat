@@ -893,7 +893,11 @@ export default function App() {
             <small>
               {selected.type === "group" ? (
                 <span className="group-active-summary"><span className="presence-dot" />{activeGroupCount} member{activeGroupCount === 1 ? " is" : "s are"} active now</span>
-              ) : selected.id.startsWith("preview-") ? "Preview conversation" : presenceLabel(selected.active, selected.lastSeen)}
+              ) : selected.id.startsWith("preview-") ? "Preview conversation" : (
+                <span className={selected.active ? "active-presence" : ""}>
+                  {presenceLabel(selected.active, selected.lastSeen)}
+                </span>
+              )}
             </small>
           </div>
           <button
