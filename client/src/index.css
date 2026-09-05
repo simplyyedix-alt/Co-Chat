@@ -16,6 +16,7 @@
 .friend-zone{margin-top:28px}.friend-section{margin-top:12px;padding:12px;border:1px solid #eceef3;border-radius:16px}.friend-section>.person-result:last-child{border-bottom:0}.friend-section>strong{display:block;margin-bottom:5px;color:#5b49d7}
 .profile-avatar{border:0;padding:0;cursor:pointer;font:inherit}.profile-avatar:hover{filter:brightness(1.08)}
 .profile-actions{display:grid;gap:8px}.profile-actions .secondary{width:100%}.danger-text{color:#c14d62}
+.auth .password-toggle{align-self:flex-end;margin-top:-34px;margin-right:8px;position:relative;z-index:1;border:0;background:transparent;color:#6652d9;font-weight:700;cursor:pointer}
 .chat-row .avatar{position:relative}.active-dot{position:absolute;right:-2px;bottom:-2px;width:13px;height:13px;border-radius:50%;background:#32cf70;border:3px solid #fff}.is-active{outline:1px solid #32cf70}:root.dark .active-dot{border-color:#26283c}
 .chat-screen .chat-header{flex:0 0 auto}
 .chat-screen .messages{flex:1;min-height:0;overflow-y:auto;padding-bottom:18px}

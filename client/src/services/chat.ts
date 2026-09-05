@@ -1,5 +1,6 @@
 import {
   addDoc,
+  arrayRemove,
   arrayUnion,
   increment,
   collection,
@@ -35,6 +36,7 @@ export type Conversation = {
   avatar: string
   active?: boolean
   unreadCount?: number
+  hiddenFor?: string[]
   type?: 'direct' | 'group'
   adminId?: string
 }
@@ -131,8 +133,8 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
       const other = otherId ? await getUserProfile(otherId) : null
       const name = String(data.type || '') === 'group' ? String(data.name || 'Group chat') : (other?.displayName || String(data.name || 'Conversation'))
       const lastSeen = other?.lastSeen?.toMillis() || 0
-      return { id: item.id, name, memberIds, type: data.type === 'group' ? ('group' as const) : ('direct' as const), adminId: data.adminId ? String(data.adminId) : undefined, lastMessage: String(data.lastMessage || ''), lastMessageAt: asTimestamp(data.lastMessageAt), createdAt: asTimestamp(data.createdAt), avatar: initials(name), active: other?.activeStatus !== false && Date.now() - lastSeen < 90000, unreadCount: Number(data.unreadCounts?.[uid] || 0) }
-    })).then(items => callback(items.sort((a, b) => ((b.lastMessageAt?.toMillis() || b.createdAt?.toMillis() || 0) - (a.lastMessageAt?.toMillis() || a.createdAt?.toMillis() || 0)))))
+      return { id: item.id, name, memberIds, type: data.type === 'group' ? ('group' as const) : ('direct' as const), adminId: data.adminId ? String(data.adminId) : undefined, lastMessage: String(data.lastMessage || ''), lastMessageAt: asTimestamp(data.lastMessageAt), createdAt: asTimestamp(data.createdAt), hiddenFor: Array.isArray(data.hiddenFor) ? data.hiddenFor.map(String) : [], avatar: initials(name), active: other?.activeStatus !== false && Date.now() - lastSeen < 90000, unreadCount: Number(data.unreadCounts?.[uid] || 0) }
+    })).then(items => callback(items.filter(item => !item.hiddenFor?.includes(uid)).sort((a, b) => ((b.lastMessageAt?.toMillis() || b.createdAt?.toMillis() || 0) - (a.lastMessageAt?.toMillis() || a.createdAt?.toMillis() || 0)))))
   })
 }
 
@@ -167,7 +169,7 @@ export async function sendMessage(conversationId: string, senderId: string, text
   await addDoc(collection(conversationRef, 'messages'), { ...messageData, seenBy: [senderId] })
   const recipients = (conversationData.memberIds || []).filter((id: string) => id !== senderId)
   const unreadUpdates = Object.fromEntries(recipients.map((id: string) => [`unreadCounts.${id}`, increment(1)]))
-  await updateDoc(conversationRef, { lastMessage: attachment ? `📎 ${attachment.name}` : text, lastMessageAt: serverTimestamp(), ...unreadUpdates })
+  await updateDoc(conversationRef, { lastMessage: attachment ? `📎 ${attachment.name}` : text, lastMessageAt: serverTimestamp(), hiddenFor: arrayRemove(senderId), ...unreadUpdates })
 }
 
 export async function unsendMessage(conversationId: string, messageId: string) {
@@ -186,13 +188,7 @@ export async function deleteConversation(conversationId: string, uid: string) {
   if (!db) return
   const ref = doc(db, 'conversations', conversationId); const snapshot = await getDoc(ref)
   if (!snapshot.exists() || !(snapshot.data().memberIds || []).includes(uid)) throw new Error('You cannot delete this conversation.')
-  const messages = await getDocs(collection(ref, 'messages'))
-  for (let start = 0; start < messages.docs.length; start += 450) {
-    const batch = writeBatch(db)
-    messages.docs.slice(start, start + 450).forEach(message => batch.delete(message.ref))
-    await batch.commit()
-  }
-  await deleteDoc(ref)
+  await updateDoc(ref, { hiddenFor: arrayUnion(uid) })
 }
 
 export async function markConversationRead(conversationId: string, uid: string) {
@@ -249,6 +245,11 @@ export async function sendFriendRequest(fromUid: string, toUid: string) {
   if (relationship === 'requested') throw new Error('Friend request already sent.')
   if (relationship === 'incoming') throw new Error('This user already sent you a request. Open your requests to accept it.')
   await setDoc(doc(db, 'friendRequests', `${fromUid}_${toUid}`), { fromUid, toUid, status: 'pending', createdAt: serverTimestamp() })
+}
+
+export async function cancelFriendRequest(fromUid: string, toUid: string) {
+  if (!db) return
+  await deleteDoc(doc(db, 'friendRequests', `${fromUid}_${toUid}`))
 }
 
 export async function respondToFriendRequest(fromUid: string, toUid: string, accept: boolean) {

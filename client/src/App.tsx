@@ -12,6 +12,7 @@ import { auth, firebaseReady, googleProvider } from "./firebase";
 import {
   addGroupMembers,
   blockUser,
+  cancelFriendRequest,
   createCall,
   createConversation,
   createGroup,
@@ -112,6 +113,7 @@ const formatTime = (value?: { toDate?: () => Date } | null) =>
 function AuthScreen({ onPreview }: { onPreview: () => void }) {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!auth) return;
@@ -212,11 +214,19 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
                 Password
                 <input
                   name="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   minLength={6}
                   required
                   placeholder="At least 6 characters"
                 />
+                <button
+                  className="password-toggle"
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? "🙈" : "👁️"}
+                </button>
               </label>
               {error && <p className="error-text">{error}</p>}
               <button className="primary">
@@ -1850,12 +1860,18 @@ function SearchPanel({
               <button
                 className="secondary compact"
                 type="button"
-                disabled={
-                  relationship === "loading" || relationship === "requested"
+                  disabled={
+                  relationship === "loading"
                 }
                 onClick={(event) => {
                   event.stopPropagation();
-                  if (relationship === "friends" || relationship === "none")
+                  if (relationship === "requested")
+                    void cancelFriendRequest(uid, profile.uid)
+                      .then(() =>
+                        setRelationships((old) => ({ ...old, [profile.uid]: "none" })),
+                      )
+                      .catch(() => setActionError("Could not cancel this request."));
+                  else if (relationship === "friends" || relationship === "none")
                     void action(profile);
                   else setFocused(profile);
                 }}
@@ -1863,7 +1879,7 @@ function SearchPanel({
                 {relationship === "friends"
                   ? "Message"
                   : relationship === "requested"
-                    ? "Requested"
+                    ? "Cancel request"
                     : relationship === "incoming"
                       ? "Pending request"
                       : "Add friend"}
