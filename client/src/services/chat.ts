@@ -142,7 +142,9 @@ export function watchMessages(conversationId: string, uid: string, callback: (it
   let cutoff: Timestamp | null = null
   let latest: ChatMessage[] = []
   let active = true
-  const visible = () => latest.filter(item => !cutoff || !item.createdAt || item.createdAt.toMillis() > cutoff.toMillis())
+  const visible = () => cutoff
+    ? latest.filter(item => Boolean(item.createdAt) && item.createdAt!.toMillis() > cutoff!.toMillis())
+    : latest
   getDoc(doc(db, 'conversations', conversationId)).then(snapshot => {
     cutoff = asTimestamp(snapshot.data()?.hiddenAt?.[uid])
     if (active) callback(visible())
