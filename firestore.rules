@@ -60,6 +60,13 @@ service cloud.firestore {
           && request.resource.data.memberIds.size() < resource.data.memberIds.size()
           && request.resource.data.adminId == resource.data.adminId
           && request.auth.uid in request.resource.data.memberIds
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds']))
+        || (resource.data.type == 'group'
+          && request.resource.data.memberIds.size() < resource.data.memberIds.size()
+          && request.auth.uid in resource.data.memberIds
+          && request.auth.uid != resource.data.adminId
+          && request.auth.uid not in request.resource.data.memberIds
+          && request.resource.data.adminId == resource.data.adminId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds'])));
       allow delete: if signedIn() && request.auth.uid in resource.data.memberIds;
       match /messages/{messageId} {

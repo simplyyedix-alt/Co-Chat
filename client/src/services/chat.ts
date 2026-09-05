@@ -311,6 +311,14 @@ export async function removeGroupMember(conversationId: string, uid: string, mem
   await updateDoc(ref, { memberIds: (data.memberIds || []).filter((id: string) => id !== memberUid) })
 }
 
+export async function leaveGroup(conversationId: string, uid: string) {
+  if (!db) return
+  const ref = doc(db, 'conversations', conversationId); const snapshot = await getDoc(ref); const data = snapshot.data()
+  if (!snapshot.exists() || data?.type !== 'group' || !Array.isArray(data.memberIds) || !data.memberIds.includes(uid)) throw new Error('You are not a member of this group.')
+  if (data.adminId === uid) throw new Error('The group admin must assign another admin before leaving.')
+  await updateDoc(ref, { memberIds: data.memberIds.filter((id: string) => id !== uid) })
+}
+
 export async function addGroupMembers(conversationId: string, uid: string, members: UserProfile[]) {
   if (!db || !members.length) return
   const ref = doc(db, 'conversations', conversationId); const snapshot = await getDoc(ref); const data = snapshot.data()
