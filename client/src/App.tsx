@@ -1170,6 +1170,10 @@ export default function App() {
     <main className="app">
       <header className="topbar">
         <div>
+          <div className="brand-line">
+            <span className="mini-mark">C</span>
+            <strong>Co‑Chat</strong>
+          </div>
           <div className="eyebrow">WELCOME BACK</div>
           <h1>
             {page === "chats"
@@ -1274,15 +1278,17 @@ export default function App() {
                 </div>
               </section>
             )}
-            <div className="chat-tools">
-              <button
-                className="secondary compact"
-                type="button"
-                onClick={() => setShowGroup(true)}
-              >
-                ＋ New group
-              </button>
-            </div>
+            {page === "communities" && (
+              <div className="chat-tools">
+                <button
+                  className="secondary compact"
+                  type="button"
+                  onClick={() => setShowGroup(true)}
+                >
+                  ＋ New group
+                </button>
+              </div>
+            )}
             <div className="section-title">
               {page === "communities" ? "COMMUNITY CHATS" : "RECENT CONVERSATIONS"}
             </div>
@@ -1817,6 +1823,9 @@ function SearchPanel({
       ),
     ).then((items) => setRelationships(Object.fromEntries(items)));
   }, [results, uid]);
+  const friendResults = results.filter(
+    (profile) => relationships[profile.uid] === "friends",
+  );
   const remember = (profile: UserProfile) => {
     const next = [
       {
@@ -1910,8 +1919,8 @@ function SearchPanel({
         </div>
       )}
       <div className="list">
-        {results.map((profile) => {
-          const relationship = relationships[profile.uid] || "loading";
+        {friendResults.map((profile) => {
+          const relationship = relationships[profile.uid];
           return (
             <div
               className="person-result"
@@ -1951,19 +1960,13 @@ function SearchPanel({
                   else setFocused(profile);
                 }}
               >
-                {relationship === "friends"
-                  ? "Message"
-                  : relationship === "requested"
-                    ? "Requested"
-                    : relationship === "incoming"
-                      ? "Pending request"
-                      : "Add friend"}
+                Message
               </button>
             </div>
           );
         })}
-        {term && !results.length && (
-          <div className="empty-state">No matching people yet.</div>
+        {term && !friendResults.length && (
+          <div className="empty-state">No matching friends yet.</div>
         )}
       </div>
       {focused && (
@@ -1995,13 +1998,6 @@ function SearchPanel({
               Message
             </button>
           )}
-          <button
-            className="secondary"
-            type="button"
-            onClick={() => setProfileExpanded((expanded) => !expanded)}
-          >
-            {profileExpanded ? "Hide profile" : "View profile"}
-          </button>
           {profileExpanded && (
             <div className="public-profile-details">
               <p>{focused.bio || "No bio added yet."}</p>
@@ -2013,16 +2009,6 @@ function SearchPanel({
               </small>
             </div>
           )}
-          <button
-            className="secondary danger-text"
-            type="button"
-            onClick={async () => {
-              await blockUser(uid, focused.uid).catch(() => undefined);
-              setFocused(null);
-            }}
-          >
-            Block
-          </button>
         </div>
       )}
     </section>
