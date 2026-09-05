@@ -374,6 +374,7 @@ export default function App() {
   const [discoverable, setDiscoverable] = useState(true);
   const [profileSaved, setProfileSaved] = useState(false);
   const [showFriendRequests, setShowFriendRequests] = useState(false);
+  const [unseenFriendRequestIds, setUnseenFriendRequestIds] = useState<string[]>([]);
   const [showChatProfile, setShowChatProfile] = useState(false);
   const [groupMembers, setGroupMembers] = useState<UserProfile[]>([]);
   const [groupFriends, setGroupFriends] = useState<UserProfile[]>([]);
@@ -396,6 +397,7 @@ export default function App() {
     useState("Incoming caller");
   const [activeStatus, setActiveStatus] = useState(true);
   const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
+  const [presenceNow, setPresenceNow] = useState(() => Date.now());
   const liveUser = preview
     ? ({
         uid: "preview",
@@ -445,6 +447,20 @@ export default function App() {
     const uid = liveUser.uid;
     return watchConversations(uid, (items) => setConversations(items));
   }, [liveUser?.uid]);
+  useEffect(() => {
+    if (!liveUser || liveUser.uid === "preview") return;
+    const key = `cochat-seen-friend-requests-${liveUser.uid}`;
+    let seen: string[] = [];
+    try { seen = JSON.parse(localStorage.getItem(key) || "[]"); } catch { seen = []; }
+    return watchFriendRequests(liveUser.uid, (items) => {
+      const incoming = items.filter((item) => item.toUid === liveUser.uid).map((item) => item.id);
+      setUnseenFriendRequestIds(incoming.filter((id) => !seen.includes(id)));
+    });
+  }, [liveUser?.uid]);
+  useEffect(() => {
+    const timer = window.setInterval(() => setPresenceNow(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
   useEffect(() => {
     if (
       !selected ||
@@ -541,7 +557,7 @@ export default function App() {
     return () => document.removeEventListener("click", closeMenus);
   }, [messageMenu, forwardingMessage]);
   useEffect(() => {
-    if (!liveUser || !showChatProfile || !selected || selected.type !== "group") return;
+    if (!liveUser || !selected || selected.type !== "group") return;
     setGroupEditName(selected.name);
     Promise.all(selected.memberIds.map((id) => getUserProfile(id))).then(
       (items) =>
@@ -786,6 +802,9 @@ export default function App() {
       setError("Could not create the call request.");
     }
   };
+  const activeGroupCount = selected?.type === "group"
+    ? groupMembers.filter((member) => member.activeStatus !== false && Boolean(member.lastSeen) && presenceNow - (member.lastSeen?.toMillis() || 0) < 90000).length
+    : 0;
   if (selected)
     return (
       <main className="app chat-screen">
@@ -804,9 +823,9 @@ export default function App() {
           <div>
             <strong>{selected.name}</strong>
             <small>
-              {selected.id.startsWith("preview-")
-                ? "Preview conversation"
-                : "Cloud-synced conversation"}
+              {selected.type === "group" ? (
+                <span className="group-active-summary"><span className="presence-dot" />{activeGroupCount} member{activeGroupCount === 1 ? " is" : "s are"} active now</span>
+              ) : selected.id.startsWith("preview-") ? "Preview conversation" : "Cloud-synced conversation"}
             </small>
           </div>
           <button
@@ -1149,9 +1168,20 @@ export default function App() {
               className="icon"
               type="button"
               title="Friend requests"
-              onClick={() => setShowFriendRequests((value) => !value)}
+              onClick={() => {
+                const next = !showFriendRequests;
+                if (next && liveUser.uid !== "preview" && unseenFriendRequestIds.length) {
+                  const key = `cochat-seen-friend-requests-${liveUser.uid}`;
+                  let seen: string[] = [];
+                  try { seen = JSON.parse(localStorage.getItem(key) || "[]"); } catch { seen = []; }
+                  const merged = [...new Set([...seen, ...unseenFriendRequestIds])];
+                  localStorage.setItem(key, JSON.stringify(merged));
+                  setUnseenFriendRequestIds([]);
+                }
+                setShowFriendRequests(next);
+              }}
             >
-              🔔
+              <span className="bell-wrap">🔔{unseenFriendRequestIds.length > 0 && <span className="notification-dot" />}</span>
             </button>
           )}
           <button
