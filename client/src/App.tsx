@@ -606,7 +606,12 @@ export default function App() {
     listFriends(liveUser.uid)
       .then(setFriendProfiles)
       .catch(() => setFriendProfiles([]));
-    const timer = window.setInterval(() => setPresenceNow(Date.now()), 30000);
+    const timer = window.setInterval(() => {
+      setPresenceNow(Date.now());
+      listFriends(liveUser.uid)
+        .then(setFriendProfiles)
+        .catch(() => undefined);
+    }, 5000);
     return () => window.clearInterval(timer);
   }, [liveUser?.uid]);
   useEffect(() => {
@@ -1394,11 +1399,13 @@ export default function App() {
                     <strong>{item.name}</strong>
                     <span className={item.unreadCount ? "unread-preview" : ""}>
                       {item.lastSenderId === liveUser.uid
-                        ? `Sent ${relativeMessageTime(item.lastMessageAt)}`
+                        ? item.lastMessageSeen
+                          ? `Seen ${relativeMessageTime(item.lastMessageAt)}`
+                          : `Sent ${relativeMessageTime(item.lastMessageAt)}`
                         : item.unreadCount
                           ? `${item.unreadCount > 4 ? "4+" : item.unreadCount} new message${item.unreadCount === 1 ? "" : "s"}`
                           : item.lastMessage
-                            ? `Seen ${relativeMessageTime(item.lastMessageAt)}`
+                            ? `Received ${relativeMessageTime(item.lastMessageAt)}`
                             : "Start a conversation"}
                     </span>
                   </span>
