@@ -378,6 +378,7 @@ export default function App() {
   const [preview, setPreview] = useState(false);
   const [loading, setLoading] = useState(firebaseReady);
   const [showVoiceCall, setShowVoiceCall] = useState(false);
+  const [voiceRole, setVoiceRole] = useState<"caller" | "callee">("caller");
   const [page, setPage] = useState("chats");
   const [conversations, setConversations] =
     useState<Conversation[]>(starterChats);
@@ -903,7 +904,10 @@ export default function App() {
           <button
             className="icon"
             title="Start audio call"
-            onClick={() => setShowVoiceCall(true)}
+            onClick={() => {
+              setVoiceRole("caller");
+              setShowVoiceCall(true);
+            }}
           >
             📲
           </button>
@@ -1048,6 +1052,7 @@ export default function App() {
               selected.memberIds.find((id) => id !== liveUser.uid) || ""
             }
             otherName={selected.name}
+            role={voiceRole}
             onClose={() => setShowVoiceCall(false)}
           />
         )}
@@ -1290,6 +1295,7 @@ export default function App() {
               lastMessage: "",
             });
             setIncomingCall(null);
+            setVoiceRole("callee");
             setShowVoiceCall(true);
           }}
         />
