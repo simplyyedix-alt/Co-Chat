@@ -314,7 +314,7 @@ export async function removeGroupMember(conversationId: string, uid: string, mem
 export async function addGroupMembers(conversationId: string, uid: string, members: UserProfile[]) {
   if (!db || !members.length) return
   const ref = doc(db, 'conversations', conversationId); const snapshot = await getDoc(ref); const data = snapshot.data()
-  if (!snapshot.exists() || data?.type !== 'group' || data.adminId !== uid) throw new Error('Only the group admin can add members.')
+  if (!snapshot.exists() || data?.type !== 'group' || !Array.isArray(data.memberIds) || !data.memberIds.includes(uid)) throw new Error('Only group members can add members.')
   const current = Array.isArray(data.memberIds) ? data.memberIds.map(String) : []
   const additions = [...new Set(members.map(member => member.uid))].filter(id => !current.includes(id) && id !== uid)
   for (const member of members) if (additions.includes(member.uid) && await getFriendship(uid, member.uid) !== 'friends') throw new Error('You can only add accepted friends.')
