@@ -31,6 +31,7 @@ export type Conversation = {
   memberIds: string[]
   lastMessage: string
   lastMessageAt?: Timestamp | null
+  createdAt?: Timestamp | null
   avatar: string
   active?: boolean
   unreadCount?: number
@@ -130,8 +131,8 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
       const other = otherId ? await getUserProfile(otherId) : null
       const name = String(data.type || '') === 'group' ? String(data.name || 'Group chat') : (other?.displayName || String(data.name || 'Conversation'))
       const lastSeen = other?.lastSeen?.toMillis() || 0
-      return { id: item.id, name, memberIds, type: data.type === 'group' ? ('group' as const) : ('direct' as const), adminId: data.adminId ? String(data.adminId) : undefined, lastMessage: String(data.lastMessage || ''), lastMessageAt: asTimestamp(data.lastMessageAt), avatar: initials(name), active: other?.activeStatus !== false && Date.now() - lastSeen < 90000, unreadCount: Number(data.unreadCounts?.[uid] || 0) }
-    })).then(items => callback(items.sort((a, b) => (b.lastMessageAt?.toMillis() || 0) - (a.lastMessageAt?.toMillis() || 0))))
+      return { id: item.id, name, memberIds, type: data.type === 'group' ? ('group' as const) : ('direct' as const), adminId: data.adminId ? String(data.adminId) : undefined, lastMessage: String(data.lastMessage || ''), lastMessageAt: asTimestamp(data.lastMessageAt), createdAt: asTimestamp(data.createdAt), avatar: initials(name), active: other?.activeStatus !== false && Date.now() - lastSeen < 90000, unreadCount: Number(data.unreadCounts?.[uid] || 0) }
+    })).then(items => callback(items.sort((a, b) => ((b.lastMessageAt?.toMillis() || b.createdAt?.toMillis() || 0) - (a.lastMessageAt?.toMillis() || a.createdAt?.toMillis() || 0)))))
   })
 }
 
@@ -315,8 +316,10 @@ export async function leaveGroup(conversationId: string, uid: string) {
   if (!db) return
   const ref = doc(db, 'conversations', conversationId); const snapshot = await getDoc(ref); const data = snapshot.data()
   if (!snapshot.exists() || data?.type !== 'group' || !Array.isArray(data.memberIds) || !data.memberIds.includes(uid)) throw new Error('You are not a member of this group.')
-  if (data.adminId === uid) throw new Error('The group admin must assign another admin before leaving.')
-  await updateDoc(ref, { memberIds: data.memberIds.filter((id: string) => id !== uid) })
+  const memberIds = data.memberIds.filter((id: string) => id !== uid)
+  if (data.adminId === uid && memberIds.length > 0) throw new Error('The admin can leave only after all other members have left.')
+  if (data.adminId === uid) await deleteDoc(ref)
+  else await updateDoc(ref, { memberIds })
 }
 
 export async function addGroupMembers(conversationId: string, uid: string, members: UserProfile[]) {
