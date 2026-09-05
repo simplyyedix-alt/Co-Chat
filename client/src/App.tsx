@@ -909,7 +909,10 @@ export default function App() {
               setShowVoiceCall(true);
             }}
           >
-            📲
+            <svg className="call-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6.6 3.8 9.2 3c.7-.2 1.4.2 1.7.8l1.2 2.8c.2.5.1 1.1-.3 1.5L10.3 9.6a13.7 13.7 0 0 0 4.1 4.1l1.5-1.5c.4-.4 1-.5 1.5-.3l2.8 1.2c.6.3 1 1 .8 1.7l-.8 2.6c-.2.7-.9 1.1-1.6 1.1C11.1 18.5 5.5 12.9 5.5 5.4c0-.7.4-1.4 1.1-1.6Z" />
+              <path d="M14.7 4.1a6.2 6.2 0 0 1 5.2 5.2M14.7 1.2a9.1 9.1 0 0 1 8.1 8.1" />
+            </svg>
           </button>
         </header>
         {showChatProfile && (
@@ -1237,9 +1240,6 @@ export default function App() {
             <strong>Co‑Chat</strong>
           </div>
           <div className="eyebrow">WELCOME BACK</div>
-          {page !== "chats" && (
-            <h1>{page[0].toUpperCase() + page.slice(1)}</h1>
-          )}
         </div>
         <div className="topbar-actions">
           {(page === "chats" || page === "communities") && (
