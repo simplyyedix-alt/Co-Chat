@@ -48,6 +48,7 @@ import {
   type UserProfile,
 } from "./services/chat";
 import "./index.css";
+import "./group-friend.css";
 import VoiceCall from "./components/VoiceCall";
 
 const starterChats: Conversation[] = [
@@ -366,6 +367,7 @@ export default function App() {
   const [showChatProfile, setShowChatProfile] = useState(false);
   const [groupMembers, setGroupMembers] = useState<UserProfile[]>([]);
   const [groupFriends, setGroupFriends] = useState<UserProfile[]>([]);
+  const [groupFriendSearch, setGroupFriendSearch] = useState("");
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [groupEditName, setGroupEditName] = useState("");
   const [messageMenu, setMessageMenu] = useState<ChatMessage | null>(null);
@@ -872,7 +874,9 @@ export default function App() {
                   {showAddMembers && (
                     <div className="group-friend-picker">
                       <small>Select accepted friends to add</small>
-                      {groupFriends.filter(friend => !selected.memberIds.includes(friend.uid)).map(friend => (
+                      <input className="search" value={groupFriendSearch} onChange={event => setGroupFriendSearch(event.target.value)} placeholder="Search your friends" />
+                      <div className="group-friend-results">
+                      {groupFriends.filter(friend => !selected.memberIds.includes(friend.uid) && (!groupFriendSearch.trim() || `${friend.displayName} ${friend.username}`.toLowerCase().includes(groupFriendSearch.trim().toLowerCase()))).map(friend => (
                         <button className="person-result" type="button" key={friend.uid} onClick={async () => {
                           try {
                             await addGroupMembers(selected.id, liveUser.uid, [friend]);
@@ -886,7 +890,8 @@ export default function App() {
                           <span>＋</span>
                         </button>
                       ))}
-                      {!groupFriends.some(friend => !selected.memberIds.includes(friend.uid)) && <small>No accepted friends available.</small>}
+                      {!groupFriends.some(friend => !selected.memberIds.includes(friend.uid) && (!groupFriendSearch.trim() || `${friend.displayName} ${friend.username}`.toLowerCase().includes(groupFriendSearch.trim().toLowerCase()))) && <small>No matching accepted friends.</small>}
+                      </div>
                     </div>
                   )}
                 </div>
