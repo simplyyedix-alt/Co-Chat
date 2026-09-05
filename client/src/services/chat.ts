@@ -22,7 +22,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore'
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
-import { db, storage } from '../firebase'
+import { auth, db, storage } from '../firebase'
 
 export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; bio?: string; notificationsEnabled?: boolean; discoverable?: boolean; activeStatus?: boolean; lastSeen?: Timestamp | null }
 export type Conversation = {
@@ -113,6 +113,8 @@ export async function ensureUserProfile(uid: string, profile: Partial<UserProfil
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   if (!db) return null
+  const viewerUid = auth?.currentUser?.uid
+  if (viewerUid && viewerUid !== uid && await isBlockedBetween(viewerUid, uid)) return null
   const snapshot = await getDoc(doc(db, 'users', uid))
   return snapshot.exists() ? profileFromDoc(uid, snapshot.data()) : null
 }
@@ -307,6 +309,16 @@ export async function removeGroupMember(conversationId: string, uid: string, mem
   const ref = doc(db, 'conversations', conversationId); const snapshot = await getDoc(ref); const data = snapshot.data()
   if (!snapshot.exists() || data?.adminId !== uid) throw new Error('Only the group admin can remove members.')
   await updateDoc(ref, { memberIds: (data.memberIds || []).filter((id: string) => id !== memberUid) })
+}
+
+export async function addGroupMembers(conversationId: string, uid: string, members: UserProfile[]) {
+  if (!db || !members.length) return
+  const ref = doc(db, 'conversations', conversationId); const snapshot = await getDoc(ref); const data = snapshot.data()
+  if (!snapshot.exists() || data?.type !== 'group' || data.adminId !== uid) throw new Error('Only the group admin can add members.')
+  const current = Array.isArray(data.memberIds) ? data.memberIds.map(String) : []
+  const additions = [...new Set(members.map(member => member.uid))].filter(id => !current.includes(id) && id !== uid)
+  for (const member of members) if (additions.includes(member.uid) && await getFriendship(uid, member.uid) !== 'friends') throw new Error('You can only add accepted friends.')
+  if (additions.length) await updateDoc(ref, { memberIds: [...current, ...additions] })
 }
 
 export function watchStories(callback: (items: Story[]) => void): Unsubscribe | undefined {
