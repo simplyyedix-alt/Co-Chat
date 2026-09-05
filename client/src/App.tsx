@@ -1713,6 +1713,7 @@ function SearchPanel({
   );
   const [actionError, setActionError] = useState("");
   const [focused, setFocused] = useState<UserProfile | null>(null);
+  const [profileExpanded, setProfileExpanded] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => {
       if (term.trim())
@@ -1742,6 +1743,7 @@ function SearchPanel({
     ].slice(0, 8);
     setHistory(next);
     localStorage.setItem(`cochat-search-history-${uid}`, JSON.stringify(next));
+    setProfileExpanded(false);
   };
   const action = async (profile: UserProfile) => {
     setActionError("");
@@ -1905,10 +1907,21 @@ function SearchPanel({
           <button
             className="secondary"
             type="button"
-            onClick={() => setFocused(null)}
+            onClick={() => setProfileExpanded((expanded) => !expanded)}
           >
-            View profile
+            {profileExpanded ? "Hide profile" : "View profile"}
           </button>
+          {profileExpanded && (
+            <div className="public-profile-details">
+              <p>{focused.bio || "No bio added yet."}</p>
+              <small>Username: @{focused.username}</small>
+              <small>
+                {focused.activeStatus === false
+                  ? "Active status hidden"
+                  : "Discoverable on Co-Chat"}
+              </small>
+            </div>
+          )}
           <button
             className="secondary danger-text"
             type="button"
