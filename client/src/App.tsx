@@ -254,8 +254,9 @@ function Nav({
     <nav className="bottom-nav">
       {[
         ["chats", "💬", "Chats"],
-        ["search", "⌕", "Search"],
-        ["profile", "☺", "Profile"],
+        ["communities", "👥", "Communities"],
+        ["discover", "⌕", "Discover"],
+        ["settings", "⚙", "Settings"],
       ].map(([id, icon, label]) => (
         <button
           type="button"
@@ -653,9 +654,18 @@ export default function App() {
   const visible = useMemo(
     () =>
       conversations.filter((item) =>
-        item.name.toLowerCase().includes(search.toLowerCase()),
+        `${item.name} ${item.lastMessage || ""}`
+          .toLowerCase()
+          .includes(search.toLowerCase()),
       ),
     [conversations, search],
+  );
+  const onlineUsers = useMemo(
+    () =>
+      conversations
+        .filter((item) => item.type !== "group" && item.active)
+        .slice(0, 8),
+    [conversations],
   );
   if (loading)
     return (
@@ -1168,7 +1178,7 @@ export default function App() {
           </h1>
         </div>
         <div className="topbar-actions">
-          {page === "chats" && (
+          {(page === "chats" || page === "communities") && (
             <button
               className="icon"
               type="button"
@@ -1191,13 +1201,13 @@ export default function App() {
           )}
           <button
             className="avatar profile-button"
-            onClick={() => setPage("profile")}
+            onClick={() => setPage("settings")}
           >
             {initials(liveUser.displayName || liveUser.email || "U")}
           </button>
         </div>
       </header>
-      {page === "chats" && showFriendRequests && (
+      {(page === "chats" || page === "communities") && showFriendRequests && (
         <div className="notification-panel">
           <FriendZone uid={liveUser.uid} onMessage={startConversation} />
         </div>
@@ -1234,14 +1244,36 @@ export default function App() {
             </button>
           </div>
         )}
-        {page === "chats" && (
+            {(page === "chats" || page === "communities") && (
           <>
             <input
               className="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search your conversations"
+              placeholder="Search people and messages"
             />
+            {page === "chats" && (
+              <section className="online-section" aria-label="Users online">
+                <div className="section-title">USERS ONLINE</div>
+                <div className="online-tray">
+                  {onlineUsers.map((item) => (
+                    <button
+                      type="button"
+                      className="online-person"
+                      key={item.id}
+                      onClick={() => setSelected(item)}
+                    >
+                      <span className="avatar is-active">
+                        {item.avatar}
+                        <i className="active-dot" aria-label="Online" />
+                      </span>
+                      <span>{item.name.split(" ")[0]}</span>
+                    </button>
+                  ))}
+                  {!onlineUsers.length && <small>No friends are online right now.</small>}
+                </div>
+              </section>
+            )}
             <div className="chat-tools">
               <button
                 className="secondary compact"
@@ -1251,9 +1283,15 @@ export default function App() {
                 ＋ New group
               </button>
             </div>
-            <div className="section-title">RECENT CONVERSATIONS</div>
+            <div className="section-title">
+              {page === "communities" ? "COMMUNITY CHATS" : "RECENT CONVERSATIONS"}
+            </div>
             <div className="list">
-              {visible.map((item) => (
+              {visible
+                .filter((item) =>
+                  page === "communities" ? item.type === "group" : item.type !== "group",
+                )
+                .map((item) => (
                 <button
                   className="chat-row"
                   key={item.id}
@@ -1299,7 +1337,9 @@ export default function App() {
                   <small>{formatTime(item.lastMessageAt) || " "}</small>
                 </button>
               ))}
-              {!visible.length && (
+              {!visible.filter((item) =>
+                page === "communities" ? item.type === "group" : item.type !== "group",
+              ).length && (
                 <div className="empty-state">No conversations found.</div>
               )}
             </div>
@@ -1387,7 +1427,7 @@ export default function App() {
             )}
           </>
         )}
-        {page === "search" && (
+        {(page === "search" || page === "discover") && (
           <SearchPanel uid={liveUser.uid} onSelect={startConversation} />
         )}
         {page === "status" && (
@@ -1400,7 +1440,7 @@ export default function App() {
             </p>
           </div>
         )}
-        {page === "profile" && (
+        {(page === "profile" || page === "settings") && (
           <>
             <form className="profile-card" onSubmit={save}>
               <div className="avatar large">
