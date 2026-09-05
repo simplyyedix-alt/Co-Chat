@@ -872,7 +872,7 @@ export default function App() {
     }
   };
   const activeGroupCount = selected?.type === "group"
-    ? groupMembers.filter((member) => member.activeStatus !== false && Boolean(member.lastSeen) && presenceNow - (member.lastSeen?.toMillis() || 0) < 90000).length
+    ? Math.min(selected.memberIds.length, groupMembers.filter((member) => member.activeStatus !== false && Boolean(member.lastSeen) && presenceNow - (member.lastSeen?.toMillis() || 0) < 90000).length)
     : 0;
   if (selected)
     return (
@@ -882,7 +882,7 @@ export default function App() {
             ←
           </button>
           <button
-            className="avatar profile-avatar"
+            className={`avatar profile-avatar ${selected.type === "group" && activeGroupCount > 0 ? "group-avatar-active" : ""}`}
             type="button"
             title="Open profile actions"
             onClick={() => setShowChatProfile(true)}
@@ -892,9 +892,9 @@ export default function App() {
           <div>
             <strong>{selected.name}</strong>
             <small>
-              {selected.type === "group" ? (
-                <span className="group-active-summary"><span className="presence-dot" />{activeGroupCount} member{activeGroupCount === 1 ? " is" : "s are"} active now</span>
-              ) : selected.id.startsWith("preview-") ? "Preview conversation" : (
+              {selected.type === "group"
+                ? (activeGroupCount > 0 && <span className="group-active-summary"><span className="presence-dot" />{activeGroupCount} Active now</span>)
+                : selected.id.startsWith("preview-") ? "Preview conversation" : (
                 <span className={selected.active ? "active-presence" : ""}>
                   {presenceLabel(selected.active, selected.lastSeen)}
                 </span>
