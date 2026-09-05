@@ -75,7 +75,10 @@ service cloud.firestore {
           && request.resource.data.text is string && request.resource.data.text.size() <= 2000
           && (!('attachment' in request.resource.data) || request.resource.data.attachment is map);
         allow update: if signedIn() && request.resource.data.senderId == resource.data.senderId
-          && request.resource.data.text == resource.data.text && request.resource.data.seenBy is list;
+          && request.resource.data.text == resource.data.text && request.resource.data.seenBy is list
+          && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seenBy'])
+            || (request.resource.data.hiddenFor is list
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hiddenFor'])));
         allow delete: if signedIn();
       }
     }

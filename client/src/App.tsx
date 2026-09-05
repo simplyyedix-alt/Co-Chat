@@ -33,6 +33,7 @@ import {
   saveProfile,
   sendFriendRequest,
   sendMessage,
+  deleteMessageForMe,
   unblockUser,
   unsendMessage,
   updateGroup,
@@ -414,6 +415,7 @@ export default function App() {
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [groupEditName, setGroupEditName] = useState("");
   const [messageMenu, setMessageMenu] = useState<ChatMessage | null>(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const [forwardingMessage, setForwardingMessage] =
     useState<ChatMessage | null>(null);
   // The reference design uses the light lavender theme as the default.
@@ -1111,11 +1113,10 @@ export default function App() {
                   >
                     Reply
                   </button>
-                  {mine && (
-                    <button
+                  <button
                       className="reply-button"
                       type="button"
-                      title="Unsend"
+                      title="Message options"
                       onClick={(event) => {
                         event.stopPropagation();
                         setMessageMenu(item);
@@ -1123,7 +1124,6 @@ export default function App() {
                     >
                       ⋯
                     </button>
-                  )}
                 </small>
               </div>
             );
@@ -1131,17 +1131,6 @@ export default function App() {
         </section>
         {messageMenu && (
           <div className="message-menu">
-            <button
-              type="button"
-              onClick={() => {
-                void unsendMessage(selected.id, messageMenu.id).catch(() =>
-                  setError("Could not unsend this message."),
-                );
-                setMessageMenu(null);
-              }}
-            >
-              Unsend
-            </button>
             <button
               type="button"
               onClick={() => {
@@ -1160,6 +1149,17 @@ export default function App() {
             >
               Forward
             </button>
+            {messageMenu.senderId === liveUser.uid || messageMenu.senderId === "me" ? (
+              <button type="button" onClick={() => {
+                void unsendMessage(selected.id, messageMenu.id).catch(() => setError("Could not unsend this message."));
+                setMessageMenu(null);
+              }}>Unsend</button>
+            ) : (
+              <button type="button" onClick={() => {
+                void deleteMessageForMe(selected.id, messageMenu.id, liveUser.uid).catch(() => setError("Could not delete this message."));
+                setMessageMenu(null);
+              }}>Delete for me</button>
+            )}
           </div>
         )}
         {forwardingMessage && (
@@ -1215,6 +1215,12 @@ export default function App() {
           </div>
         )}
         <form className="composer" onSubmit={send}>
+          {emojiOpen && <div className="emoji-picker" role="listbox">
+            {['😀','😂','😍','😊','👍','❤️','🎉','🔥','🙏','😎','👏','✨'].map(emoji => (
+              <button key={emoji} type="button" onClick={() => setText(current => current + emoji)}>{emoji}</button>
+            ))}
+          </div>}
+          <button className="emoji-button" type="button" title="Add emoji" onClick={() => setEmojiOpen(open => !open)}>☺</button>
           <label className="attach-button" title="Attach a file">
             📎
             <input

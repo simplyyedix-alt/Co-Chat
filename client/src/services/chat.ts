@@ -43,7 +43,7 @@ export type Conversation = {
   adminId?: string
 }
 export type ChatAttachment = { name: string; url: string; type: string; size: number }
-export type ChatMessage = { id: string; text: string; senderId: string; createdAt?: Timestamp | null; attachment?: ChatAttachment | null; replyTo?: { id: string; text: string; senderId: string } | null; seenBy?: string[] }
+export type ChatMessage = { id: string; text: string; senderId: string; createdAt?: Timestamp | null; attachment?: ChatAttachment | null; replyTo?: { id: string; text: string; senderId: string } | null; seenBy?: string[]; hiddenFor?: string[] }
 export type Story = { id: string; uid: string; displayName: string; text: string; createdAt?: Timestamp | null; expiresAt?: Timestamp | null }
 export type CallRecord = { id: string; type: 'audio' | 'video'; status: string; memberIds: string[]; callerId?: string; calleeId?: string; createdAt?: Timestamp | null }
 export type FriendRequest = { id: string; fromUid: string; toUid: string; status: 'pending' | 'accepted' | 'declined'; createdAt?: Timestamp | null }
@@ -148,15 +148,18 @@ export function watchMessages(conversationId: string, uid: string, callback: (it
   let cutoff: Timestamp | null = null
   let latest: ChatMessage[] = []
   let active = true
-  const visible = () => cutoff
-    ? latest.filter(item => Boolean(item.createdAt) && item.createdAt!.toMillis() > cutoff!.toMillis())
-    : latest
+  const visible = () => {
+    const notHidden = latest.filter(item => !item.hiddenFor?.includes(uid))
+    return cutoff
+      ? notHidden.filter(item => Boolean(item.createdAt) && item.createdAt!.toMillis() > cutoff!.toMillis())
+      : notHidden
+  }
   getDoc(doc(db, 'conversations', conversationId)).then(snapshot => {
     cutoff = asTimestamp(snapshot.data()?.hiddenAt?.[uid])
     if (active) callback(visible())
   }).catch(() => undefined)
   const q = query(collection(db, 'conversations', conversationId, 'messages'))
-  const unsubscribe = onSnapshot(q, snapshot => { latest = snapshot.docs.map(item => { const data = item.data(); return { id: item.id, text: String(data.text || ''), senderId: String(data.senderId || ''), createdAt: asTimestamp(data.createdAt), attachment: data.attachment ? { name: String(data.attachment.name || 'file'), url: String(data.attachment.url || ''), type: String(data.attachment.type || ''), size: Number(data.attachment.size || 0) } : null, replyTo: data.replyTo ? { id: String(data.replyTo.id || ''), text: String(data.replyTo.text || ''), senderId: String(data.replyTo.senderId || '') } : null, seenBy: Array.isArray(data.seenBy) ? data.seenBy.map(String) : [] } }).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)); if (active) callback(visible()) })
+  const unsubscribe = onSnapshot(q, snapshot => { latest = snapshot.docs.map(item => { const data = item.data(); return { id: item.id, text: String(data.text || ''), senderId: String(data.senderId || ''), createdAt: asTimestamp(data.createdAt), attachment: data.attachment ? { name: String(data.attachment.name || 'file'), url: String(data.attachment.url || ''), type: String(data.attachment.type || ''), size: Number(data.attachment.size || 0) } : null, replyTo: data.replyTo ? { id: String(data.replyTo.id || ''), text: String(data.replyTo.text || ''), senderId: String(data.replyTo.senderId || '') } : null, seenBy: Array.isArray(data.seenBy) ? data.seenBy.map(String) : [], hiddenFor: Array.isArray(data.hiddenFor) ? data.hiddenFor.map(String) : [] } }).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)); if (active) callback(visible()) })
   return () => { active = false; unsubscribe() }
 }
 
@@ -198,6 +201,11 @@ export async function unsendMessage(conversationId: string, messageId: string) {
     const latest = remaining.docs[0].data()
     await updateDoc(conversationRef, { lastMessage: String(latest.text || (latest.attachment ? `📎 ${latest.attachment.name || 'Attachment'}` : '')), lastSenderId: String(latest.senderId || ''), lastMessageAt: latest.createdAt || null })
   }
+}
+
+export async function deleteMessageForMe(conversationId: string, messageId: string, uid: string) {
+  if (!db) return
+  await updateDoc(doc(db, 'conversations', conversationId, 'messages', messageId), { hiddenFor: arrayUnion(uid) })
 }
 
 export async function deleteConversation(conversationId: string, uid: string) {
