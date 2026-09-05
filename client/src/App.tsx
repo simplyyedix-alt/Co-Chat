@@ -379,6 +379,7 @@ export default function App() {
   const [showChatProfile, setShowChatProfile] = useState(false);
   const [groupMembers, setGroupMembers] = useState<UserProfile[]>([]);
   const [groupFriends, setGroupFriends] = useState<UserProfile[]>([]);
+  const [friendProfiles, setFriendProfiles] = useState<UserProfile[]>([]);
   const [groupFriendSearch, setGroupFriendSearch] = useState("");
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [groupEditName, setGroupEditName] = useState("");
@@ -572,6 +573,14 @@ export default function App() {
     listFriends(liveUser.uid).then(setGroupFriends).catch(() => setGroupFriends([]));
   }, [showChatProfile, selected?.id, selected?.type, liveUser?.uid]);
   useEffect(() => {
+    if (!liveUser || liveUser.uid === "preview") return;
+    listFriends(liveUser.uid)
+      .then(setFriendProfiles)
+      .catch(() => setFriendProfiles([]));
+    const timer = window.setInterval(() => setPresenceNow(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, [liveUser?.uid]);
+  useEffect(() => {
     setShowChatProfile(false);
     setShowAddMembers(false);
     setGroupFriendSearch("");
@@ -660,13 +669,21 @@ export default function App() {
       ),
     [conversations, search],
   );
-  const onlineUsers = useMemo(
-    () =>
-      conversations
-        .filter((item) => item.type !== "group" && item.active)
-        .slice(0, 8),
-    [conversations],
-  );
+  const onlineUsers = useMemo(() => {
+    if (liveUser?.uid === "preview")
+      return conversations.filter((item) => item.type !== "group" && item.active).slice(0, 8);
+    return friendProfiles
+      .filter((profile) => profile.activeStatus !== false && presenceNow - (profile.lastSeen?.toMillis() || 0) < 90000)
+      .map((profile) => ({
+        id: profile.uid,
+        name: profile.displayName,
+        memberIds: [liveUser?.uid || "", profile.uid],
+        avatar: initials(profile.displayName),
+        lastMessage: "",
+        type: "direct" as const,
+      }))
+      .slice(0, 8);
+  }, [conversations, friendProfiles, liveUser?.uid, presenceNow]);
   if (loading)
     return (
       <main className="auth">
@@ -1258,20 +1275,26 @@ export default function App() {
               <section className="online-section" aria-label="Users online">
                 <div className="section-title">USERS ONLINE</div>
                 <div className="online-tray">
-                  {onlineUsers.map((item) => (
+                  {onlineUsers.map((item) => {
+                    const profile = liveUser?.uid === "preview"
+                      ? null
+                      : friendProfiles.find((friend) => item.memberIds.includes(friend.uid) || friend.uid === item.id);
+                    const name = profile?.displayName || item.name;
+                    return (
                     <button
                       type="button"
                       className="online-person"
                       key={item.id}
-                      onClick={() => setSelected(item)}
+                      onClick={() => profile ? void startConversation(profile) : setSelected(item)}
                     >
                       <span className="avatar is-active">
-                        {item.avatar}
+                        {profile ? initials(profile.displayName) : item.avatar}
                         <i className="active-dot" aria-label="Online" />
                       </span>
-                      <span>{item.name.split(" ")[0]}</span>
+                      <span>{name.split(" ")[0]}</span>
                     </button>
-                  ))}
+                    );
+                  })}
                   {!onlineUsers.length && <small>No friends are online right now.</small>}
                 </div>
               </section>
@@ -1821,9 +1844,6 @@ function SearchPanel({
       ),
     ).then((items) => setRelationships(Object.fromEntries(items)));
   }, [results, uid]);
-  const friendResults = results.filter(
-    (profile) => relationships[profile.uid] === "friends",
-  );
   const remember = (profile: UserProfile) => {
     const next = [
       {
@@ -1917,8 +1937,8 @@ function SearchPanel({
         </div>
       )}
       <div className="list">
-        {friendResults.map((profile) => {
-          const relationship = relationships[profile.uid];
+        {results.map((profile) => {
+          const relationship = relationships[profile.uid] || "loading";
           return (
             <div
               className="person-result"
@@ -1958,13 +1978,19 @@ function SearchPanel({
                   else setFocused(profile);
                 }}
               >
-                Message
+                {relationship === "friends"
+                  ? "Message"
+                  : relationship === "requested"
+                    ? "Requested"
+                    : relationship === "incoming"
+                      ? "Pending request"
+                      : "Add friend"}
               </button>
             </div>
           );
         })}
-        {term && !friendResults.length && (
-          <div className="empty-state">No matching friends yet.</div>
+        {term && !results.length && (
+          <div className="empty-state">No matching people yet.</div>
         )}
       </div>
       {focused && (
