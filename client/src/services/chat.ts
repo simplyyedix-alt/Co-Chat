@@ -34,6 +34,7 @@ export type Conversation = {
   createdAt?: Timestamp | null
   avatar: string
   active?: boolean
+  lastSeen?: Timestamp | null
   unreadCount?: number
   hiddenFor?: string[]
   type?: 'direct' | 'group'
@@ -132,7 +133,7 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
       const other = otherId ? await getUserProfile(otherId) : null
       const name = String(data.type || '') === 'group' ? String(data.name || 'Group chat') : (other?.displayName || String(data.name || 'Conversation'))
       const lastSeen = other?.lastSeen?.toMillis() || 0
-      return { id: item.id, name, memberIds, type: data.type === 'group' ? ('group' as const) : ('direct' as const), adminId: data.adminId ? String(data.adminId) : undefined, lastMessage: String(data.lastMessage || ''), lastMessageAt: asTimestamp(data.lastMessageAt), createdAt: asTimestamp(data.createdAt), hiddenFor: Array.isArray(data.hiddenFor) ? data.hiddenFor.map(String) : [], avatar: initials(name), active: other?.activeStatus !== false && Date.now() - lastSeen < 90000, unreadCount: Number(data.unreadCounts?.[uid] || 0) }
+      return { id: item.id, name, memberIds, type: data.type === 'group' ? ('group' as const) : ('direct' as const), adminId: data.adminId ? String(data.adminId) : undefined, lastMessage: String(data.lastMessage || ''), lastMessageAt: asTimestamp(data.lastMessageAt), createdAt: asTimestamp(data.createdAt), hiddenFor: Array.isArray(data.hiddenFor) ? data.hiddenFor.map(String) : [], avatar: initials(name), active: other?.activeStatus !== false && Date.now() - lastSeen < 90000, lastSeen: other?.lastSeen || null, unreadCount: Number(data.unreadCounts?.[uid] || 0) }
     })).then(items => callback(items.filter(item => !item.hiddenFor?.includes(uid)).sort((a, b) => ((b.lastMessageAt?.toMillis() || b.createdAt?.toMillis() || 0) - (a.lastMessageAt?.toMillis() || a.createdAt?.toMillis() || 0)))))
   })
 }

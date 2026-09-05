@@ -109,6 +109,22 @@ const formatTime = (value?: { toDate?: () => Date } | null) =>
         .toDate()
         .toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : "";
+const presenceLabel = (
+  active?: boolean,
+  lastSeen?: { toMillis?: () => number } | null,
+) => {
+  if (active) return "Active now";
+  const timestamp = lastSeen?.toMillis?.() || 0;
+  if (!timestamp) return "Offline";
+  const minutes = Math.max(1, Math.floor((Date.now() - timestamp) / 60000));
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} day${days === 1 ? "" : "s"} ago`;
+  const weeks = Math.floor(days / 7);
+  return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
+};
 
 function AuthScreen({ onPreview }: { onPreview: () => void }) {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
@@ -681,6 +697,8 @@ export default function App() {
         avatar: initials(profile.displayName),
         lastMessage: "",
         type: "direct" as const,
+        active: true,
+        lastSeen: profile.lastSeen,
       }))
       .slice(0, 8);
   }, [conversations, friendProfiles, liveUser?.uid, presenceNow]);
@@ -857,7 +875,7 @@ export default function App() {
             <small>
               {selected.type === "group" ? (
                 <span className="group-active-summary"><span className="presence-dot" />{activeGroupCount} member{activeGroupCount === 1 ? " is" : "s are"} active now</span>
-              ) : selected.id.startsWith("preview-") ? "Preview conversation" : "Cloud-synced conversation"}
+              ) : selected.id.startsWith("preview-") ? "Preview conversation" : presenceLabel(selected.active, selected.lastSeen)}
             </small>
           </div>
           <button
