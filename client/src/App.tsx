@@ -479,7 +479,7 @@ export default function App() {
       );
       return;
     }
-    return watchMessages(selected.id, setMessages);
+    return watchMessages(selected.id, liveUser.uid, setMessages);
   }, [selected?.id, liveUser?.uid]);
   useEffect(() => {
     if (!liveUser || !messages.length) return;
@@ -1909,7 +1909,7 @@ function SearchPanel({
                 {relationship === "friends"
                   ? "Message"
                   : relationship === "requested"
-                    ? "Cancel request"
+                    ? "Requested"
                     : relationship === "incoming"
                       ? "Pending request"
                       : "Add friend"}

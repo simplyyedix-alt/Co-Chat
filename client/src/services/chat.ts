@@ -1,6 +1,5 @@
 import {
   addDoc,
-  arrayRemove,
   arrayUnion,
   increment,
   collection,
@@ -138,10 +137,19 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
   })
 }
 
-export function watchMessages(conversationId: string, callback: (items: ChatMessage[]) => void): Unsubscribe | undefined {
+export function watchMessages(conversationId: string, uid: string, callback: (items: ChatMessage[]) => void): Unsubscribe | undefined {
   if (!db) return undefined
+  let cutoff: Timestamp | null = null
+  let latest: ChatMessage[] = []
+  let active = true
+  const visible = () => latest.filter(item => !cutoff || !item.createdAt || item.createdAt.toMillis() > cutoff.toMillis())
+  getDoc(doc(db, 'conversations', conversationId)).then(snapshot => {
+    cutoff = asTimestamp(snapshot.data()?.hiddenAt?.[uid])
+    if (active) callback(visible())
+  }).catch(() => undefined)
   const q = query(collection(db, 'conversations', conversationId, 'messages'))
-  return onSnapshot(q, snapshot => callback(snapshot.docs.map(item => { const data = item.data(); return { id: item.id, text: String(data.text || ''), senderId: String(data.senderId || ''), createdAt: asTimestamp(data.createdAt), attachment: data.attachment ? { name: String(data.attachment.name || 'file'), url: String(data.attachment.url || ''), type: String(data.attachment.type || ''), size: Number(data.attachment.size || 0) } : null, replyTo: data.replyTo ? { id: String(data.replyTo.id || ''), text: String(data.replyTo.text || ''), senderId: String(data.replyTo.senderId || '') } : null, seenBy: Array.isArray(data.seenBy) ? data.seenBy.map(String) : [] } }).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0))))
+  const unsubscribe = onSnapshot(q, snapshot => { latest = snapshot.docs.map(item => { const data = item.data(); return { id: item.id, text: String(data.text || ''), senderId: String(data.senderId || ''), createdAt: asTimestamp(data.createdAt), attachment: data.attachment ? { name: String(data.attachment.name || 'file'), url: String(data.attachment.url || ''), type: String(data.attachment.type || ''), size: Number(data.attachment.size || 0) } : null, replyTo: data.replyTo ? { id: String(data.replyTo.id || ''), text: String(data.replyTo.text || ''), senderId: String(data.replyTo.senderId || '') } : null, seenBy: Array.isArray(data.seenBy) ? data.seenBy.map(String) : [] } }).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)); if (active) callback(visible()) })
+  return () => { active = false; unsubscribe() }
 }
 
 export async function sendMessage(conversationId: string, senderId: string, text: string, file?: File, replyTo?: ChatMessage | null) {
@@ -169,7 +177,7 @@ export async function sendMessage(conversationId: string, senderId: string, text
   await addDoc(collection(conversationRef, 'messages'), { ...messageData, seenBy: [senderId] })
   const recipients = (conversationData.memberIds || []).filter((id: string) => id !== senderId)
   const unreadUpdates = Object.fromEntries(recipients.map((id: string) => [`unreadCounts.${id}`, increment(1)]))
-  await updateDoc(conversationRef, { lastMessage: attachment ? `📎 ${attachment.name}` : text, lastMessageAt: serverTimestamp(), hiddenFor: arrayRemove(senderId), ...unreadUpdates })
+  await updateDoc(conversationRef, { lastMessage: attachment ? `📎 ${attachment.name}` : text, lastMessageAt: serverTimestamp(), hiddenFor: [], ...unreadUpdates })
 }
 
 export async function unsendMessage(conversationId: string, messageId: string) {
@@ -188,7 +196,7 @@ export async function deleteConversation(conversationId: string, uid: string) {
   if (!db) return
   const ref = doc(db, 'conversations', conversationId); const snapshot = await getDoc(ref)
   if (!snapshot.exists() || !(snapshot.data().memberIds || []).includes(uid)) throw new Error('You cannot delete this conversation.')
-  await updateDoc(ref, { hiddenFor: arrayUnion(uid) })
+  await updateDoc(ref, { hiddenFor: arrayUnion(uid), [`hiddenAt.${uid}`]: serverTimestamp() })
 }
 
 export async function markConversationRead(conversationId: string, uid: string) {
