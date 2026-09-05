@@ -927,13 +927,15 @@ export default function App() {
               </>
             )}
             <div className="profile-actions">
-              <button
-                className="secondary"
-                type="button"
-                onClick={() => setShowChatProfile(false)}
-              >
-                View profile
-              </button>
+              {selected.type !== "group" && (
+                <button
+                  className="secondary"
+                  type="button"
+                  onClick={() => setShowChatProfile(false)}
+                >
+                  View profile
+                </button>
+              )}
               {selected.type === "group" ? (
                 <button className="secondary" type="button" onClick={async () => {
                   try { await leaveGroup(selected.id, liveUser.uid); setShowChatProfile(false); setSelected(null); setError("You left the group."); }
