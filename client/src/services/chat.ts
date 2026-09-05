@@ -1,6 +1,5 @@
 import {
   addDoc,
-  arrayRemove,
   arrayUnion,
   increment,
   collection,
@@ -302,7 +301,7 @@ export async function createConversation(uid: string, other: UserProfile) {
     const hiddenFor = Array.isArray(data.hiddenFor) ? data.hiddenFor.map(String) : []
     if (hiddenFor.includes(uid)) {
       const hiddenAt = data.hiddenAt && typeof data.hiddenAt === 'object' ? data.hiddenAt as Record<string, unknown> : {}
-      await updateDoc(ref, { hiddenFor: arrayRemove(uid), ...(hiddenAt[uid] ? {} : { [`hiddenAt.${uid}`]: serverTimestamp() }) })
+      if (!hiddenAt[uid]) await updateDoc(ref, { [`hiddenAt.${uid}`]: serverTimestamp() })
     }
   }
   return id
