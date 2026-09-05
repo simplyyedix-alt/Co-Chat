@@ -571,6 +571,11 @@ export default function App() {
     listFriends(liveUser.uid).then(setGroupFriends).catch(() => setGroupFriends([]));
   }, [showChatProfile, selected?.id, selected?.type, liveUser?.uid]);
   useEffect(() => {
+    setShowChatProfile(false);
+    setShowAddMembers(false);
+    setGroupFriendSearch("");
+  }, [selected?.id]);
+  useEffect(() => {
     if (!conversationMenu) return;
     const closeMenu = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
