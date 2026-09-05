@@ -30,6 +30,7 @@ export type Conversation = {
   name: string
   memberIds: string[]
   lastMessage: string
+  lastSenderId?: string
   lastMessageAt?: Timestamp | null
   createdAt?: Timestamp | null
   avatar: string
@@ -133,7 +134,7 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
       const other = otherId ? await getUserProfile(otherId) : null
       const name = String(data.type || '') === 'group' ? String(data.name || 'Group chat') : (other?.displayName || String(data.name || 'Conversation'))
       const lastSeen = other?.lastSeen?.toMillis() || 0
-      return { id: item.id, name, memberIds, type: data.type === 'group' ? ('group' as const) : ('direct' as const), adminId: data.adminId ? String(data.adminId) : undefined, lastMessage: String(data.lastMessage || ''), lastMessageAt: asTimestamp(data.lastMessageAt), createdAt: asTimestamp(data.createdAt), hiddenFor: Array.isArray(data.hiddenFor) ? data.hiddenFor.map(String) : [], avatar: initials(name), active: other?.activeStatus !== false && Date.now() - lastSeen < 90000, lastSeen: other?.lastSeen || null, unreadCount: Number(data.unreadCounts?.[uid] || 0) }
+      return { id: item.id, name, memberIds, type: data.type === 'group' ? ('group' as const) : ('direct' as const), adminId: data.adminId ? String(data.adminId) : undefined, lastMessage: String(data.lastMessage || ''), lastSenderId: data.lastSenderId ? String(data.lastSenderId) : undefined, lastMessageAt: asTimestamp(data.lastMessageAt), createdAt: asTimestamp(data.createdAt), hiddenFor: Array.isArray(data.hiddenFor) ? data.hiddenFor.map(String) : [], avatar: initials(name), active: other?.activeStatus !== false && Date.now() - lastSeen < 90000, lastSeen: other?.lastSeen || null, unreadCount: Number(data.unreadCounts?.[uid] || 0) }
     })).then(items => callback(items.filter(item => !item.hiddenFor?.includes(uid)).sort((a, b) => ((b.lastMessageAt?.toMillis() || b.createdAt?.toMillis() || 0) - (a.lastMessageAt?.toMillis() || a.createdAt?.toMillis() || 0)))))
   })
 }
@@ -180,7 +181,7 @@ export async function sendMessage(conversationId: string, senderId: string, text
   await addDoc(collection(conversationRef, 'messages'), { ...messageData, seenBy: [senderId] })
   const recipients = (conversationData.memberIds || []).filter((id: string) => id !== senderId)
   const unreadUpdates = Object.fromEntries(recipients.map((id: string) => [`unreadCounts.${id}`, increment(1)]))
-  await updateDoc(conversationRef, { lastMessage: attachment ? `📎 ${attachment.name}` : text, lastMessageAt: serverTimestamp(), hiddenFor: [], ...unreadUpdates })
+  await updateDoc(conversationRef, { lastMessage: attachment ? `📎 ${attachment.name}` : text, lastSenderId: senderId, lastMessageAt: serverTimestamp(), hiddenFor: [], ...unreadUpdates })
 }
 
 export async function unsendMessage(conversationId: string, messageId: string) {
@@ -188,10 +189,10 @@ export async function unsendMessage(conversationId: string, messageId: string) {
   await deleteDoc(doc(db, 'conversations', conversationId, 'messages', messageId))
   const remaining = await getDocs(query(collection(db, 'conversations', conversationId, 'messages'), orderBy('createdAt', 'desc'), limit(1)))
   const conversationRef = doc(db, 'conversations', conversationId)
-  if (remaining.empty) await updateDoc(conversationRef, { lastMessage: '', lastMessageAt: null })
+  if (remaining.empty) await updateDoc(conversationRef, { lastMessage: '', lastSenderId: null, lastMessageAt: null })
   else {
     const latest = remaining.docs[0].data()
-    await updateDoc(conversationRef, { lastMessage: String(latest.text || (latest.attachment ? `📎 ${latest.attachment.name || 'Attachment'}` : '')), lastMessageAt: latest.createdAt || null })
+    await updateDoc(conversationRef, { lastMessage: String(latest.text || (latest.attachment ? `📎 ${latest.attachment.name || 'Attachment'}` : '')), lastSenderId: String(latest.senderId || ''), lastMessageAt: latest.createdAt || null })
   }
 }
 

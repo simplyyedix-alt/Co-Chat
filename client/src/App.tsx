@@ -125,6 +125,19 @@ const presenceLabel = (
   const weeks = Math.floor(days / 7);
   return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
 };
+const relativeMessageTime = (value?: { toMillis?: () => number } | null) => {
+  const timestamp = value?.toMillis?.() || 0;
+  if (!timestamp) return "just now";
+  const minutes = Math.floor((Date.now() - timestamp) / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} day${days === 1 ? "" : "s"} ago`;
+  const weeks = Math.floor(days / 7);
+  return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
+};
 
 function AuthScreen({ onPreview }: { onPreview: () => void }) {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
@@ -1379,14 +1392,16 @@ export default function App() {
                   </span>
                   <span className="chat-copy">
                     <strong>{item.name}</strong>
-                    <span>
-                      {item.lastMessage || "Start a conversation"}
-                      {item.unreadCount
-                        ? ` · ${item.unreadCount > 4 ? "4+" : item.unreadCount} message${item.unreadCount === 1 ? "" : "s"}`
-                        : ""}
+                    <span className={item.unreadCount ? "unread-preview" : ""}>
+                      {item.lastSenderId === liveUser.uid
+                        ? `Sent ${relativeMessageTime(item.lastMessageAt)}`
+                        : item.unreadCount
+                          ? `${item.unreadCount > 4 ? "4+" : item.unreadCount} new message${item.unreadCount === 1 ? "" : "s"}`
+                          : item.lastMessage
+                            ? `Seen ${relativeMessageTime(item.lastMessageAt)}`
+                            : "Start a conversation"}
                     </span>
                   </span>
-                  <small>{formatTime(item.lastMessageAt) || " "}</small>
                 </button>
               ))}
               {!visible.filter((item) =>
