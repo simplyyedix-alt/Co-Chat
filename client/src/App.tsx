@@ -614,7 +614,7 @@ export default function App() {
       listFriends(liveUser.uid)
         .then(setFriendProfiles)
         .catch(() => undefined);
-    }, 5000);
+    }, 30000);
     return () => window.clearInterval(timer);
   }, [liveUser?.uid]);
   useEffect(() => {
