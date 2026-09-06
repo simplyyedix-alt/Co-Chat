@@ -54,6 +54,7 @@ import "./group-friend.css";
 import VoiceCall from "./components/VoiceCall";
 import GroupVoiceCall from "./components/GroupVoiceCall";
 import Avatar from "./components/Avatar";
+import { Capacitor } from "@capacitor/core";
 
 const starterChats: Conversation[] = [
   {
@@ -471,19 +472,22 @@ export default function App() {
   useEffect(() => {
     if (!liveUser || liveUser.uid === "preview") return;
     const uid = liveUser.uid;
+    const isNativeAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
     ensureUserProfile(uid, {
       displayName: liveUser.displayName || "",
       email: liveUser.email || "",
       photoURL: liveUser.photoURL || "",
     })
-      .then(() => getUserProfile(uid))
-      .then((profile) => {
+      .then((profileCreatedOrNeedsSetup) => getUserProfile(uid).then((profile) => ({ profile, profileCreatedOrNeedsSetup })))
+      .then(({ profile, profileCreatedOrNeedsSetup }) => {
         setProfileName(profile?.displayName || liveUser.displayName || "");
         setProfileUsername(profile?.username || "");
         setProfileBio(profile?.bio || "");
-        // Profile completion is authoritative in Firestore so a fresh Android
-        // WebView cannot bypass setup because of stale/missing localStorage.
-        setNeedsUsername(profile?.profileComplete !== true);
+        // Keep the established web flow unchanged. Android cannot rely on a
+        // fresh WebView's localStorage, so it uses the profile service result:
+        // newly created profiles (or profiles missing a username) see setup;
+        // existing complete profiles go directly to the app.
+        setNeedsUsername(isNativeAndroid ? profileCreatedOrNeedsSetup : !localStorage.getItem(`cochat-username-${uid}`));
         setNotificationsEnabled(profile?.notificationsEnabled !== false);
         setDiscoverable(profile?.discoverable !== false);
         setActiveStatus(profile?.activeStatus !== false);
