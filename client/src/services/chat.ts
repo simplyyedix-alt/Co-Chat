@@ -24,7 +24,7 @@ import {
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { auth, db, storage } from '../firebase'
 
-export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; bio?: string; notificationsEnabled?: boolean; discoverable?: boolean; activeStatus?: boolean; lastSeen?: Timestamp | null }
+export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; bio?: string; notificationsEnabled?: boolean; discoverable?: boolean; activeStatus?: boolean; lastSeen?: Timestamp | null; profileComplete?: boolean }
 export type Conversation = {
   id: string
   name: string
@@ -110,7 +110,9 @@ export async function ensureUserProfile(uid: string, profile: Partial<UserProfil
   if (!current.exists()) {
     let username = normalizeUsername(displayName) || `user${uid.slice(0, 8).toLowerCase()}`
     try { username = await reserveUsername(uid, username, `user${uid.slice(0, 8).toLowerCase()}`) } catch { username = await reserveUsername(uid, `user${uid.slice(0, 8).toLowerCase()}`, `user${uid.slice(0, 8).toLowerCase()}`) }
-    await setDoc(ref, { displayName, email: profile.email || '', username, photoURL: profile.photoURL || '', bio: '', notificationsEnabled: true, discoverable: true, createdAt: serverTimestamp() })
+    // Reserve a safe placeholder so profile references remain valid, but keep
+    // setup incomplete until the user explicitly saves their chosen profile.
+    await setDoc(ref, { displayName, email: profile.email || '', username, photoURL: profile.photoURL || '', bio: '', notificationsEnabled: true, discoverable: true, profileComplete: false, createdAt: serverTimestamp() })
     return true
   }
   else await updateDoc(ref, { displayName, email: profile.email || current.data().email || '', photoURL: profile.photoURL || current.data().photoURL || '' })
@@ -303,7 +305,7 @@ export function watchFriendRequests(uid: string, callback: (items: FriendRequest
   return () => { incomingUnsub(); outgoingUnsub() }
 }
 
-function profileFromDoc(uid: string, data: DocumentData): UserProfile { return { uid, displayName: String(data.displayName || 'Co-Chat member'), email: String(data.email || ''), username: String(data.username || ''), photoURL: String(data.photoURL || ''), bio: String(data.bio || ''), notificationsEnabled: data.notificationsEnabled !== false, discoverable: data.discoverable !== false, activeStatus: data.activeStatus !== false, lastSeen: asTimestamp(data.lastSeen) } }
+function profileFromDoc(uid: string, data: DocumentData): UserProfile { return { uid, displayName: String(data.displayName || 'Co-Chat member'), email: String(data.email || ''), username: String(data.username || ''), photoURL: String(data.photoURL || ''), bio: String(data.bio || ''), notificationsEnabled: data.notificationsEnabled !== false, discoverable: data.discoverable !== false, activeStatus: data.activeStatus !== false, lastSeen: asTimestamp(data.lastSeen), profileComplete: data.profileComplete === true } }
 
 export async function createConversation(uid: string, other: UserProfile) {
   if (!db) return ''
@@ -390,7 +392,7 @@ export async function saveProfile(uid: string, values: Pick<UserProfile, 'displa
   const username = normalizeUsername(values.username)
   if (username.length < 3) throw new Error('Username must be at least 3 characters.')
   await reserveUsername(uid, username, uid)
-  await updateDoc(userRef, { displayName: values.displayName.trim(), username, bio: String(values.bio || '').trim().slice(0, 280), notificationsEnabled: values.notificationsEnabled, discoverable: values.discoverable, activeStatus: values.activeStatus !== false, updatedAt: serverTimestamp() })
+  await updateDoc(userRef, { displayName: values.displayName.trim(), username, bio: String(values.bio || '').trim().slice(0, 280), notificationsEnabled: values.notificationsEnabled, discoverable: values.discoverable, activeStatus: values.activeStatus !== false, profileComplete: true, updatedAt: serverTimestamp() })
   if (oldUsername && oldUsername !== username) {
     const oldRef = doc(db, 'usernames', oldUsername)
     const old = await getDoc(oldRef)

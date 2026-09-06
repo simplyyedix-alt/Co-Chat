@@ -145,7 +145,6 @@ const relativeMessageTime = (value?: { toMillis?: () => number } | null) => {
 function AuthScreen({ onPreview }: { onPreview: () => void }) {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [error, setError] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!auth) return;
@@ -246,19 +245,11 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
                 Password
                 <input
                   name="password"
-                  type={showPassword ? "text" : "password"}
+                  type="password"
                   minLength={6}
                   required
                   placeholder="At least 6 characters"
                 />
-                <button
-                  className="password-toggle"
-                  type="button"
-                  onClick={() => setShowPassword((visible) => !visible)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? "🙈" : "👁️"}
-                </button>
               </label>
               {error && <p className="error-text">{error}</p>}
               <button className="primary">
@@ -490,7 +481,9 @@ export default function App() {
         setProfileName(profile?.displayName || liveUser.displayName || "");
         setProfileUsername(profile?.username || "");
         setProfileBio(profile?.bio || "");
-        setNeedsUsername(!localStorage.getItem(`cochat-username-${uid}`));
+        // Profile completion is authoritative in Firestore so a fresh Android
+        // WebView cannot bypass setup because of stale/missing localStorage.
+        setNeedsUsername(profile?.profileComplete !== true);
         setNotificationsEnabled(profile?.notificationsEnabled !== false);
         setDiscoverable(profile?.discoverable !== false);
         setActiveStatus(profile?.activeStatus !== false);
