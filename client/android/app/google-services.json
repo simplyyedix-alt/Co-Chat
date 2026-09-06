@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "883596884512",
+    "firebase_url": "https://co-chatt-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "co-chatt",
+    "storage_bucket": "co-chatt.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:883596884512:android:66ff8c7b474c41e9b91a45",
+        "android_client_info": {
+          "package_name": "com.cochat.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "883596884512-rpb3j19eqvjkb1uo13b8l2fld4knataf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCbJTus-NQUZt0O0aQNhX2vd8OwI3WB9EI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "883596884512-rpb3j19eqvjkb1uo13b8l2fld4knataf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

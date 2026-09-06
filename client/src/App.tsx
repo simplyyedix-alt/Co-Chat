@@ -55,6 +55,7 @@ import VoiceCall from "./components/VoiceCall";
 import GroupVoiceCall from "./components/GroupVoiceCall";
 import Avatar from "./components/Avatar";
 import { Capacitor } from "@capacitor/core";
+import { startPushNotifications, stopPushNotifications } from "./services/notifications";
 
 const starterChats: Conversation[] = [
   {
@@ -518,6 +519,11 @@ export default function App() {
     const timer = window.setInterval(() => setPresenceNow(Date.now()), 30000);
     return () => window.clearInterval(timer);
   }, []);
+  useEffect(() => {
+    if (!liveUser || liveUser.uid === "preview") return;
+    void startPushNotifications(liveUser.uid);
+    return () => { void stopPushNotifications(); };
+  }, [liveUser?.uid]);
   useEffect(() => {
     if (
       !selected ||
