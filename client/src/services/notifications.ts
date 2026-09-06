@@ -1,7 +1,7 @@
 import { Capacitor, type PluginListenerHandle } from '@capacitor/core'
 import { PushNotifications } from '@capacitor/push-notifications'
 import { arrayUnion, doc, setDoc } from 'firebase/firestore'
-import { db } from '../firebase'
+import { auth, db } from '../firebase'
 
 let activeUid = ''
 let listeners: PluginListenerHandle[] = []
@@ -34,4 +34,22 @@ export async function stopPushNotifications() {
   await Promise.all(listeners.map(listener => listener.remove()))
   listeners = []
   activeUid = ''
+}
+
+/** Send a background notification through the optional trusted worker. */
+export async function sendPushToTokens(tokens: string[], title: string, body: string, data: Record<string, string> = {}) {
+  const endpoint = String(import.meta.env.VITE_PUSH_WORKER_URL || '').trim()
+  if (!endpoint || !tokens.length) return
+  try {
+    const idToken = await auth?.currentUser?.getIdToken()
+    if (!idToken) return
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ tokens: [...new Set(tokens)], title, body, data }),
+    })
+    if (!response.ok) return
+  } catch {
+    // Notifications are best-effort and must never interrupt chat/calls.
+  }
 }
