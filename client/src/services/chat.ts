@@ -284,7 +284,11 @@ export async function respondToFriendRequest(fromUid: string, toUid: string, acc
     const batch = writeBatch(db)
     batch.update(requestRef, { status: 'accepted', respondedAt: serverTimestamp() })
     batch.set(doc(db, 'friendships', [fromUid, toUid].sort().join('_')), { memberIds: [fromUid, toUid], status: 'accepted', createdAt: serverTimestamp() })
-    batch.set(doc(db, 'conversations', [fromUid, toUid].sort().join('_')), { type: 'direct', memberIds: [fromUid, toUid], createdBy: toUid, lastMessage: '', lastMessageAt: null, createdAt: serverTimestamp() }, { merge: true })
+    const conversationRef = doc(db, 'conversations', [fromUid, toUid].sort().join('_'))
+    const conversation = await getDoc(conversationRef)
+    if (!conversation.exists()) {
+      batch.set(conversationRef, { type: 'direct', memberIds: [fromUid, toUid], createdBy: toUid, lastMessage: '', lastMessageAt: null, createdAt: serverTimestamp() })
+    }
     await batch.commit()
   } else await updateDoc(requestRef, { status: 'declined', respondedAt: serverTimestamp() })
 }
