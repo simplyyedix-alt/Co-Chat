@@ -23,7 +23,6 @@ import {
 } from 'firebase/firestore'
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { auth, db, storage } from '../firebase'
-import { sendPushToTokens } from './notifications'
 
 export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; bio?: string; notificationsEnabled?: boolean; discoverable?: boolean; activeStatus?: boolean; lastSeen?: Timestamp | null; profileComplete?: boolean }
 export type Conversation = {
@@ -45,12 +44,6 @@ export type Conversation = {
   adminId?: string
 }
 
-async function notifyRecipients(recipientIds: string[], title: string, body: string, data: Record<string, string>) {
-  if (!db || !recipientIds.length) return
-  const profiles = await Promise.all(recipientIds.map(id => getDoc(doc(db!, 'users', id))))
-  const tokens = profiles.flatMap(snapshot => { const values = snapshot.data()?.pushTokens; return Array.isArray(values) ? values.map(String) : [] })
-  await sendPushToTokens(tokens, title, body, data)
-}
 export type ChatAttachment = { name: string; url: string; type: string; size: number }
 export type ChatMessage = { id: string; text: string; senderId: string; createdAt?: Timestamp | null; attachment?: ChatAttachment | null; replyTo?: { id: string; text: string; senderId: string } | null; seenBy?: string[]; hiddenFor?: string[] }
 export type Story = { id: string; uid: string; displayName: string; text: string; createdAt?: Timestamp | null; expiresAt?: Timestamp | null }
@@ -200,7 +193,6 @@ export async function sendMessage(conversationId: string, senderId: string, text
   const recipients = (conversationData.memberIds || []).filter((id: string) => id !== senderId)
   const unreadUpdates = Object.fromEntries(recipients.map((id: string) => [`unreadCounts.${id}`, increment(1)]))
   await updateDoc(conversationRef, { lastMessage: attachment ? `📎 ${attachment.name}` : text, lastSenderId: senderId, lastMessageAt: serverTimestamp(), hiddenFor: [], ...unreadUpdates })
-  void notifyRecipients(recipients, conversationData.type === 'group' ? String(conversationData.name || 'Group chat') : 'New message', attachment ? `📎 ${attachment.name}` : text, { type: 'message', conversationId }).catch(() => undefined)
 }
 
 export async function unsendMessage(conversationId: string, messageId: string) {
@@ -425,7 +417,6 @@ export async function createCall(memberIds: string[], type: 'audio' | 'video', i
     const callId = `group_${group.id}_${Date.now()}_${initiatorId}`
     const callRef = doc(db, 'calls', callId)
     await setDoc(callRef, { type, callerId: initiatorId, memberIds: unique, groupId: group.id, groupName: group.name, joinedIds: [initiatorId], status: 'ringing', createdAt: serverTimestamp() })
-    void notifyRecipients(unique.filter(id => id !== initiatorId), group.name || 'Group voice call', 'Incoming group voice call', { type: 'group-call', callId })
     return callId
   }
   if (unique.length !== 2) throw new Error('Calls are available between two people only.')
@@ -441,7 +432,6 @@ export async function createCall(memberIds: string[], type: 'audio' | 'video', i
     }
     transaction.set(callRef, { memberIds: unique, callerId, calleeId, type, status: 'ringing', createdAt: serverTimestamp(), callerCandidates: [], calleeCandidates: [] })
   })
-  void notifyRecipients([calleeId], 'Incoming voice call', 'You have an incoming voice call', { type: 'call', callId })
   return callId
 }
 

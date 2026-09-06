@@ -1,7 +1,0 @@
-name = "co-chat-notifications"
-main = "src/index.ts"
-compatibility_date = "2026-09-06"
-
-[vars]
-# Set these as Cloudflare secrets, not in this file:
-# FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY
