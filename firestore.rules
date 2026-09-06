@@ -106,13 +106,30 @@ service cloud.firestore {
       allow update: if signedIn()
         && resource.data.memberIds is list && request.auth.uid in resource.data.memberIds
         && request.resource.data.memberIds == resource.data.memberIds
-        && ((resource.data.groupId is string
-          && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['joinedIds'])
-            || (request.resource.data.status == 'ended'
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'endedAt'])
-              && request.auth.uid == resource.data.callerId)))
-          || (!(resource.data.groupId is string)
-            && (request.auth.uid == resource.data.callerId || request.auth.uid == resource.data.calleeId)));
+        && (
+          (
+            'groupId' in resource.data
+            && resource.data.groupId is string
+            && (
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['joinedIds'])
+              || (
+                request.resource.data.status in ['ended', 'declined']
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'endedAt'])
+                && (
+                  request.auth.uid == resource.data.callerId
+                  || request.resource.data.status == 'declined'
+                )
+              )
+            )
+          )
+          || (
+            !('groupId' in resource.data)
+            && (
+              request.auth.uid == resource.data.callerId
+              || request.auth.uid == resource.data.calleeId
+            )
+          )
+        );
       allow delete: if signedIn()
         && (request.auth.uid == resource.data.callerId
           || request.auth.uid == resource.data.calleeId
