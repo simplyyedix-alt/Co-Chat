@@ -380,6 +380,7 @@ export default function App() {
   const [loading, setLoading] = useState(firebaseReady);
   const [showVoiceCall, setShowVoiceCall] = useState(false);
   const [voiceRole, setVoiceRole] = useState<"caller" | "callee">("caller");
+  const [voiceTarget, setVoiceTarget] = useState<{ id: string; name: string; memberIds: string[] } | null>(null);
   const [page, setPage] = useState("chats");
   const [conversations, setConversations] =
     useState<Conversation[]>(starterChats);
@@ -908,6 +909,7 @@ export default function App() {
             title="Start audio call"
             onClick={() => {
               setVoiceRole("caller");
+              setVoiceTarget({ id: selected.id, name: selected.name, memberIds: selected.memberIds });
               setShowVoiceCall(true);
             }}
           >
@@ -1048,15 +1050,13 @@ export default function App() {
             </div>
           </div>
         )}
-        {showVoiceCall && (
+        {showVoiceCall && voiceTarget && (
           <VoiceCall
             uid={liveUser.uid}
-            otherUid={
-              selected.memberIds.find((id) => id !== liveUser.uid) || ""
-            }
-            otherName={selected.name}
+            otherUid={voiceTarget.memberIds.find((id) => id !== liveUser.uid) || ""}
+            otherName={voiceTarget.name}
             role={voiceRole}
-            onClose={() => setShowVoiceCall(false)}
+            onClose={() => { setShowVoiceCall(false); setVoiceTarget(null); }}
           />
         )}
         <section className="messages">
@@ -1244,13 +1244,7 @@ export default function App() {
               const caller = incomingCall.callerId
                 ? await getUserProfile(incomingCall.callerId)
                 : null;
-              setSelected({
-                id: incomingCall.id,
-                name: caller?.displayName || "Incoming caller",
-                avatar: initials(caller?.displayName || "IC"),
-                memberIds: incomingCall.memberIds,
-                lastMessage: "",
-              });
+              setVoiceTarget({ id: incomingCall.id, name: caller?.displayName || "Incoming caller", memberIds: incomingCall.memberIds });
               setIncomingCall(null);
               setVoiceRole("callee");
               setShowVoiceCall(true);
@@ -1322,17 +1316,20 @@ export default function App() {
             const caller = incomingCall.callerId
               ? await getUserProfile(incomingCall.callerId)
               : null;
-            setSelected({
-              id: incomingCall.id,
-              name: caller?.displayName || "Incoming caller",
-              avatar: initials(caller?.displayName || "IC"),
-              memberIds: incomingCall.memberIds,
-              lastMessage: "",
-            });
+            setVoiceTarget({ id: incomingCall.id, name: caller?.displayName || "Incoming caller", memberIds: incomingCall.memberIds });
             setIncomingCall(null);
             setVoiceRole("callee");
             setShowVoiceCall(true);
           }}
+        />
+      )}
+      {showVoiceCall && voiceTarget && (
+        <VoiceCall
+          uid={liveUser.uid}
+          otherUid={voiceTarget.memberIds.find((id) => id !== liveUser.uid) || ""}
+          otherName={voiceTarget.name}
+          role={voiceRole}
+          onClose={() => { setShowVoiceCall(false); setVoiceTarget(null); }}
         />
       )}
       <section className="content">
