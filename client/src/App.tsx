@@ -484,12 +484,14 @@ export default function App() {
   }, [liveUser?.uid]);
   useEffect(() => {
     if (!liveUser || liveUser.uid === "preview") return;
-    const key = `cochat-seen-friend-requests-${liveUser.uid}`;
-    let seen: string[] = [];
-    try { seen = JSON.parse(localStorage.getItem(key) || "[]"); } catch { seen = []; }
     return watchFriendRequests(liveUser.uid, (items) => {
-      const incoming = items.filter((item) => item.toUid === liveUser.uid).map((item) => item.id);
-      setUnseenFriendRequestIds(incoming.filter((id) => !seen.includes(id)));
+      // The bell represents pending incoming requests.  Keep it in sync with
+      // the live Firestore snapshot so a request is shown immediately, even
+      // after a reload or when an older localStorage value is stale.
+      const incoming = items
+        .filter((item) => item.toUid === liveUser.uid && item.status === "pending")
+        .map((item) => item.id);
+      setUnseenFriendRequestIds(incoming);
     });
   }, [liveUser?.uid]);
   useEffect(() => {
