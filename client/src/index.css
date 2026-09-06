@@ -59,3 +59,5 @@ html{background:#f5f4fb}body{min-width:320px;-webkit-font-smoothing:antialiased}
 :root.dark .settings-toggle{background:#4b505a}:root.dark .settings-toggle.on{background:#54dc8b}
 :root .call-backdrop{z-index:1000}
 .bubble.me .message-sender{color:#fff!important}.bubble.me small,.bubble.me .reply-button{color:rgba(255,255,255,.82)}.bubble.me .read-receipt{color:#d7ecff}.bubble.me .read-receipt.seen{color:#8ed0ff}:root.dark .bubble:not(.me) .message-sender{color:#8f9dff}:root.dark .bubble:not(.me) small,:root.dark .bubble:not(.me) .reply-button{color:#b9c0ca}
+:root:not(.dark) .bubble.me .message-sender{color:#5b49d7!important}:root:not(.dark) .bubble.me small{color:#73758c}:root:not(.dark) .bubble.me .reply-button{color:#5b49d7}:root:not(.dark) .bubble.me .read-receipt{color:#2589e8}:root:not(.dark) .bubble.me .read-receipt.seen{color:#2589e8}
+.call-card .primary{color:#fff!important;background:linear-gradient(135deg,#7050e8,#a45be8)}.call-card .secondary{color:#5b49d7!important;background:#f1efff}:root.dark .call-card .primary{color:#fff!important;background:#405de6}:root.dark .call-card .secondary{color:#fff!important;background:#252a31}
