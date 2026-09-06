@@ -448,10 +448,28 @@ export default function App() {
       setLoading(false);
       return;
     }
-    return onAuthStateChanged(auth, (next) => {
-      setUser(next);
+    let settled = false;
+    const finishLoading = () => {
+      if (settled) return;
+      settled = true;
       setLoading(false);
-    });
+    };
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (next) => {
+        setUser(next);
+        finishLoading();
+      },
+      () => {
+        setError("Could not connect to authentication. Please try again.");
+        finishLoading();
+      },
+    );
+    const timeout = window.setTimeout(finishLoading, 10000);
+    return () => {
+      window.clearTimeout(timeout);
+      unsubscribe();
+    };
   }, []);
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
