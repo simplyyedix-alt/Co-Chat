@@ -4,6 +4,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
+  signInWithCredential,
+  GoogleAuthProvider,
   signOut,
   updateProfile,
   type User,
@@ -56,6 +58,7 @@ import GroupVoiceCall from "./components/GroupVoiceCall";
 import Avatar from "./components/Avatar";
 import { Capacitor } from "@capacitor/core";
 import { startPushNotifications, stopPushNotifications } from "./services/notifications";
+import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 
 const starterChats: Conversation[] = [
   {
@@ -182,7 +185,15 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
     if (!auth) return;
     setError("");
     try {
-      await signInWithPopup(auth, googleProvider);
+      const isAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
+      if (isAndroid) {
+        const result = await FirebaseAuthentication.signInWithGoogle();
+        const credential = result.credential;
+        if (!credential?.idToken) throw new Error("Google sign-in did not return an ID token.");
+        await signInWithCredential(auth, GoogleAuthProvider.credential(credential.idToken, credential.accessToken));
+      } else {
+        await signInWithPopup(auth, googleProvider);
+      }
     } catch (e) {
       setError(
         e instanceof Error
