@@ -392,7 +392,9 @@ export async function saveProfile(uid: string, values: Pick<UserProfile, 'displa
   const username = normalizeUsername(values.username)
   if (username.length < 3) throw new Error('Username must be at least 3 characters.')
   await reserveUsername(uid, username, uid)
-  await updateDoc(userRef, { displayName: values.displayName.trim(), username, bio: String(values.bio || '').trim().slice(0, 280), notificationsEnabled: values.notificationsEnabled, discoverable: values.discoverable, activeStatus: values.activeStatus !== false, profileComplete: true, updatedAt: serverTimestamp() })
+  // Upsert so a fresh Android/WebView session can finish setup even if the
+  // initial profile write was interrupted or the document does not exist yet.
+  await setDoc(userRef, { displayName: values.displayName.trim(), email: current.exists() ? String(current.data().email || '') : (auth?.currentUser?.email || ''), username, photoURL: current.exists() ? String(current.data().photoURL || auth?.currentUser?.photoURL || '') : (auth?.currentUser?.photoURL || ''), bio: String(values.bio || '').trim().slice(0, 280), notificationsEnabled: values.notificationsEnabled, discoverable: values.discoverable, activeStatus: values.activeStatus !== false, profileComplete: true, updatedAt: serverTimestamp() }, { merge: true })
   if (oldUsername && oldUsername !== username) {
     const oldRef = doc(db, 'usernames', oldUsername)
     const old = await getDoc(oldRef)
