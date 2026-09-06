@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { arrayRemove, arrayUnion, doc, getDoc, onSnapshot, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 import { getUserProfile, type UserProfile } from '../services/chat'
+import Avatar from './Avatar'
 
 type Props = {
   uid: string
@@ -56,7 +57,7 @@ export default function GroupVoiceCall({ uid, callId, groupName, memberIds, call
   }, [callId, uid, onClose])
 
   useEffect(() => {
-    const ids = [...new Set([...memberIds, ...joinedIds])].filter(id => id !== uid)
+    const ids = [...new Set([...memberIds, ...joinedIds])]
     Promise.all(ids.map(async id => [id, await getUserProfile(id)] as const)).then(items => setProfiles(old => ({ ...old, ...Object.fromEntries(items.filter((item): item is [string, UserProfile] => Boolean(item[1]))) })))
   }, [memberIds, joinedIds, uid])
 
@@ -100,7 +101,7 @@ export default function GroupVoiceCall({ uid, callId, groupName, memberIds, call
 
   useEffect(() => { if (status !== 'Connected') return; const timer = window.setInterval(() => setElapsed(Math.max(0, Math.floor((Date.now() - startedAt.current) / 1000))), 1000); return () => window.clearInterval(timer) }, [status])
   const leave = async (endForEveryone: boolean) => { if (db) { const ref = doc(db, 'calls', callId); if (endForEveryone) await updateDoc(ref, { status: 'ended', endedAt: serverTimestamp() }).catch(() => undefined); else await updateDoc(ref, { joinedIds: arrayRemove(uid) }).catch(() => undefined) }; onClose() }
-  return <div className="group-call-page"><header><div className="avatar large">{groupName.slice(0, 2).toUpperCase()}</div><div><p className="eyebrow">GROUP VOICE CALL</p><h1>{groupName}</h1><strong>{joinedIds.length} member{joinedIds.length === 1 ? '' : 's'} joined</strong></div></header><p className="group-call-status">{error || status}</p>{status === 'Connected' && <strong className="call-duration">{String(Math.floor(elapsed / 60)).padStart(2, '0')}:{String(elapsed % 60).padStart(2, '0')}</strong>}<div className="group-call-members">{joinedIds.map(id => <div className="group-call-member" key={id}><span className="avatar">{profiles[id]?.photoURL ? <img src={profiles[id].photoURL} alt="" /> : initials(profiles[id]?.displayName || (id === uid ? 'You' : 'U'))}</span><span>{id === uid ? 'You' : profiles[id]?.displayName || 'Member'}</span>{id === callerId && <small>Host</small>}<audio ref={element => { audioRefs.current[id] = element }} autoPlay /></div>)}</div><div className="call-actions"><button className="secondary" onClick={() => { streamRef.current?.getAudioTracks().forEach(track => { track.enabled = muted }); setMuted(value => !value) }}>{muted ? 'Unmute' : 'Mute'}</button><button className="danger" onClick={() => leave(host)}>{host ? 'End call' : 'Leave call'}</button></div></div>
+  return <div className="group-call-page"><header><div className="avatar large">{groupName.slice(0, 2).toUpperCase()}</div><div><p className="eyebrow">GROUP VOICE CALL</p><h1>{groupName}</h1><strong>{joinedIds.length} member{joinedIds.length === 1 ? '' : 's'} joined</strong></div></header><p className="group-call-status">{error || status}</p>{status === 'Connected' && <strong className="call-duration">{String(Math.floor(elapsed / 60)).padStart(2, '0')}:{String(elapsed % 60).padStart(2, '0')}</strong>}<div className="group-call-members">{joinedIds.map(id => <div className="group-call-member" key={id}><Avatar profile={profiles[id]} name={id === uid ? 'You' : 'Member'} /><span>{id === uid ? 'You' : profiles[id]?.displayName || 'Member'}</span>{id === callerId && <small>Host</small>}<audio ref={element => { audioRefs.current[id] = element }} autoPlay /></div>)}</div><div className="call-actions"><button className="secondary" onClick={() => { streamRef.current?.getAudioTracks().forEach(track => { track.enabled = muted }); setMuted(value => !value) }}>{muted ? 'Unmute' : 'Mute'}</button><button className="danger" onClick={() => leave(host)}>{host ? 'End call' : 'Leave call'}</button></div></div>
 }
 
 function initials(name: string) { return name.split(/\s+/).filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'U' }

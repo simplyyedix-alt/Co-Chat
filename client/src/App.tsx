@@ -53,6 +53,7 @@ import "./index.css";
 import "./group-friend.css";
 import VoiceCall from "./components/VoiceCall";
 import GroupVoiceCall from "./components/GroupVoiceCall";
+import Avatar from "./components/Avatar";
 
 const starterChats: Conversation[] = [
   {
@@ -381,7 +382,7 @@ export default function App() {
   const [loading, setLoading] = useState(firebaseReady);
   const [showVoiceCall, setShowVoiceCall] = useState(false);
   const [voiceRole, setVoiceRole] = useState<"caller" | "callee">("caller");
-  const [voiceTarget, setVoiceTarget] = useState<{ id: string; name: string; memberIds: string[] } | null>(null);
+  const [voiceTarget, setVoiceTarget] = useState<{ id: string; name: string; photoURL?: string; memberIds: string[] } | null>(null);
   const [page, setPage] = useState("chats");
   const [conversations, setConversations] =
     useState<Conversation[]>(starterChats);
@@ -433,6 +434,7 @@ export default function App() {
   const suppressConversationClick = useRef(false);
   const [incomingCallerName, setIncomingCallerName] =
     useState("Incoming caller");
+  const [incomingCallerPhoto, setIncomingCallerPhoto] = useState<string | undefined>();
   const [activeStatus, setActiveStatus] = useState(true);
   const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
   const [presenceNow, setPresenceNow] = useState(() => Date.now());
@@ -579,9 +581,7 @@ export default function App() {
     if (!incomingCall?.callerId) return;
     if (incomingCall.groupId) return;
     getUserProfile(incomingCall.callerId)
-      .then((profile) =>
-        setIncomingCallerName(profile?.displayName || "Incoming caller"),
-      )
+      .then((profile) => { setIncomingCallerName(profile?.displayName || "Incoming caller"); setIncomingCallerPhoto(profile?.photoURL || undefined); })
       .catch(() => setIncomingCallerName("Incoming caller"));
   }, [incomingCall?.callerId]);
   useEffect(() => {
@@ -742,6 +742,7 @@ export default function App() {
         name: profile.displayName,
         memberIds: [liveUser?.uid || "", profile.uid],
         avatar: initials(profile.displayName),
+        photoURL: profile.photoURL || '',
         lastMessage: "",
         type: "direct" as const,
         active: true,
@@ -918,7 +919,7 @@ export default function App() {
       return;
     }
     const caller = incomingCall.callerId ? await getUserProfile(incomingCall.callerId) : null;
-    setVoiceTarget({ id: incomingCall.id, name: caller?.displayName || "Incoming caller", memberIds: incomingCall.memberIds });
+    setVoiceTarget({ id: incomingCall.id, name: caller?.displayName || "Incoming caller", photoURL: caller?.photoURL || undefined, memberIds: incomingCall.memberIds });
     setIncomingCall(null);
     setVoiceRole("callee");
     setShowVoiceCall(true);
@@ -941,7 +942,7 @@ export default function App() {
             title={selected.type === "group" ? "Open group settings" : undefined}
             onClick={selected.type === "group" ? () => setShowChatProfile(true) : undefined}
           >
-            {selected.avatar}
+            <Avatar name={selected.name} photoURL={selected.photoURL} />
           </button>
           <div>
             <strong>{selected.name}</strong>
@@ -966,7 +967,7 @@ export default function App() {
                 } catch (error) { setError(error instanceof Error ? error.message : "Could not start the group call."); }
               } else {
                 setVoiceRole("caller");
-                setVoiceTarget({ id: selected.id, name: selected.name, memberIds: selected.memberIds });
+                setVoiceTarget({ id: selected.id, name: selected.name, photoURL: selected.photoURL || undefined, memberIds: selected.memberIds });
                 setShowVoiceCall(true);
               }
             }}
@@ -986,7 +987,7 @@ export default function App() {
             >
               ×
             </button>
-            <div className="avatar large">{selected.avatar}</div>
+            <Avatar name={selected.name} photoURL={selected.photoURL} className="avatar large" />
             <h3>{selected.name}</h3>
             <small>
               {selected.type === "group"
@@ -998,9 +999,7 @@ export default function App() {
                 <div className="group-member-list">
                   {groupMembers.map((member) => (
                     <div className="person-result" key={member.uid}>
-                      <span className="avatar">
-                        {initials(member.displayName)}
-                      </span>
+                      <Avatar profile={member} />
                       <span className="chat-copy">
                         <strong>
                           {member.displayName}
@@ -1048,7 +1047,7 @@ export default function App() {
                             setGroupFriends(old => old.filter(item => item.uid !== friend.uid));
                           } catch (error) { setError(error instanceof Error ? error.message : "Could not add this friend."); }
                         }}>
-                          <span className="avatar">{initials(friend.displayName)}</span>
+                          <Avatar profile={friend} />
                           <span className="chat-copy"><strong>{friend.displayName}</strong><span>@{friend.username}</span></span>
                           <span>＋</span>
                         </button>
@@ -1113,6 +1112,7 @@ export default function App() {
             uid={liveUser.uid}
             otherUid={voiceTarget.memberIds.find((id) => id !== liveUser.uid) || ""}
             otherName={voiceTarget.name}
+            otherPhotoURL={voiceTarget.photoURL}
             role={voiceRole}
             onClose={() => { setShowVoiceCall(false); setVoiceTarget(null); }}
           />
@@ -1249,7 +1249,7 @@ export default function App() {
                       .catch(() => setError("Could not forward this message."));
                   }}
                 >
-                  <span className="avatar">{item.avatar}</span>
+                  <Avatar name={item.name} photoURL={item.photoURL} />
                   <span className="chat-copy">
                     <strong>{item.name}</strong>
                     <span>Send message</span>
@@ -1294,6 +1294,7 @@ export default function App() {
         {incomingCall && (
           <IncomingCall
             name={incomingCall.groupId ? (incomingCall.groupName || "Group voice call") : incomingCallerName}
+            photoURL={incomingCall.groupId ? undefined : incomingCallerPhoto}
             group={Boolean(incomingCall.groupId)}
             onDecline={declineIncomingCall}
             onAccept={acceptIncomingCall}
@@ -1344,7 +1345,7 @@ export default function App() {
             className="avatar profile-button"
             onClick={() => setPage("settings")}
           >
-            {initials(liveUser.displayName || liveUser.email || "U")}
+            <Avatar name={liveUser.displayName || liveUser.email || "U"} photoURL={liveUser.photoURL || undefined} />
           </button>
         </div>
       </header>
@@ -1356,6 +1357,7 @@ export default function App() {
       {incomingCall && (
         <IncomingCall
           name={incomingCall.groupId ? (incomingCall.groupName || "Group voice call") : incomingCallerName}
+          photoURL={incomingCall.groupId ? undefined : incomingCallerPhoto}
           group={Boolean(incomingCall.groupId)}
           onDecline={declineIncomingCall}
           onAccept={acceptIncomingCall}
@@ -1366,6 +1368,7 @@ export default function App() {
           uid={liveUser.uid}
           otherUid={voiceTarget.memberIds.find((id) => id !== liveUser.uid) || ""}
           otherName={voiceTarget.name}
+          otherPhotoURL={voiceTarget.photoURL}
           role={voiceRole}
           onClose={() => { setShowVoiceCall(false); setVoiceTarget(null); }}
         />
@@ -1403,10 +1406,7 @@ export default function App() {
                       key={item.id}
                       onClick={() => profile ? void startConversation(profile) : setSelected(item)}
                     >
-                      <span className="avatar is-active">
-                        {profile ? initials(profile.displayName) : item.avatar}
-                        <i className="active-dot" aria-label="Online" />
-                      </span>
+                      <Avatar name={name} profile={profile} active />
                       <span>{name.split(" ")[0]}</span>
                     </button>
                     );
@@ -1462,12 +1462,7 @@ export default function App() {
                     window.clearTimeout(holdTimers.current[item.id])
                   }
                 >
-                  <span className={`avatar ${item.active ? "is-active" : ""}`}>
-                    {item.avatar}
-                    {item.active && (
-                      <i className="active-dot" aria-label="Online" />
-                    )}
-                  </span>
+                  <Avatar name={item.name} photoURL={item.photoURL} active={Boolean(item.active)} />
                   <span className="chat-copy">
                     <strong>{item.name}</strong>
                     <span className={item.unreadCount ? "unread-preview" : ""}>
@@ -1590,9 +1585,7 @@ export default function App() {
         {(page === "profile" || page === "settings") && (
           <>
             <form className="profile-card" onSubmit={save}>
-              <div className="avatar large">
-                {initials(profileName || liveUser.email || "U")}
-              </div>
+              <Avatar name={profileName || liveUser.email || "U"} photoURL={liveUser.photoURL || undefined} className="avatar large" />
               <h2>{profileName || "Co Chat member"}</h2>
               <p>{liveUser.email}</p>
               <label className="field-label">
@@ -1654,11 +1647,13 @@ export default function App() {
 
 function IncomingCall({
   name,
+  photoURL,
   group,
   onAccept,
   onDecline,
 }: {
   name: string;
+  photoURL?: string;
   group?: boolean;
   onAccept: () => void;
   onDecline: () => void;
@@ -1666,7 +1661,7 @@ function IncomingCall({
   return (
     <div className="call-backdrop">
       <section className="call-card">
-        <div className="avatar large">{initials(name)}</div>
+        <Avatar name={name} photoURL={photoURL} className="avatar large" />
         <p className="eyebrow">{group ? "INCOMING GROUP VOICE CALL" : "INCOMING VOICE CALL"}</p>
         <h2>{name}</h2>
         <p>{group ? "Join the conference call" : "Wants to talk with you"}</p>
@@ -1749,7 +1744,7 @@ function FriendZone({
                     profile && (setFocused(profile), setProfileExpanded(false))
                   }
                 >
-                  {initials(profile?.displayName || "U")}
+                  <Avatar profile={profile} />
                 </button>
                 <span className="chat-copy">
                   <strong>{profile?.displayName || "Someone"}</strong>
@@ -1796,7 +1791,7 @@ function FriendZone({
                     }
                   }}
                 >
-                  {initials(other?.displayName || "U")}
+                  <Avatar profile={other} />
                 </button>
                 <span className="chat-copy">
                   <strong>{other?.displayName || "Friend"}</strong>
@@ -1830,7 +1825,7 @@ function FriendZone({
           >
             ×
           </button>
-          <div className="avatar large">{initials(focused.displayName)}</div>
+          <Avatar profile={focused} className="avatar large" />
           <h3>{focused.displayName}</h3>
           <p>@{focused.username}</p>
           {profileExpanded && <small>Friend on Co-Chat · Public profile</small>}
@@ -1989,7 +1984,7 @@ function SearchPanel({
                 remember(item as UserProfile);
               }}
             >
-              <span className="avatar">{initials(item.displayName)}</span>
+              <Avatar profile={item as UserProfile} />
               <span className="chat-copy">
                 <strong>{item.displayName}</strong>
                 <span>@{item.username}</span>
@@ -2015,7 +2010,7 @@ function SearchPanel({
                   setFocused(profile);
                 }}
               >
-                {initials(profile.displayName)}
+                <Avatar profile={profile} />
               </button>
               <span className="chat-copy">
                 <strong>{profile.displayName}</strong>
@@ -2064,7 +2059,7 @@ function SearchPanel({
           >
             ×
           </button>
-          <div className="avatar large">{initials(focused.displayName)}</div>
+          <Avatar profile={focused} className="avatar large" />
           <h3>{focused.displayName}</h3>
           <p>@{focused.username}</p>
           <small>
@@ -2201,9 +2196,7 @@ function GroupCreator({
                     setTerm("");
                   }}
                 >
-                  <span className="avatar">
-                    {initials(profile.displayName)}
-                  </span>
+                  <Avatar profile={profile} />
                   <span className="chat-copy">
                     <strong>{profile.displayName}</strong>
                     <span>@{profile.username}</span>
@@ -2311,7 +2304,7 @@ function NewConversation({
         <div className="list">
           {results.map((profile) => (
             <div className="person-result" key={profile.uid}>
-              <span className="avatar">{initials(profile.displayName)}</span>
+              <Avatar profile={profile} />
               <span className="chat-copy">
                 <strong>{profile.displayName}</strong>
                 <span>@{profile.username}</span>
@@ -2343,7 +2336,7 @@ function NewConversation({
             >
               ×
             </button>
-            <div className="avatar large">{initials(focused.displayName)}</div>
+            <Avatar profile={focused} className="avatar large" />
             <h3>{focused.displayName}</h3>
             <p>@{focused.username}</p>
             <button className="primary" onClick={() => onSelect(focused)}>

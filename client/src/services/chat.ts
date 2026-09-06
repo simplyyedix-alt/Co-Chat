@@ -35,6 +35,7 @@ export type Conversation = {
   lastMessageAt?: Timestamp | null
   createdAt?: Timestamp | null
   avatar: string
+  photoURL?: string
   active?: boolean
   lastSeen?: Timestamp | null
   unreadCount?: number
@@ -138,7 +139,7 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
       const lastMessageAt = asTimestamp(data.lastMessageAt)
       const readAt = data.readAt && typeof data.readAt === 'object' ? data.readAt as Record<string, unknown> : {}
       const otherReadAt = otherId ? asTimestamp(readAt[otherId]) : null
-      return { id: item.id, name, memberIds, type: data.type === 'group' ? ('group' as const) : ('direct' as const), adminId: data.adminId ? String(data.adminId) : undefined, lastMessage: String(data.lastMessage || ''), lastSenderId: data.lastSenderId ? String(data.lastSenderId) : undefined, lastMessageAt, lastMessageSeen: Boolean(lastMessageAt && otherReadAt && otherReadAt.toMillis() >= lastMessageAt.toMillis()), createdAt: asTimestamp(data.createdAt), hiddenFor: Array.isArray(data.hiddenFor) ? data.hiddenFor.map(String) : [], avatar: initials(name), active: other?.activeStatus !== false && Date.now() - lastSeen < 90000, lastSeen: other?.lastSeen || null, unreadCount: Number(data.unreadCounts?.[uid] || 0) }
+      return { id: item.id, name, memberIds, type: data.type === 'group' ? ('group' as const) : ('direct' as const), adminId: data.adminId ? String(data.adminId) : undefined, lastMessage: String(data.lastMessage || ''), lastSenderId: data.lastSenderId ? String(data.lastSenderId) : undefined, lastMessageAt, lastMessageSeen: Boolean(lastMessageAt && otherReadAt && otherReadAt.toMillis() >= lastMessageAt.toMillis()), createdAt: asTimestamp(data.createdAt), hiddenFor: Array.isArray(data.hiddenFor) ? data.hiddenFor.map(String) : [], avatar: initials(name), photoURL: data.type === 'group' ? '' : (other?.photoURL || ''), active: other?.activeStatus !== false && Date.now() - lastSeen < 90000, lastSeen: other?.lastSeen || null, unreadCount: Number(data.unreadCounts?.[uid] || 0) }
     })).then(items => callback(items.filter(item => !item.hiddenFor?.includes(uid)).sort((a, b) => ((b.lastMessageAt?.toMillis() || b.createdAt?.toMillis() || 0) - (a.lastMessageAt?.toMillis() || a.createdAt?.toMillis() || 0)))))
   })
 }
