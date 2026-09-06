@@ -45,7 +45,7 @@ export type Conversation = {
 export type ChatAttachment = { name: string; url: string; type: string; size: number }
 export type ChatMessage = { id: string; text: string; senderId: string; createdAt?: Timestamp | null; attachment?: ChatAttachment | null; replyTo?: { id: string; text: string; senderId: string } | null; seenBy?: string[]; hiddenFor?: string[] }
 export type Story = { id: string; uid: string; displayName: string; text: string; createdAt?: Timestamp | null; expiresAt?: Timestamp | null }
-export type CallRecord = { id: string; type: 'audio' | 'video'; status: string; memberIds: string[]; callerId?: string; calleeId?: string; createdAt?: Timestamp | null }
+export type CallRecord = { id: string; type: 'audio' | 'video'; status: string; memberIds: string[]; callerId?: string; calleeId?: string; groupId?: string; groupName?: string; joinedIds?: string[]; createdAt?: Timestamp | null }
 export type FriendRequest = { id: string; fromUid: string; toUid: string; status: 'pending' | 'accepted' | 'declined'; createdAt?: Timestamp | null }
 
 export type BlockRecord = { id: string; blockerId: string; blockedId: string; createdAt?: Timestamp | null }
@@ -399,12 +399,20 @@ export async function saveProfile(uid: string, values: Pick<UserProfile, 'displa
 
 export function watchCalls(uid: string, callback: (items: CallRecord[]) => void): Unsubscribe | undefined {
   if (!db) return undefined
-  return onSnapshot(query(collection(db, 'calls'), where('memberIds', 'array-contains', uid), limit(50)), snapshot => callback(snapshot.docs.map(item => { const data = item.data(); const type: CallRecord['type'] = data.type === 'video' ? 'video' : 'audio'; return { id: item.id, type, status: String(data.status || 'completed'), memberIds: Array.isArray(data.memberIds) ? data.memberIds : [], callerId: String(data.callerId || ''), calleeId: String(data.calleeId || ''), createdAt: asTimestamp(data.createdAt) } }).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))))
+  return onSnapshot(query(collection(db, 'calls'), where('memberIds', 'array-contains', uid), limit(50)), snapshot => callback(snapshot.docs.map(item => { const data = item.data(); const type: CallRecord['type'] = data.type === 'video' ? 'video' : 'audio'; return { id: item.id, type, status: String(data.status || 'completed'), memberIds: Array.isArray(data.memberIds) ? data.memberIds.map(String) : [], callerId: String(data.callerId || ''), calleeId: String(data.calleeId || ''), groupId: data.groupId ? String(data.groupId) : undefined, groupName: data.groupName ? String(data.groupName) : undefined, joinedIds: Array.isArray(data.joinedIds) ? data.joinedIds.map(String) : [], createdAt: asTimestamp(data.createdAt) } }).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))))
 }
 
-export async function createCall(memberIds: string[], type: 'audio' | 'video', initiatorId?: string) {
+export async function createCall(memberIds: string[], type: 'audio' | 'video', initiatorId?: string, group?: { id: string; name: string }) {
   if (!db) return
   const unique = [...new Set(memberIds)].sort()
+  if (group) {
+    if (unique.length < 3) throw new Error('A group call needs at least three members.')
+    if (!initiatorId || !unique.includes(initiatorId)) throw new Error('Only a group member can start this call.')
+    const callId = `group_${group.id}_${Date.now()}_${initiatorId}`
+    const callRef = doc(db, 'calls', callId)
+    await setDoc(callRef, { type, callerId: initiatorId, memberIds: unique, groupId: group.id, groupName: group.name, joinedIds: [initiatorId], status: 'ringing', createdAt: serverTimestamp() })
+    return callId
+  }
   if (unique.length !== 2) throw new Error('Calls are available between two people only.')
   const callerId = initiatorId && unique.includes(initiatorId) ? initiatorId : unique[0]; const calleeId = unique.find(id => id !== callerId) || unique[1]
   if (await isBlockedBetween(callerId, calleeId)) throw new Error('You cannot call this user.')

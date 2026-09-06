@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -52,6 +52,7 @@ import {
 import "./index.css";
 import "./group-friend.css";
 import VoiceCall from "./components/VoiceCall";
+import GroupVoiceCall from "./components/GroupVoiceCall";
 
 const starterChats: Conversation[] = [
   {
@@ -397,6 +398,8 @@ export default function App() {
   const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
   const [stories, setStories] = useState<Story[]>([]);
   const [incomingCall, setIncomingCall] = useState<CallRecord | null>(null);
+  const [groupCall, setGroupCall] = useState<{ id: string; name: string; memberIds: string[]; callerId: string; host: boolean } | null>(null);
+  const [dismissedGroupCallIds, setDismissedGroupCallIds] = useState<string[]>([]);
   const [activeStory, setActiveStory] = useState<Story | null>(null);
   const [calls, setCalls] = useState<CallRecord[]>([]);
   const [storyText, setStoryText] = useState("");
@@ -549,12 +552,14 @@ export default function App() {
   }, [liveUser?.uid]);
   useEffect(() => {
     const call = calls.find(
-      (item) => item.status === "ringing" && item.calleeId === liveUser?.uid,
+      (item) => item.status === "ringing" && item.memberIds.includes(liveUser?.uid || "") && item.callerId !== liveUser?.uid &&
+        (!item.groupId ? item.calleeId === liveUser?.uid : !dismissedGroupCallIds.includes(item.id) && !(groupCall?.id === item.id)),
     );
     setIncomingCall(call || null);
-  }, [calls, liveUser?.uid]);
+  }, [calls, liveUser?.uid, dismissedGroupCallIds, groupCall?.id]);
   useEffect(() => {
     if (!incomingCall?.callerId) return;
+    if (incomingCall.groupId) return;
     getUserProfile(incomingCall.callerId)
       .then((profile) =>
         setIncomingCallerName(profile?.displayName || "Incoming caller"),
@@ -876,9 +881,35 @@ export default function App() {
       setError("Could not create the call request.");
     }
   };
+  const closeGroupCall = useCallback(() => setGroupCall(null), []);
+  const declineIncomingCall = async () => {
+    if (!incomingCall) return;
+    if (incomingCall.groupId) {
+      setDismissedGroupCallIds(old => old.includes(incomingCall.id) ? old : [...old, incomingCall.id]);
+      setIncomingCall(null);
+    } else {
+      await declineCall(incomingCall.id).catch(() => undefined);
+      setIncomingCall(null);
+    }
+  };
+  const acceptIncomingCall = async () => {
+    if (!incomingCall || !liveUser) return;
+    if (incomingCall.groupId) {
+      setGroupCall({ id: incomingCall.id, name: incomingCall.groupName || "Group voice call", memberIds: incomingCall.memberIds, callerId: incomingCall.callerId || "", host: false });
+      setIncomingCall(null);
+      return;
+    }
+    const caller = incomingCall.callerId ? await getUserProfile(incomingCall.callerId) : null;
+    setVoiceTarget({ id: incomingCall.id, name: caller?.displayName || "Incoming caller", memberIds: incomingCall.memberIds });
+    setIncomingCall(null);
+    setVoiceRole("callee");
+    setShowVoiceCall(true);
+  };
   const activeGroupCount = selected?.type === "group"
     ? Math.min(selected.memberIds.length, groupMembers.filter((member) => member.activeStatus !== false && Boolean(member.lastSeen) && presenceNow - (member.lastSeen?.toMillis() || 0) < 90000).length)
     : 0;
+  if (groupCall)
+    return <main className="app"><GroupVoiceCall uid={liveUser.uid} callId={groupCall.id} groupName={groupCall.name} memberIds={groupCall.memberIds} callerId={groupCall.callerId} host={groupCall.host} onClose={closeGroupCall} /></main>;
   if (selected)
     return (
       <main className="app chat-screen">
@@ -909,10 +940,17 @@ export default function App() {
           <button
             className="icon"
             title="Start audio call"
-            onClick={() => {
-              setVoiceRole("caller");
-              setVoiceTarget({ id: selected.id, name: selected.name, memberIds: selected.memberIds });
-              setShowVoiceCall(true);
+            onClick={async () => {
+              if (selected.type === "group") {
+                try {
+                  const id = await createCall(selected.memberIds, "audio", liveUser.uid, { id: selected.id, name: selected.name });
+                  if (id) setGroupCall({ id, name: selected.name, memberIds: selected.memberIds, callerId: liveUser.uid, host: true });
+                } catch (error) { setError(error instanceof Error ? error.message : "Could not start the group call."); }
+              } else {
+                setVoiceRole("caller");
+                setVoiceTarget({ id: selected.id, name: selected.name, memberIds: selected.memberIds });
+                setShowVoiceCall(true);
+              }
             }}
           >
             <svg className="call-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1237,20 +1275,10 @@ export default function App() {
         </form>
         {incomingCall && (
           <IncomingCall
-            name={incomingCallerName}
-            onDecline={async () => {
-              await declineCall(incomingCall.id).catch(() => undefined);
-              setIncomingCall(null);
-            }}
-            onAccept={async () => {
-              const caller = incomingCall.callerId
-                ? await getUserProfile(incomingCall.callerId)
-                : null;
-              setVoiceTarget({ id: incomingCall.id, name: caller?.displayName || "Incoming caller", memberIds: incomingCall.memberIds });
-              setIncomingCall(null);
-              setVoiceRole("callee");
-              setShowVoiceCall(true);
-            }}
+            name={incomingCall.groupId ? (incomingCall.groupName || "Group voice call") : incomingCallerName}
+            group={Boolean(incomingCall.groupId)}
+            onDecline={declineIncomingCall}
+            onAccept={acceptIncomingCall}
           />
         )}
       </main>
@@ -1309,20 +1337,10 @@ export default function App() {
       )}
       {incomingCall && (
         <IncomingCall
-          name={incomingCallerName}
-          onDecline={async () => {
-            await declineCall(incomingCall.id).catch(() => undefined);
-            setIncomingCall(null);
-          }}
-          onAccept={async () => {
-            const caller = incomingCall.callerId
-              ? await getUserProfile(incomingCall.callerId)
-              : null;
-            setVoiceTarget({ id: incomingCall.id, name: caller?.displayName || "Incoming caller", memberIds: incomingCall.memberIds });
-            setIncomingCall(null);
-            setVoiceRole("callee");
-            setShowVoiceCall(true);
-          }}
+          name={incomingCall.groupId ? (incomingCall.groupName || "Group voice call") : incomingCallerName}
+          group={Boolean(incomingCall.groupId)}
+          onDecline={declineIncomingCall}
+          onAccept={acceptIncomingCall}
         />
       )}
       {showVoiceCall && voiceTarget && (
@@ -1618,10 +1636,12 @@ export default function App() {
 
 function IncomingCall({
   name,
+  group,
   onAccept,
   onDecline,
 }: {
   name: string;
+  group?: boolean;
   onAccept: () => void;
   onDecline: () => void;
 }) {
@@ -1629,9 +1649,9 @@ function IncomingCall({
     <div className="call-backdrop">
       <section className="call-card">
         <div className="avatar large">{initials(name)}</div>
-        <p className="eyebrow">INCOMING VOICE CALL</p>
+        <p className="eyebrow">{group ? "INCOMING GROUP VOICE CALL" : "INCOMING VOICE CALL"}</p>
         <h2>{name}</h2>
-        <p>Wants to talk with you</p>
+        <p>{group ? "Join the conference call" : "Wants to talk with you"}</p>
         <div className="call-actions">
           <button className="secondary" onClick={onDecline}>
             Decline
