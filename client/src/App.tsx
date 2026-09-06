@@ -1233,18 +1233,49 @@ export default function App() {
           />
           <button className="primary">Send</button>
         </form>
+        {incomingCall && (
+          <IncomingCall
+            name={incomingCallerName}
+            onDecline={async () => {
+              await declineCall(incomingCall.id).catch(() => undefined);
+              setIncomingCall(null);
+            }}
+            onAccept={async () => {
+              const caller = incomingCall.callerId
+                ? await getUserProfile(incomingCall.callerId)
+                : null;
+              setSelected({
+                id: incomingCall.id,
+                name: caller?.displayName || "Incoming caller",
+                avatar: initials(caller?.displayName || "IC"),
+                memberIds: incomingCall.memberIds,
+                lastMessage: "",
+              });
+              setIncomingCall(null);
+              setVoiceRole("callee");
+              setShowVoiceCall(true);
+            }}
+          />
+        )}
       </main>
     );
   return (
     <main className="app">
       <header className="topbar">
-        <div>
-          <div className="brand-line">
-            <span className="mini-mark">C</span>
-            <strong>Co‑Chat</strong>
+        {page === "settings" ? (
+          <div className="settings-topbar-title">
+            <button className="icon" type="button" title="Back" onClick={() => setPage("chats")}>←</button>
+            <strong>Settings and Profile</strong>
           </div>
-          <div className="eyebrow">WELCOME BACK</div>
-        </div>
+        ) : (
+          <div>
+            <div className="brand-line">
+              <span className="mini-mark">C</span>
+              <strong>Co‑Chat</strong>
+            </div>
+            <div className="eyebrow">WELCOME BACK</div>
+          </div>
+        )}
         <div className="topbar-actions">
           {(page === "chats" || page === "communities") && (
             <button
@@ -1566,13 +1597,13 @@ export default function App() {
                 type="button"
                 onClick={() => setDarkMode((value) => !value)}
               >
-                ◐ Appearance <span>{darkMode ? "Dark" : "Light"}</span>
+                <span className="settings-row-icon">◐</span>Appearance <span className="settings-value">{darkMode ? "Dark" : "Light"} <span className="chevron">›</span></span>
               </button>
               <button
                 type="button"
                 onClick={() => setActiveStatus((value) => !value)}
               >
-                🟢 Active status <span>{activeStatus ? "On" : "Off"}</span>
+                <span className="settings-row-icon online">●</span>Active Status <span className="settings-value">{activeStatus ? "On" : "Off"}</span>
               </button>
               <button type="button" onClick={logout}>
                 ↪ Log out <span>›</span>
