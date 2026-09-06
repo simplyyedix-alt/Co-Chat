@@ -749,6 +749,7 @@ export default function App() {
       }))
       .slice(0, 8);
   }, [conversations, friendProfiles, liveUser?.uid, presenceNow]);
+  const closeGroupCall = useCallback(() => setGroupCall(null), []);
   if (loading)
     return (
       <main className="auth">
@@ -899,7 +900,6 @@ export default function App() {
       setError("Could not create the call request.");
     }
   };
-  const closeGroupCall = useCallback(() => setGroupCall(null), []);
   const declineIncomingCall = async () => {
     if (!incomingCall) return;
     if (incomingCall.groupId) {
