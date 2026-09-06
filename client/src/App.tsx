@@ -1603,7 +1603,7 @@ export default function App() {
                 type="button"
                 onClick={() => setActiveStatus((value) => !value)}
               >
-                <span className="settings-row-icon online">●</span>Active Status <span className="settings-value">{activeStatus ? "On" : "Off"}</span>
+                <span className={`settings-row-icon ${activeStatus ? "online" : ""}`}>●</span>Active Status <span className={`settings-toggle ${activeStatus ? "on" : ""}`} aria-label={activeStatus ? "Active status on" : "Active status off"}><span /></span>
               </button>
               <button type="button" onClick={logout}>
                 ↪ Log out <span>›</span>
