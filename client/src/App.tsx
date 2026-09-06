@@ -886,8 +886,8 @@ export default function App() {
           <button
             className={`avatar profile-avatar ${selected.type === "group" && activeGroupCount > 0 ? "group-avatar-active" : ""}`}
             type="button"
-            title="Open profile actions"
-            onClick={() => setShowChatProfile(true)}
+            title={selected.type === "group" ? "Open group settings" : undefined}
+            onClick={selected.type === "group" ? () => setShowChatProfile(true) : undefined}
           >
             {selected.avatar}
           </button>
@@ -917,7 +917,7 @@ export default function App() {
             </svg>
           </button>
         </header>
-        {showChatProfile && (
+        {showChatProfile && selected.type === "group" && (
           <div className="person-profile chat-profile-menu">
             <button
               className="icon close-profile"
@@ -1044,9 +1044,7 @@ export default function App() {
                   try { await leaveGroup(selected.id, liveUser.uid); setShowChatProfile(false); setSelected(null); setError("You left the group."); }
                   catch (error) { setError(error instanceof Error ? error.message : "Could not leave the group."); }
                 }}>Leave group</button>
-              ) : (
-                <button className="secondary danger-text" type="button" onClick={() => setShowChatProfile(false)}>Block</button>
-              )}
+              ) : null}
             </div>
           </div>
         )}
@@ -1532,15 +1530,6 @@ export default function App() {
               <h2>{profileName || "Co Chat member"}</h2>
               <p>{liveUser.email}</p>
               <label className="field-label">
-                Bio
-                <textarea
-                  value={profileBio}
-                  onChange={(e) => setProfileBio(e.target.value)}
-                  maxLength={280}
-                  placeholder="Tell your friends a little about you"
-                />
-              </label>
-              <label className="field-label">
                 Display name
                 <input
                   value={profileName}
@@ -1581,13 +1570,6 @@ export default function App() {
               </button>
               <button
                 type="button"
-                onClick={() => setDiscoverable((value) => !value)}
-              >
-                🔒 Discoverable in search{" "}
-                <span>{discoverable ? "On" : "Off"}</span>
-              </button>
-              <button
-                type="button"
                 onClick={() => setActiveStatus((value) => !value)}
               >
                 🟢 Active status <span>{activeStatus ? "On" : "Off"}</span>
@@ -1595,35 +1577,6 @@ export default function App() {
               <button type="button" onClick={logout}>
                 ↪ Log out <span>›</span>
               </button>
-            </div>
-            <div className="settings blocked-settings">
-              <div className="section-title">BLOCKED USERS</div>
-              {blockedUsers.length ? (
-                blockedUsers.map((blockedId) => (
-                  <div className="person-result" key={blockedId}>
-                    <span className="chat-copy">
-                      <strong>Co-Chat user</strong>
-                      <span>Details hidden</span>
-                    </span>
-                    <button
-                      className="secondary compact"
-                      type="button"
-                      onClick={async () => {
-                        await unblockUser(liveUser.uid, blockedId).catch(
-                          () => undefined,
-                        );
-                        setBlockedUsers((old) =>
-                          old.filter((id) => id !== blockedId),
-                        );
-                      }}
-                    >
-                      Unblock
-                    </button>
-                  </div>
-                ))
-              ) : (
-                <p className="empty-state">No blocked users.</p>
-              )}
             </div>
           </>
         )}
@@ -1830,21 +1783,6 @@ function FriendZone({
               onClick={() => setProfileExpanded(true)}
             >
               View profile
-            </button>
-            <button
-              className="secondary danger-text"
-              type="button"
-              onClick={async () => {
-              try {
-                  await blockUser(uid, focused.uid);
-                  setBlocked((old) => [...old, focused.uid]);
-                  setFocused(null);
-                } catch {
-                  setFocused(null);
-                }
-              }}
-            >
-              Block
             </button>
           </div>
         </div>
@@ -2080,13 +2018,8 @@ function SearchPanel({
           )}
           {profileExpanded && (
             <div className="public-profile-details">
-              <p>{focused.bio || "No bio added yet."}</p>
               <small>Username: @{focused.username}</small>
-              <small>
-                {focused.activeStatus === false
-                  ? "Active status hidden"
-                  : "Discoverable on Co-Chat"}
-              </small>
+              {focused.activeStatus === false && <small>Active status hidden</small>}
             </div>
           )}
         </div>
@@ -2345,7 +2278,6 @@ function NewConversation({
             <div className="avatar large">{initials(focused.displayName)}</div>
             <h3>{focused.displayName}</h3>
             <p>@{focused.username}</p>
-            <small>Discoverable on Co-Chat</small>
             <button className="primary" onClick={() => onSelect(focused)}>
               Message {focused.displayName.split(" ")[0]}
             </button>
