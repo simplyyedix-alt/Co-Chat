@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { UserProfile } from '../services/chat'
 
 type Props = {
@@ -16,8 +17,10 @@ export function avatarInitials(name: string) {
 export default function Avatar({ name = 'Co-Chat member', profile, photoURL, active = false, className = 'avatar', label = 'Online' }: Props) {
   const displayName = profile?.displayName || name
   const src = profile?.photoURL || photoURL
+  const [imageFailed, setImageFailed] = useState(false)
+  useEffect(() => setImageFailed(false), [src])
   return <span className={`${className}${active ? ' is-active' : ''}`}>
-    {src ? <img src={src} alt={`${displayName} profile`} /> : avatarInitials(displayName)}
+    {src && !imageFailed ? <img src={src} alt={`${displayName} profile`} referrerPolicy="no-referrer" onError={() => setImageFailed(true)} /> : avatarInitials(displayName)}
     {active && <i className="active-dot" aria-label={label} />}
   </span>
 }

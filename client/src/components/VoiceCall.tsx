@@ -13,7 +13,7 @@ export default function VoiceCall({ uid, otherUid, otherName, otherPhotoURL, rol
     let stopped = false; let unsub: (() => void) | undefined; let ringTimeout: number | undefined; let disconnectTimer: number | undefined; const receivedCandidates = new Set<string>(); const pendingCandidates: RTCIceCandidateInit[] = []; let remoteDescriptionReady = false
     const start = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); if (stopped) return; streamRef.current = stream
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); if (stopped) return; streamRef.current = stream
         // Add TURN credentials through VITE_TURN_* for mobile/carrier networks; never commit real credentials.
         const turnUrl = import.meta.env.VITE_TURN_URL as string | undefined; const turnUsername = import.meta.env.VITE_TURN_USERNAME as string | undefined; const turnCredential = import.meta.env.VITE_TURN_CREDENTIAL as string | undefined
         const iceServers: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }]
@@ -39,7 +39,10 @@ export default function VoiceCall({ uid, otherUid, otherName, otherPhotoURL, rol
           const candidates = (caller ? data.calleeCandidates : data.callerCandidates) || []; for (const candidate of candidates) { const key = JSON.stringify(candidate); if (receivedCandidates.has(key)) continue; receivedCandidates.add(key); if (!remoteDescriptionReady) pendingCandidates.push(candidate); else await peer.addIceCandidate(candidate).catch(() => undefined) }
         })
         if (!caller) ringTimeout = window.setTimeout(() => { if (!stopped) { setStatus('Call timed out'); onClose() } }, 45000)
-      } catch (e) { setError(e instanceof Error ? e.message : 'Microphone permission or call setup failed.') }
+      } catch (e) {
+        const name = e instanceof DOMException ? e.name : ''
+        setError(name === 'NotAllowedError' ? 'Microphone permission was denied. Enable it in Android Settings.' : name === 'NotReadableError' ? 'Android granted permission, but no microphone input is available. Close other apps using the microphone and try again.' : e instanceof Error ? e.message : 'Microphone permission or call setup failed.')
+      }
     }
     start(); return () => { stopped = true; if (ringTimeout) window.clearTimeout(ringTimeout); if (disconnectTimer) window.clearTimeout(disconnectTimer); unsub?.(); streamRef.current?.getTracks().forEach(track => track.stop()); peerRef.current?.close() }
   }, [uid, otherUid, role])

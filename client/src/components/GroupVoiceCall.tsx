@@ -37,7 +37,7 @@ export default function GroupVoiceCall({ uid, callId, groupName, memberIds, call
     const start = async () => {
       if (!db) { setError('Voice calling is unavailable.'); return }
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
         if (stopped.current) return
         streamRef.current = stream
         const callRef = doc(db, 'calls', callId)
@@ -64,7 +64,10 @@ export default function GroupVoiceCall({ uid, callId, groupName, memberIds, call
           setJoinedIds(ids.includes(uid) ? ids : [...ids, uid])
           setStatus(ids.length > 1 ? 'Connected' : 'Waiting for others…')
         })
-      } catch (e) { setError(e instanceof Error ? e.message : 'Microphone permission is required.') }
+      } catch (e) {
+        const name = e instanceof DOMException ? e.name : ''
+        setError(name === 'NotAllowedError' ? 'Microphone permission was denied. Enable it in Android Settings.' : name === 'NotReadableError' ? 'Android granted permission, but no microphone input is available. Close other apps using the microphone and try again.' : e instanceof Error ? e.message : 'Microphone permission is required.')
+      }
     }
     start()
     return () => { stopped.current = true; unsubscribe?.(); if (expiryTimer.current) window.clearTimeout(expiryTimer.current); streamRef.current?.getTracks().forEach(track => track.stop()); Object.values(peers.current).forEach(item => item.peer.close()) }
