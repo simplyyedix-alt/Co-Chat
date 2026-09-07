@@ -581,7 +581,7 @@ export default function App() {
   useEffect(() => {
     const call = calls.find(
       (item) => item.status === "ringing" && item.memberIds.includes(liveUser?.uid || "") && item.callerId !== liveUser?.uid &&
-        (!item.groupId ? item.calleeId === liveUser?.uid : !dismissedGroupCallIds.includes(item.id) && !(groupCall?.id === item.id)),
+        (!item.groupId ? item.calleeId === liveUser?.uid : !item.leftIds?.includes(liveUser?.uid || "") && !dismissedGroupCallIds.includes(item.id) && !(groupCall?.id === item.id) && (!item.createdAt || Date.now() - item.createdAt.toMillis() < 60 * 60 * 1000)),
     );
     setIncomingCall(call || null);
   }, [calls, liveUser?.uid, dismissedGroupCallIds, groupCall?.id]);
@@ -886,6 +886,9 @@ export default function App() {
         activeStatus,
       });
       await updateProfile(liveUser, { displayName: profileName });
+      localStorage.setItem(`cochat-username-${liveUser.uid}`, profileUsername.trim().toLowerCase());
+      setProfileName(profileName.trim());
+      setProfileUsername(profileUsername.trim().toLowerCase());
       setProfileSaved(true);
       setError("");
       setTimeout(() => setProfileSaved(false), 2000);

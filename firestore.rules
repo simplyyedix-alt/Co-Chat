@@ -111,13 +111,14 @@ service cloud.firestore {
             'groupId' in resource.data
             && resource.data.groupId is string
             && (
-              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['joinedIds'])
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['joinedIds', 'leftIds'])
               || (
                 request.resource.data.status in ['ended', 'declined']
                 && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'endedAt'])
                 && (
                   request.auth.uid == resource.data.callerId
                   || request.resource.data.status == 'declined'
+                  || request.resource.data.status == 'ended'
                 )
               )
             )

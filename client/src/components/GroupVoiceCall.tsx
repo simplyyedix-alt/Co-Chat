@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { arrayRemove, arrayUnion, doc, getDoc, onSnapshot, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore'
+import { arrayRemove, arrayUnion, doc, onSnapshot, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 import { getUserProfile, type UserProfile } from '../services/chat'
 import Avatar from './Avatar'
@@ -15,6 +15,7 @@ type Props = {
 }
 
 type PeerState = { peer: RTCPeerConnection; remoteReady: boolean; pending: RTCIceCandidateInit[]; seen: Set<string> }
+const MAX_CALL_SECONDS = 60 * 60
 
 export default function GroupVoiceCall({ uid, callId, groupName, memberIds, callerId, host, onClose }: Props) {
   const [status, setStatus] = useState('Joining…')
@@ -26,6 +27,7 @@ export default function GroupVoiceCall({ uid, callId, groupName, memberIds, call
   const peers = useRef<Record<string, PeerState>>({})
   const audioRefs = useRef<Record<string, HTMLAudioElement | null>>({})
   const startedAt = useRef<number>(Date.now())
+  const expiryTimer = useRef<number | undefined>(undefined)
   const stopped = useRef(false)
   const [error, setError] = useState('')
   const otherIds = useMemo(() => joinedIds.filter(id => id !== uid), [joinedIds, uid])
@@ -44,16 +46,28 @@ export default function GroupVoiceCall({ uid, callId, groupName, memberIds, call
           const data = snap.data()
           if (!data) return
           if (data.status === 'ended') { setStatus('Call ended'); onClose(); return }
+          const created = data.createdAt?.toMillis?.()
+          if (created) {
+            startedAt.current = created
+            const remaining = Math.max(0, created + MAX_CALL_SECONDS * 1000 - Date.now())
+            if (remaining === 0) {
+              updateDoc(callRef, { status: 'ended', endedAt: serverTimestamp() }).catch(() => undefined)
+              setStatus('One-hour limit reached'); onClose(); return
+            }
+            if (expiryTimer.current) window.clearTimeout(expiryTimer.current)
+            expiryTimer.current = window.setTimeout(() => {
+              updateDoc(callRef, { status: 'ended', endedAt: serverTimestamp() }).catch(() => undefined)
+              setStatus('One-hour limit reached'); onClose()
+            }, remaining)
+          }
           const ids = Array.isArray(data.joinedIds) ? data.joinedIds.map(String) : []
           setJoinedIds(ids.includes(uid) ? ids : [...ids, uid])
-          const created = data.createdAt?.toMillis?.()
-          if (created) startedAt.current = created
           setStatus(ids.length > 1 ? 'Connected' : 'Waiting for others…')
         })
       } catch (e) { setError(e instanceof Error ? e.message : 'Microphone permission is required.') }
     }
     start()
-    return () => { stopped.current = true; unsubscribe?.(); streamRef.current?.getTracks().forEach(track => track.stop()); Object.values(peers.current).forEach(item => item.peer.close()) }
+    return () => { stopped.current = true; unsubscribe?.(); if (expiryTimer.current) window.clearTimeout(expiryTimer.current); streamRef.current?.getTracks().forEach(track => track.stop()); Object.values(peers.current).forEach(item => item.peer.close()) }
   }, [callId, uid, onClose])
 
   useEffect(() => {
@@ -100,7 +114,7 @@ export default function GroupVoiceCall({ uid, callId, groupName, memberIds, call
   }, [callId, uid, otherIds.join('|')])
 
   useEffect(() => { if (status !== 'Connected') return; const timer = window.setInterval(() => setElapsed(Math.max(0, Math.floor((Date.now() - startedAt.current) / 1000))), 1000); return () => window.clearInterval(timer) }, [status])
-  const leave = async (endForEveryone: boolean) => { if (db) { const ref = doc(db, 'calls', callId); if (endForEveryone) await updateDoc(ref, { status: 'ended', endedAt: serverTimestamp() }).catch(() => undefined); else await updateDoc(ref, { joinedIds: arrayRemove(uid) }).catch(() => undefined) }; onClose() }
+  const leave = async (endForEveryone: boolean) => { if (db) { const ref = doc(db, 'calls', callId); if (endForEveryone) await updateDoc(ref, { status: 'ended', endedAt: serverTimestamp() }).catch(() => undefined); else await updateDoc(ref, { joinedIds: arrayRemove(uid), leftIds: arrayUnion(uid) }).catch(() => undefined) }; onClose() }
   return <div className="group-call-page"><header><div className="avatar large">{groupName.slice(0, 2).toUpperCase()}</div><div><p className="eyebrow">GROUP VOICE CALL</p><h1>{groupName}</h1><strong>{joinedIds.length} member{joinedIds.length === 1 ? '' : 's'} joined</strong></div></header><p className="group-call-status">{error || status}</p>{status === 'Connected' && <strong className="call-duration">{String(Math.floor(elapsed / 60)).padStart(2, '0')}:{String(elapsed % 60).padStart(2, '0')}</strong>}<div className="group-call-members">{joinedIds.map(id => <div className="group-call-member" key={id}><Avatar profile={profiles[id]} name={id === uid ? 'You' : 'Member'} /><span>{id === uid ? 'You' : profiles[id]?.displayName || 'Member'}</span>{id === callerId && <small>Host</small>}<audio ref={element => { audioRefs.current[id] = element }} autoPlay /></div>)}</div><div className="call-actions"><button className="secondary" onClick={() => { streamRef.current?.getAudioTracks().forEach(track => { track.enabled = muted }); setMuted(value => !value) }}>{muted ? 'Unmute' : 'Mute'}</button><button className="danger" onClick={() => leave(host)}>{host ? 'End call' : 'Leave call'}</button></div></div>
 }
 

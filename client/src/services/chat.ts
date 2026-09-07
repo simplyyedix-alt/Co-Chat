@@ -47,7 +47,7 @@ export type Conversation = {
 export type ChatAttachment = { name: string; url: string; type: string; size: number }
 export type ChatMessage = { id: string; text: string; senderId: string; createdAt?: Timestamp | null; attachment?: ChatAttachment | null; replyTo?: { id: string; text: string; senderId: string } | null; seenBy?: string[]; hiddenFor?: string[] }
 export type Story = { id: string; uid: string; displayName: string; text: string; createdAt?: Timestamp | null; expiresAt?: Timestamp | null }
-export type CallRecord = { id: string; type: 'audio' | 'video'; status: string; memberIds: string[]; callerId?: string; calleeId?: string; groupId?: string; groupName?: string; joinedIds?: string[]; createdAt?: Timestamp | null }
+export type CallRecord = { id: string; type: 'audio' | 'video'; status: string; memberIds: string[]; callerId?: string; calleeId?: string; groupId?: string; groupName?: string; joinedIds?: string[]; leftIds?: string[]; createdAt?: Timestamp | null }
 export type FriendRequest = { id: string; fromUid: string; toUid: string; status: 'pending' | 'accepted' | 'declined'; createdAt?: Timestamp | null }
 
 export type BlockRecord = { id: string; blockerId: string; blockedId: string; createdAt?: Timestamp | null }
@@ -405,7 +405,7 @@ export async function saveProfile(uid: string, values: Pick<UserProfile, 'displa
 
 export function watchCalls(uid: string, callback: (items: CallRecord[]) => void): Unsubscribe | undefined {
   if (!db) return undefined
-  return onSnapshot(query(collection(db, 'calls'), where('memberIds', 'array-contains', uid), limit(50)), snapshot => callback(snapshot.docs.map(item => { const data = item.data(); const type: CallRecord['type'] = data.type === 'video' ? 'video' : 'audio'; return { id: item.id, type, status: String(data.status || 'completed'), memberIds: Array.isArray(data.memberIds) ? data.memberIds.map(String) : [], callerId: String(data.callerId || ''), calleeId: String(data.calleeId || ''), groupId: data.groupId ? String(data.groupId) : undefined, groupName: data.groupName ? String(data.groupName) : undefined, joinedIds: Array.isArray(data.joinedIds) ? data.joinedIds.map(String) : [], createdAt: asTimestamp(data.createdAt) } }).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))))
+  return onSnapshot(query(collection(db, 'calls'), where('memberIds', 'array-contains', uid), limit(50)), snapshot => callback(snapshot.docs.map(item => { const data = item.data(); const type: CallRecord['type'] = data.type === 'video' ? 'video' : 'audio'; return { id: item.id, type, status: String(data.status || 'completed'), memberIds: Array.isArray(data.memberIds) ? data.memberIds.map(String) : [], callerId: String(data.callerId || ''), calleeId: String(data.calleeId || ''), groupId: data.groupId ? String(data.groupId) : undefined, groupName: data.groupName ? String(data.groupName) : undefined, joinedIds: Array.isArray(data.joinedIds) ? data.joinedIds.map(String) : [], leftIds: Array.isArray(data.leftIds) ? data.leftIds.map(String) : [], createdAt: asTimestamp(data.createdAt) } }).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))))
 }
 
 export async function createCall(memberIds: string[], type: 'audio' | 'video', initiatorId?: string, group?: { id: string; name: string }) {
