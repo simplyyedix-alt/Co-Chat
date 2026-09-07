@@ -24,7 +24,7 @@ import {
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { auth, db, storage } from '../firebase'
 
-export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; bio?: string; notificationsEnabled?: boolean; discoverable?: boolean; activeStatus?: boolean; lastSeen?: Timestamp | null; profileComplete?: boolean }
+export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; bio?: string; notificationsEnabled?: boolean; discoverable?: boolean; activeStatus?: boolean; theme?: 'light' | 'dark'; lastSeen?: Timestamp | null; profileComplete?: boolean }
 export type Conversation = {
   id: string
   name: string
@@ -306,7 +306,12 @@ export function watchFriendRequests(uid: string, callback: (items: FriendRequest
   return () => { incomingUnsub(); outgoingUnsub() }
 }
 
-function profileFromDoc(uid: string, data: DocumentData): UserProfile { return { uid, displayName: String(data.displayName || 'Co-Chat member'), email: String(data.email || ''), username: String(data.username || ''), photoURL: String(data.photoURL || ''), bio: String(data.bio || ''), notificationsEnabled: data.notificationsEnabled !== false, discoverable: data.discoverable !== false, activeStatus: data.activeStatus !== false, lastSeen: asTimestamp(data.lastSeen), profileComplete: data.profileComplete === true } }
+function profileFromDoc(uid: string, data: DocumentData): UserProfile { return { uid, displayName: String(data.displayName || 'Co-Chat member'), email: String(data.email || ''), username: String(data.username || ''), photoURL: String(data.photoURL || ''), bio: String(data.bio || ''), notificationsEnabled: data.notificationsEnabled !== false, discoverable: data.discoverable !== false, activeStatus: data.activeStatus !== false, theme: data.theme === 'light' ? 'light' : data.theme === 'dark' ? 'dark' : undefined, lastSeen: asTimestamp(data.lastSeen), profileComplete: data.profileComplete === true } }
+
+export async function saveTheme(uid: string, theme: 'light' | 'dark') {
+  if (!db || !uid) return
+  await setDoc(doc(db, 'users', uid), { theme, updatedAt: serverTimestamp() }, { merge: true })
+}
 
 export async function createConversation(uid: string, other: UserProfile) {
   if (!db) return ''

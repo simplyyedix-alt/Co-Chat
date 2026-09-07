@@ -33,6 +33,7 @@ import {
   removeGroupMember,
   respondToFriendRequest,
   saveProfile,
+  saveTheme,
   sendFriendRequest,
   sendMessage,
   deleteMessageForMe,
@@ -426,9 +427,11 @@ export default function App() {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [forwardingMessage, setForwardingMessage] =
     useState<ChatMessage | null>(null);
-  // The reference design uses the light lavender theme as the default.
-  // Users can still switch to dark mode from Settings.
-  const [darkMode, setDarkMode] = useState(false);
+  // Dark is the default, and the account preference is restored across web
+  // refreshes and Android sessions when the user is signed in.
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("cochat-theme") !== "light");
+  const [themeLoaded, setThemeLoaded] = useState(false);
+  const [themeLoadedUid, setThemeLoadedUid] = useState<string | null>(null);
   const [conversationMenu, setConversationMenu] = useState<Conversation | null>(
     null,
   );
@@ -479,10 +482,15 @@ export default function App() {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
     localStorage.setItem("cochat-theme", darkMode ? "dark" : "light");
-  }, [darkMode]);
+    if (themeLoaded && themeLoadedUid === liveUser?.uid && liveUser && liveUser.uid !== "preview") {
+      saveTheme(liveUser.uid, darkMode ? "dark" : "light").catch(() => undefined);
+    }
+  }, [darkMode, themeLoaded, themeLoadedUid, liveUser?.uid]);
   useEffect(() => {
     if (!liveUser || liveUser.uid === "preview") return;
     const uid = liveUser.uid;
+    setThemeLoaded(false);
+    setThemeLoadedUid(null);
     const isNativeAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
     ensureUserProfile(uid, {
       displayName: liveUser.displayName || "",
@@ -494,6 +502,9 @@ export default function App() {
         setProfileName(profile?.displayName || liveUser.displayName || "");
         setProfileUsername(profile?.username || "");
         setProfileBio(profile?.bio || "");
+        if (profile?.theme) setDarkMode(profile.theme === "dark");
+        setThemeLoaded(true);
+        setThemeLoadedUid(uid);
         // Keep the established web flow unchanged. Android cannot rely on a
         // fresh WebView's localStorage, so it uses the profile service result:
         // newly created profiles (or profiles missing a username) see setup;
