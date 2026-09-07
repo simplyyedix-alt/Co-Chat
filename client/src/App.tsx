@@ -370,7 +370,7 @@ function UsernameSetup({
             />
           </label>
           {error && <p className="error-text">{error}</p>}
-          <button className="primary" disabled={saving}>
+          <button type="submit" className="primary" disabled={saving}>
             {saving ? "Saving…" : "Continue"}
           </button>
         </form>
@@ -1627,7 +1627,7 @@ export default function App() {
                   Unique, 3–24 characters: letters, numbers, and underscores.
                 </small>
               </label>
-              <button className="primary" disabled={preview}>
+              <button type="submit" className="primary" disabled={preview}>
                 {profileSaved ? "Saved ✓" : "Save profile"}
               </button>
             </form>

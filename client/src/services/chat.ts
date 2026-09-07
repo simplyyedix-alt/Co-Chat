@@ -386,7 +386,7 @@ export async function createStory(uid: string, displayName: string, text: string
 }
 
 export async function saveProfile(uid: string, values: Pick<UserProfile, 'displayName' | 'username' | 'bio' | 'notificationsEnabled' | 'discoverable'> & { activeStatus?: boolean }) {
-  if (!db) return
+  if (!db) throw new Error('Profile service is unavailable. Check your connection and try again.')
   const userRef = doc(db, 'users', uid)
   const current = await getDoc(userRef)
   const oldUsername = current.exists() ? normalizeUsername(String(current.data().username || '')) : ''
