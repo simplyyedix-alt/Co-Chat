@@ -118,7 +118,9 @@ service cloud.firestore {
                 && (
                   request.auth.uid == resource.data.callerId
                   || request.resource.data.status == 'declined'
-                  || request.resource.data.status == 'ended'
+                  || (request.resource.data.status == 'ended'
+                    && 'createdAt' in resource.data
+                    && request.time >= resource.data.createdAt + duration.value(1, 'h'))
                 )
               )
             )
