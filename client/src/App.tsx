@@ -864,6 +864,12 @@ export default function App() {
   };
   const logout = async () => {
     try {
+      // The native Google provider keeps its own session on Android. Clear it
+      // as well as the Firebase web session so the next Google sign-in shows
+      // the account chooser instead of silently reusing the last account.
+      if (!preview && Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android") {
+        await FirebaseAuthentication.signOut().catch(() => undefined);
+      }
       if (auth && !preview) await signOut(auth);
       setPreview(false);
       setUser(null);
