@@ -1,0 +1,5 @@
+[functions.auth-bridge]
+verify_jwt = false
+
+[functions.social-api]
+verify_jwt = false
