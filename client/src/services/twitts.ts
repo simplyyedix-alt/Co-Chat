@@ -127,7 +127,7 @@ export async function recordTwittView(twittId: string, uid: string) {
 export async function createTwittComment(twittId: string, uid: string, body: string, attachment?: TwittAttachment | null) {
   if (socialBackend === 'supabase' && supabaseReady) {
     const id = await createSupabaseTwittComment(twittId, uid, body, attachment)
-    window.dispatchEvent(new CustomEvent('cochat-comment-created', { detail: { twittId, id, uid, body: body.trim() } }))
+    window.dispatchEvent(new CustomEvent('cochat-comment-created', { detail: { twittId, id, uid, body: body.trim() || '📎 Attachment', attachment: attachment || null } }))
     return id
   }
   if (!db) throw new Error('Firebase is not configured.')
@@ -141,7 +141,7 @@ export async function createTwittComment(twittId: string, uid: string, body: str
     transaction.set(commentRef, { uid, body: text, ...(attachment ? { attachment } : {}), createdAt: serverTimestamp() })
     transaction.update(twittRef, { comments: Math.max(0, Number(twitt.data().comments || 0)) + 1 })
   })
-  window.dispatchEvent(new CustomEvent('cochat-comment-created', { detail: { twittId, id: commentRef.id, uid, body: text } }))
+  window.dispatchEvent(new CustomEvent('cochat-comment-created', { detail: { twittId, id: commentRef.id, uid, body: text, attachment: attachment || null } }))
   return commentRef.id
 }
 

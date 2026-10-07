@@ -258,7 +258,7 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
         <div className="auth-feature-grid">
           <span><b>01</b><strong>Focus together</strong><small>Turn study time into momentum.</small></span>
           <span><b>02</b><strong>Find your circle</strong><small>Meet people learning beside you.</small></span>
-          <span><b>03</b><strong>Keep it personal</strong><small>Your space, your pace, your people.</small></span>
+          <span><b>03</b><strong>Keep it personal</strong><small>Your people, your pace, your next win.</small></span>
         </div>
         <div className="auth-orb auth-orb-one" /><div className="auth-orb auth-orb-two" />
       </section>
@@ -642,7 +642,7 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   }), [running, targetSeconds, seconds]);
   return (
     <div className="study-home">
-      <section className="study-hero"><div><span className="kicker">YOUR STUDY SPACE</span><h2>Lock in, one session at a time.</h2><p>Small wins stack into a study rhythm that actually lasts.</p></div><div className="quest-badge">✦</div></section>
+      <section className="study-hero"><div><span className="kicker">YOUR STUDY SPACE</span><h2>Lock in. Let the small wins stack.</h2><p>One focused session at a time, with your people in the loop.</p></div><div className="quest-badge">✦</div></section>
       <section className="study-shortcuts"><button type="button" onClick={() => setTaskSheetOpen(true)}><span>✓</span><div><strong>Tasks</strong><small>{tasks.filter((task) => task.completedAt).length}/{tasks.length} complete</small></div></button><button type="button" onClick={() => setLeaderboardOpen(true)}><span>🏆</span><div><strong>Leaderboard</strong><small>Friends & public</small></div></button><button type="button" onClick={() => setJourneyOpen(true)}><span>✦</span><div><strong>Journey</strong><small>{league}</small></div></button></section>
       {activeTasks.length > 0 && <section className="active-tasks"><div className="active-tasks-heading"><div><span className="kicker">IN PROGRESS</span><strong>{activeTasks.length} active task{activeTasks.length === 1 ? "" : "s"}</strong></div><button className="secondary compact" type="button" onClick={() => setTaskSheetOpen(true)}>View tasks</button></div>{activeTasks.map((task) => <article key={task.id}><span>◷</span><div><strong>{task.title}</strong><small>{task.action === "discover" ? "Ready to help in Discover" : `Started ${Math.max(1, Math.floor((Date.now() - (task.startedAt || Date.now())) / 60000))} min ago`}</small></div><button className="icon" type="button" aria-label={`Continue ${task.title}`} onClick={() => focusTask(task)}>→</button></article>)}</section>}
       <section className="timer-card" ref={timerRef}><div className="timer-ring" style={{ "--progress": `${progress}%` } as CSSProperties}><strong>{display}</strong><span>{running ? (timerTaskId ? "task timer running" : "focus session running") : targetSeconds ? "timer ready" : "choose a duration"}</span></div>{targetSeconds > 0 && <button className="timer-change" type="button" onClick={() => setTimerSetupOpen(true)}>Change · {Math.floor(targetSeconds / 3600) ? `${Math.floor(targetSeconds / 3600)}h ` : ""}{Math.floor((targetSeconds % 3600) / 60)}m</button>}<div className="timer-actions"><button className="primary" type="button" onClick={toggleTimer}>{running ? "Pause timer" : targetSeconds ? "Start timer" : "Set timer"}</button><button className="secondary" type="button" onClick={saveSession} disabled={!seconds}>Finish & save</button><button className="secondary" type="button" onClick={() => { setRunning(false); setTimerStartedAt(null); setTimerTaskId(null); setSeconds(0); setTargetSeconds(0); }}>Reset</button></div><small className="timer-note">Your countdown keeps its place if you close or background the app. It saves only when you finish.</small></section>
@@ -676,7 +676,7 @@ function CommentSheet({ post, comments, loading, hasMore, names, currentUid, onC
         {comments.map((comment) => <article className="sheet-comment" key={comment.id}><div className="comment-avatar">{(names[comment.uid] || comment.uid).slice(0, 2).toUpperCase()}</div><div className="sheet-comment-body"><div><strong>@{names[comment.uid] || comment.uid.slice(0, 10)}</strong>{comment.uid === currentUid && <button className="comment-delete" type="button" onClick={() => onDelete(comment)}>Delete</button>}</div><p>{comment.body}</p>{comment.attachment && (comment.attachment.type.startsWith("image/") ? <a className="twitt-media-preview" href={comment.attachment.url} target="_blank" rel="noreferrer" download={comment.attachment.name}><img src={comment.attachment.url} alt={comment.attachment.name} /><span>Open / save image</span></a> : <a className="twitt-attachment" href={comment.attachment.url} target="_blank" rel="noreferrer" download={comment.attachment.name}>📄 {comment.attachment.name} · Open / save</a>)}<button className={comment.liked ? "comment-like liked" : "comment-like"} type="button" onClick={() => onLike(comment)}>♡ {comment.likes || 0}</button></div></article>)}
         {hasMore && <button className="load-comments" type="button" disabled={loading} onClick={onLoadMore}>{loading ? "Loading…" : "Load more comments"}</button>}
       </div>
-      <form className="comment-sheet-compose" onSubmit={submit}><input value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 240))} placeholder="Add a thoughtful comment" autoFocus /><label className="comment-media-picker" title="Photo or PDF, max 5 MB">📎<input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label><button className="primary compact" type="submit" disabled={!draft.trim() && !file}>Send</button></form>
+      <form className="comment-sheet-compose" onSubmit={submit}><input value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 240))} placeholder="Add a thoughtful comment" autoFocus /><label className="comment-media-picker" title="Photo or PDF, max 5 MB">📎<input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label>{file && <small className="comment-file-name" title={file.name}>{file.name}</small>}<button className="primary compact" type="submit" disabled={!draft.trim() && !file}>Send</button></form>
     </section>
   </div>;
 }
@@ -709,6 +709,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
   const [commentMore, setCommentMore] = useState<Record<string, boolean>>({});
   const [commentLoading, setCommentLoading] = useState<string | null>(null);
   const [commentNames, setCommentNames] = useState<Record<string, string>>({});
+  const [commentError, setCommentError] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [busyDeletes, setBusyDeletes] = useState<string[]>([]);
   const hiddenKey = `cochat-hidden-twitts-${auth?.currentUser?.uid || "preview"}`;
@@ -823,6 +824,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
     } finally { setCommentLoading(null); }
   };
   const submitComment = async (post: TwittPreview, body: string, file?: File | null) => {
+    setCommentError("");
     const uid = auth?.currentUser?.uid || 'you';
     const localId = `local-comment-${Date.now()}`;
     const optimisticComment = { id: localId, uid, body, createdAt: { toMillis: () => Date.now() } };
@@ -840,21 +842,22 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
       }
       const profile = uid !== 'you' ? await getUserProfile(uid) : null;
       setCommentNames((current) => ({ ...current, [uid]: profile?.username || current[uid] || uid.slice(0, 10) }));
-    } catch {
+    } catch (error) {
       setCommentsByPost((current) => ({ ...current, [post.id]: (current[post.id] || []).filter((comment) => comment.id !== localId) }));
       setPosts((current) => current.map((item) => item.id === post.id ? { ...item, comments: Math.max(0, item.comments - 1) } : item));
+      setCommentError(error instanceof Error ? error.message : "Could not add that comment or attachment.");
     }
   };
   useEffect(() => {
     const onCommentCreated = (event: Event) => {
-      const detail = (event as CustomEvent<{ twittId?: string; id?: string; uid?: string; body?: string }>).detail;
+      const detail = (event as CustomEvent<{ twittId?: string; id?: string; uid?: string; body?: string; attachment?: TwittAttachment | null }>).detail;
       if (!detail?.twittId || !detail.id || !detail.uid || !detail.body) return;
       void getUserProfile(detail.uid).then((profile) => {
         setCommentNames((names) => ({ ...names, [detail.uid!]: profile?.username || detail.uid!.slice(0, 10) }));
         setCommentsByPost((current) => {
           const comments = current[detail.twittId!] || [];
           if (comments.some((comment) => comment.id === detail.id)) return current;
-          return { ...current, [detail.twittId!]: [...comments, { id: detail.id!, uid: detail.uid!, body: detail.body!, likes: 0, createdAt: { toMillis: () => Date.now() } }] };
+          return { ...current, [detail.twittId!]: [...comments, { id: detail.id!, uid: detail.uid!, body: detail.body!, attachment: detail.attachment || null, likes: 0, createdAt: { toMillis: () => Date.now() } }] };
         });
       });
     };
@@ -975,6 +978,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
     <div className="feed-tabs"><button className={tab === "recent" ? "active" : ""} onClick={() => setTab("recent")}>Recent <small>{communityLabel} · 24h</small></button><button className={tab === "trending" ? "active" : ""} onClick={() => setTab("trending")}>Trending <small>{communityLabel} · daily</small></button></div>
     <div className="follow-strip"><span>Following: {following.length ? following.map((id) => id.toUpperCase()).join(" · ") : "none"}</span><button onClick={() => setCommunity("following")}>View following</button></div>
     {remoteError && <div className="notice twitt-sync-error">{remoteError}<button className="secondary compact" type="button" onClick={() => window.location.reload()}>Retry</button></div>}
+    {commentError && <div className="notice twitt-sync-error">{commentError}<button className="icon" type="button" aria-label="Dismiss comment error" onClick={() => setCommentError("")}>×</button></div>}
     {remoteLoading && !posts.length && <div className="twitt-skeleton-list" aria-label="Loading Twitts"><article><span/><div><b/><i/></div></article><article><span/><div><b/><i/></div></article><article><span/><div><b/><i/></div></article></div>}
     <div className="twitt-list">{filtered.slice(0, visible).map((post) => <article className="twitt-card" key={post.id}><div className="twitt-head"><span className="avatar">{authorProfiles[post.handle]?.photoURL ? <img src={authorProfiles[post.handle].photoURL} alt="" /> : post.avatar}</span><div><strong>{post.author}</strong><small>@{post.handle} · {post.age} · {post.community.toUpperCase()}</small></div><div className="twitt-actions"><button className="icon" aria-label="Twitt options" aria-expanded={postMenu === post.id} onClick={() => setPostMenu(postMenu === post.id ? null : post.id)}>•••</button>{postMenu === post.id && <div className="twitt-menu">{post.authorUid === auth?.currentUser?.uid ? <button type="button" className="danger" onClick={() => void removePost(post)}>Delete Twitt</button> : <button type="button" onClick={() => void dismissPost(post)}>Not interested</button>}<button type="button" onClick={() => setPostMenu(null)}>Cancel</button></div>}</div></div><p>{post.body}</p>{post.attachment && (post.attachment.type.startsWith("image/") ? <a className="twitt-media-preview" href={post.attachment.url} target="_blank" rel="noreferrer" download={post.attachment.name}><img src={post.attachment.url} alt={post.attachment.name} /><span>Open / save image</span></a> : <a className="twitt-attachment" href={post.attachment.url} target="_blank" rel="noreferrer" download={post.attachment.name}>📄 {post.attachment.name} · Open / save</a>)}<div className="twitt-meta"><button className={post.liked ? "liked" : ""} onClick={() => handleLike(post)}>♡ {post.likes}</button><button onClick={() => void openComments(post.id)}>◌ {post.comments}</button><span>◉ {post.views}</span><button className={following.includes(post.community) ? "followed" : ""} onClick={() => setFollowing((current) => current.includes(post.community) ? current.filter((id) => id !== post.community) : [...current, post.community])}>{following.includes(post.community) ? "Following" : `Follow ${post.community.toUpperCase()}`}</button></div></article>)}</div>
     {commenting && posts.find((post) => post.id === commenting) && <CommentSheet post={posts.find((post) => post.id === commenting)!} comments={commentsByPost[commenting] || []} loading={commentLoading === commenting} hasMore={Boolean(commentMore[commenting])} names={commentNames} currentUid={auth?.currentUser?.uid} onClose={() => setCommenting(null)} onLoadMore={() => void loadMoreComments(commenting)} onSubmit={(body, file) => void submitComment(posts.find((post) => post.id === commenting)!, body, file)} onLike={(comment) => void likeComment(commenting, comment)} onDelete={(comment) => void removeComment(posts.find((post) => post.id === commenting)!, comment)} />}
@@ -2128,7 +2132,7 @@ export default function App() {
               <span className="mini-mark">C</span>
               <strong>Co‑Chat</strong>
             </div>
-            <div className="eyebrow">WELCOME BACK</div>
+            <div className="eyebrow">YOUR SPACE · YOUR RHYTHM</div>
           </div>
         )}
         <div className="topbar-actions">
@@ -2408,7 +2412,7 @@ export default function App() {
         {(page === "profile" || page === "settings") && (
           <div className="settings-page">
             <div className="settings-hero">
-              <div><span className="settings-eyebrow">ACCOUNT CENTER</span><h1>{page === "settings" ? "Settings & profile" : "Your profile"}</h1><p>Make Co‑Chat feel like your space.</p></div>
+              <div><span className="settings-eyebrow">ACCOUNT CENTER</span><h1>{page === "settings" ? "Settings & profile" : "Your profile"}</h1><p>Set your vibe, keep your circle close.</p></div>
               <div className="settings-hero-mark">✦</div>
             </div>
             <form className="profile-card settings-profile-card" onSubmit={save}>
@@ -2425,8 +2429,13 @@ export default function App() {
               <label className="field-label settings-bio-field">About you<textarea value={profileBio} onChange={(e) => setProfileBio(e.target.value)} maxLength={160} placeholder="A short line about what you are learning…" /><small>Shown when someone opens your profile from People or your friend list.</small></label>
               <div className="settings-save-row"><span>{profileSaved ? "Profile saved successfully" : "Changes sync across your devices"}</span><button type="submit" className="primary" disabled={preview}>{profileSaved ? "Saved ✓" : "Save profile"}</button></div>
             </form>
+            <div className="settings-quick-grid" aria-label="Co-Chat account summary">
+              <article><span>✦</span><div><b>Personal space</b><small>Your profile, bio, and handle are ready to share.</small></div></article>
+              <article><span>⌁</span><div><b>Stay in the loop</b><small>Messages, calls, and study updates follow your notification choice.</small></div></article>
+              <article><span>◉</span><div><b>Your boundaries</b><small>Control who can discover you and see your active status.</small></div></article>
+            </div>
             <div className="settings settings-list">
-              <div className="settings-section-label">PREFERENCES</div>
+              <div className="settings-section-label">YOUR CO-CHAT EXPERIENCE</div>
               <button type="button" onClick={() => void shareProfile(profileName, profileUsername)}>
                 <span className="settings-row-icon">↗</span><span className="settings-option-copy"><b>Share your profile</b><small>Send your name and handle to a friend</small></span><span>›</span>
               </button>
