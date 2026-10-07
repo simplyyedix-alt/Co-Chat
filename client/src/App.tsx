@@ -7,6 +7,7 @@ import {
   signInWithCredential,
   GoogleAuthProvider,
   sendPasswordResetEmail,
+  sendEmailVerification,
   signOut,
   updateProfile,
   type User,
@@ -185,6 +186,7 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
         await updateProfile(result.user, {
           displayName: String(data.get("name")),
         });
+        await sendEmailVerification(result.user);
       } else
         await signInWithEmailAndPassword(
           auth,
@@ -634,6 +636,7 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [showNew, setShowNew] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
   const [showGroup, setShowGroup] = useState(false);
   const [needsUsername, setNeedsUsername] = useState(false);
   const [senderNames, setSenderNames] = useState<Record<string, string>>({});
@@ -688,6 +691,15 @@ export default function App() {
         email: "preview@cochat.local",
       } as User)
     : user;
+  const resendVerification = async () => {
+    if (!user) return;
+    try {
+      await sendEmailVerification(user);
+      setVerificationSent(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message.replace("Firebase: ", "") : "Could not resend the verification email.");
+    }
+  };
   useEffect(() => {
     if (!auth) {
       setLoading(false);
@@ -1627,6 +1639,11 @@ export default function App() {
           </button>
         </div>
       </header>
+      {user && !user.emailVerified && (
+        <div className="notice" role="status">
+          Verify your email to keep your account secure. {verificationSent ? "Check your inbox." : <button type="button" className="secondary compact" onClick={() => void resendVerification()}>Resend email</button>}
+        </div>
+      )}
       {(page === "chats" || page === "communities") && showFriendRequests && (
         <div className="notification-panel">
           <FriendZone uid={liveUser.uid} onMessage={startConversation} />
