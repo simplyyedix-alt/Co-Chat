@@ -2344,7 +2344,7 @@ export default function App() {
                 type="button"
                 onClick={() => setDarkMode((value) => !value)}
               >
-                <span className="settings-row-icon">◐</span>Appearance <span className="settings-value">{darkMode ? "Dark" : "Light"} <span className="chevron">›</span></span>
+                <span className="settings-row-icon">◐</span><span className="settings-option-copy"><b>Appearance</b><small>Choose the {darkMode ? "dark" : "light"} Co‑Chat theme</small></span><span className="settings-value">{darkMode ? "Dark" : "Light"} <span className="chevron">›</span></span>
               </button>
               <button type="button" onClick={() => setNotificationsEnabled((value) => !value)}>
                 <span className="settings-row-icon">⌁</span><span className="settings-option-copy"><b>Notifications</b><small>Get updates about messages and study activity</small></span><span className={`settings-toggle ${notificationsEnabled ? "on" : ""}`} aria-label={notificationsEnabled ? "Notifications on" : "Notifications off"}><span /></span>
@@ -2356,7 +2356,7 @@ export default function App() {
                 type="button"
                 onClick={() => setActiveStatus((value) => !value)}
               >
-                <span className={`settings-row-icon ${activeStatus ? "online" : ""}`}>●</span>Active Status <span className={`settings-toggle ${activeStatus ? "on" : ""}`} aria-label={activeStatus ? "Active status on" : "Active status off"}><span /></span>
+                <span className={`settings-row-icon ${activeStatus ? "online" : ""}`}>●</span><span className="settings-option-copy"><b>Active status</b><small>Let friends see when you are available</small></span><span className={`settings-toggle ${activeStatus ? "on" : ""}`} aria-label={activeStatus ? "Active status on" : "Active status off"}><span /></span>
               </button>
               <button type="button" className="settings-danger" onClick={logout}>
                 <span className="settings-row-icon">↪</span><span className="settings-option-copy"><b>Log out</b><small>Sign out of this device</small></span><span>›</span>
