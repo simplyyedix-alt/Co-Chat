@@ -62,6 +62,7 @@ import {
 } from "./services/chat";
 import { attachTwittCommentMedia, attachTwittMedia, createTwitt as createRemoteTwitt, createTwittComment, deleteTwitt, deleteTwittComment, hideTwitt, loadTwittComments, loadTwittPage, recordTwittView, toggleTwittCommentLike, toggleTwittLike, type TwittAttachment, type TwittComment } from "./services/twitts";
 import { StorageManager } from "./services/storageManager";
+import { registerFcmNotifications } from "./services/notifications";
 import "./index.css";
 import "./group-friend.css";
 import "./community-feed.css";
@@ -1179,6 +1180,10 @@ export default function App() {
       })
       .catch(() => setError("Could not load your profile."));
   }, [liveUser?.uid]);
+  useEffect(() => {
+    if (!liveUser || liveUser.uid === "preview") return;
+    void registerFcmNotifications(notificationsEnabled).catch(() => undefined);
+  }, [liveUser?.uid, notificationsEnabled]);
   useEffect(() => {
     if (!liveUser || liveUser.uid === "preview") return;
     const uid = liveUser.uid;
