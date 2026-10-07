@@ -26,12 +26,9 @@ async function getNotificationServiceWorker() {
   if (notificationRegistration) return notificationRegistration
   const scriptUrl = new URL('firebase-messaging-sw.js', document.baseURI)
   try {
-    const existing = await navigator.serviceWorker.getRegistration(scriptUrl.pathname)
-    if (existing) {
-      notificationRegistration = existing
-      return existing
-    }
     scriptUrl.search = messagingConfig().toString()
+    // Register on every fresh page load so an older worker created before the
+    // app-base-path fix is updated instead of being reused forever.
     notificationRegistration = await navigator.serviceWorker.register(scriptUrl.toString())
     return notificationRegistration
   } catch {
