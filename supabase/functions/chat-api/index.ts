@@ -63,7 +63,18 @@ Deno.serve(async (request) => {
     }
     if (action === 'conversations') {
       const rows = await rest(`conversation_members?uid=eq.${encodeURIComponent(user.uid)}&select=conversation_id,hidden_at,unread_count,read_at,conversations(id,type,name,admin_id,created_by,last_message,last_sender_id,last_message_at,created_at)&order=joined_at.desc`)
-      return response({ items: rows || [] })
+      const items = await Promise.all((rows || []).map(async (item: Record<string, unknown>) => ({ ...item, member_ids: await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(String(item.conversation_id))}&select=uid`) })))
+      return response({ items })
+    }
+    if (action === 'create-direct') {
+      const otherUid = String(body?.otherUid || '')
+      const name = String(body?.name || 'Conversation').slice(0, 100)
+      if (!otherUid || otherUid === user.uid) return response({ error: 'A different user is required' }, 400)
+      const created = await rest('conversations', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ type: 'direct', name, created_by: user.uid }) })
+      const conversationId = created?.[0]?.id
+      if (!conversationId) throw new Error('Conversation could not be created')
+      await rest('conversation_members', { method: 'POST', body: JSON.stringify([{ conversation_id: conversationId, uid: user.uid }, { conversation_id: conversationId, uid: otherUid }]) })
+      return response({ id: conversationId })
     }
     if (action === 'messages') {
       const conversationId = String(body?.conversationId || '')

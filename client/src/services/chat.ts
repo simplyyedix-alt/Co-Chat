@@ -23,6 +23,7 @@ import {
 } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { StorageManager } from './storageManager'
+import { createDirect, isSupabaseChatEnabled, sendMessage as sendSupabaseMessage, watchConversations as watchSupabaseConversations, watchMessages as watchSupabaseMessages } from './supabaseChat'
 
 export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; bio?: string; notificationsEnabled?: boolean; discoverable?: boolean; activeStatus?: boolean; theme?: 'light' | 'dark'; lastSeen?: Timestamp | null; profileComplete?: boolean }
 export type Conversation = {
@@ -129,6 +130,7 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 }
 
 export function watchConversations(uid: string, callback: (items: Conversation[]) => void): Unsubscribe | undefined {
+  if (isSupabaseChatEnabled()) return watchSupabaseConversations(uid, callback)
   if (!db) return undefined
   const q = query(collection(db, 'conversations'), where('memberIds', 'array-contains', uid), limit(50))
   return onSnapshot(q, snapshot => {
@@ -148,6 +150,7 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
 }
 
 export function watchMessages(conversationId: string, uid: string, callback: (items: ChatMessage[]) => void): Unsubscribe | undefined {
+  if (isSupabaseChatEnabled()) return watchSupabaseMessages(conversationId, uid, callback)
   if (!db) return undefined
   let cutoff: Timestamp | null = null
   let latest: ChatMessage[] = []
@@ -168,6 +171,15 @@ export function watchMessages(conversationId: string, uid: string, callback: (it
 }
 
 export async function sendMessage(conversationId: string, senderId: string, text: string, file?: File, replyTo?: ChatMessage | null) {
+  if (isSupabaseChatEnabled()) {
+    let attachment: ChatAttachment | null = null
+    if (file) {
+      const stored = await StorageManager.upload(file, { ownerId: senderId, originalName: file.name, mimeType: file.type, sizeBytes: file.size, conversationId })
+      attachment = { name: stored.originalName, url: stored.url, type: stored.mimeType, size: stored.sizeBytes }
+    }
+    await sendSupabaseMessage(conversationId, text, attachment, replyTo)
+    return
+  }
   if (!db) return
   const conversationRef = doc(db, 'conversations', conversationId)
   const conversationSnapshot = await getDoc(conversationRef)
@@ -313,6 +325,11 @@ export async function saveTheme(uid: string, theme: 'light' | 'dark') {
 }
 
 export async function createConversation(uid: string, other: UserProfile) {
+  if (isSupabaseChatEnabled()) {
+    if (!uid || !other.uid || uid === other.uid) throw new Error('Choose another user to start a conversation.')
+    if (await isBlockedBetween(uid, other.uid)) throw new Error('You cannot message this user.')
+    return createDirect(other.uid, other.displayName || other.username)
+  }
   if (!db) return ''
   if (!uid || !other.uid || uid === other.uid) throw new Error('Choose another user to start a conversation.')
   if (await isBlockedBetween(uid, other.uid)) throw new Error('You cannot message this user.')
