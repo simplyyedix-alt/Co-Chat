@@ -17,9 +17,10 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import { socialBackend, supabaseReady } from '../supabase'
-import { createSupabaseTwitt, createSupabaseTwittComment, deleteSupabaseTwitt, deleteSupabaseTwittComment, hideSupabaseTwitt, loadSupabaseTwittComments, loadSupabaseTwittPage, recordSupabaseTwittView, toggleSupabaseTwittCommentLike, toggleSupabaseTwittLike } from './supabaseTwitts'
+import { attachSupabaseTwittCommentMedia, attachSupabaseTwittMedia, createSupabaseTwitt, createSupabaseTwittComment, deleteSupabaseTwitt, deleteSupabaseTwittComment, hideSupabaseTwitt, loadSupabaseTwittComments, loadSupabaseTwittPage, recordSupabaseTwittView, toggleSupabaseTwittCommentLike, toggleSupabaseTwittLike } from './supabaseTwitts'
 
 export type TwittCommunity = 'jee' | 'neet' | 'study' | 'public'
+export type TwittAttachment = { name: string; url: string; storageKey?: string; type: string; size: number }
 
 export type TwittRecord = {
   id: string
@@ -30,6 +31,8 @@ export type TwittRecord = {
   likes: number
   comments: number
   views: number
+  liked?: boolean
+  attachment?: TwittAttachment | null
 }
 
 export type TwittPage = {
@@ -38,7 +41,7 @@ export type TwittPage = {
   hasMore: boolean
 }
 
-export type TwittComment = { id: string; uid: string; body: string; createdAt: DocumentData['createdAt'] | null; likes?: number; liked?: boolean }
+export type TwittComment = { id: string; uid: string; body: string; createdAt: DocumentData['createdAt'] | null; likes?: number; liked?: boolean; attachment?: TwittAttachment | null }
 
 const PAGE_SIZE = 20
 
@@ -53,7 +56,16 @@ function fromDoc(item: QueryDocumentSnapshot<DocumentData>): TwittRecord {
     likes: Number(data.likes || 0),
     comments: Number(data.comments || 0),
     views: Number(data.views || 0),
+    attachment: attachmentFromUnknown(data.attachment),
   }
+}
+
+function attachmentFromUnknown(value: unknown): TwittAttachment | null {
+  if (!value || typeof value !== 'object') return null
+  const item = value as Record<string, unknown>
+  const url = String(item.url || '')
+  if (!url) return null
+  return { name: String(item.name || 'attachment'), url, storageKey: item.storageKey ? String(item.storageKey) : undefined, type: String(item.type || 'application/octet-stream'), size: Number(item.size || 0) }
 }
 
 export async function loadTwittPage(community: TwittCommunity | 'all', cursor?: string | null): Promise<TwittPage> {
@@ -67,12 +79,12 @@ export async function loadTwittPage(community: TwittCommunity | 'all', cursor?: 
   return { items: snapshot.docs.map(fromDoc), cursor: lastCreatedAt?.toDate?.()?.toISOString?.() || null, hasMore: snapshot.size === PAGE_SIZE }
 }
 
-export async function createTwitt(uid: string, body: string, community: TwittCommunity) {
-  if (socialBackend === 'supabase' && supabaseReady) return createSupabaseTwitt(uid, body, community)
+export async function createTwitt(uid: string, body: string, community: TwittCommunity, attachment?: TwittAttachment | null) {
+  if (socialBackend === 'supabase' && supabaseReady) return createSupabaseTwitt(uid, body, community, attachment)
   if (!db) throw new Error('Firebase is not configured.')
   const text = body.trim()
   if (!text || text.length > 280) throw new Error('Twitt must be between 1 and 280 characters.')
-  const ref = await addDoc(collection(db, 'twitts'), { uid, body: text, community, likes: 0, comments: 0, views: 0, createdAt: serverTimestamp() })
+  const ref = await addDoc(collection(db, 'twitts'), { uid, body: text, community, likes: 0, comments: 0, views: 0, ...(attachment ? { attachment } : {}), createdAt: serverTimestamp() })
   return ref.id
 }
 
@@ -112,9 +124,9 @@ export async function recordTwittView(twittId: string, uid: string) {
   })
 }
 
-export async function createTwittComment(twittId: string, uid: string, body: string) {
+export async function createTwittComment(twittId: string, uid: string, body: string, attachment?: TwittAttachment | null) {
   if (socialBackend === 'supabase' && supabaseReady) {
-    const id = await createSupabaseTwittComment(twittId, uid, body)
+    const id = await createSupabaseTwittComment(twittId, uid, body, attachment)
     window.dispatchEvent(new CustomEvent('cochat-comment-created', { detail: { twittId, id, uid, body: body.trim() } }))
     return id
   }
@@ -126,11 +138,23 @@ export async function createTwittComment(twittId: string, uid: string, body: str
   await runTransaction(db, async (transaction) => {
     const twitt = await transaction.get(twittRef)
     if (!twitt.exists()) throw new Error('Twitt no longer exists.')
-    transaction.set(commentRef, { uid, body: text, createdAt: serverTimestamp() })
+    transaction.set(commentRef, { uid, body: text, ...(attachment ? { attachment } : {}), createdAt: serverTimestamp() })
     transaction.update(twittRef, { comments: Math.max(0, Number(twitt.data().comments || 0)) + 1 })
   })
   window.dispatchEvent(new CustomEvent('cochat-comment-created', { detail: { twittId, id: commentRef.id, uid, body: text } }))
   return commentRef.id
+}
+
+export async function attachTwittMedia(twittId: string, uid: string, attachment: TwittAttachment) {
+  if (socialBackend === 'supabase' && supabaseReady) return attachSupabaseTwittMedia(twittId, uid, attachment)
+  if (!db) throw new Error('Firebase is not configured.')
+  await updateDoc(doc(db, 'twitts', twittId), { attachment })
+}
+
+export async function attachTwittCommentMedia(twittId: string, commentId: string, uid: string, attachment: TwittAttachment) {
+  if (socialBackend === 'supabase' && supabaseReady) return attachSupabaseTwittCommentMedia(twittId, commentId, uid, attachment)
+  if (!db) throw new Error('Firebase is not configured.')
+  await updateDoc(doc(db, 'twitts', twittId, 'comments', commentId), { attachment })
 }
 
 export async function deleteTwitt(twittId: string, uid: string) {
@@ -186,7 +210,7 @@ export async function loadTwittComments(twittId: string, cursor?: string | null)
   const constraints: QueryConstraint[] = [orderBy('createdAt', 'desc'), ...(cursor ? [where('createdAt', '<', Timestamp.fromDate(new Date(cursor)))] : []), limit(PAGE_SIZE)]
   const snapshot = await getDocs(query(collection(db, 'twitts', twittId, 'comments'), ...constraints))
   return {
-    items: snapshot.docs.map((item) => ({ id: item.id, uid: String(item.data().uid || ''), body: String(item.data().body || ''), likes: Number(item.data().likes || 0), createdAt: item.data().createdAt || null })),
+    items: snapshot.docs.map((item) => ({ id: item.id, uid: String(item.data().uid || ''), body: String(item.data().body || ''), likes: Number(item.data().likes || 0), liked: false, attachment: attachmentFromUnknown(item.data().attachment), createdAt: item.data().createdAt || null })),
     cursor: snapshot.docs[snapshot.docs.length - 1]?.data().createdAt?.toDate?.()?.toISOString?.() || null,
     hasMore: snapshot.size === PAGE_SIZE,
   }

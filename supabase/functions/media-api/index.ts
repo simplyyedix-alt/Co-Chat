@@ -19,6 +19,8 @@ const corsHeaders = {
 
 const maxFileSize = 50 * 1024 * 1024
 const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/webm', 'application/pdf', 'text/plain'])
+const socialMaxFileSize = 5 * 1024 * 1024
+const socialAllowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'])
 
 function response(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -64,7 +66,7 @@ function safeSegment(value: string, fallback: string) {
 
 function keyFromRequest(request: Request) {
   const key = new URL(request.url).searchParams.get('key') || ''
-  if (!key.startsWith('conversation-media/') || key.includes('..') || key.includes('\\')) throw new Error('Invalid storage key')
+  if ((!key.startsWith('conversation-media/') && !key.startsWith('twitt-media/')) || key.includes('..') || key.includes('\\')) throw new Error('Invalid storage key')
   return key
 }
 
@@ -87,13 +89,17 @@ Deno.serve(async (request) => {
       const form = await request.formData()
       const file = form.get('file')
       if (!(file instanceof File)) return response({ error: 'file is required' }, 400)
-      if (file.size <= 0 || file.size > maxFileSize) return response({ error: 'Files must be smaller than 50 MB' }, 400)
-      if (!allowedTypes.has(file.type)) return response({ error: 'This file type is not supported' }, 400)
-      let metadata: { originalName?: string; mimeType?: string; conversationId?: string } = {}
+      let metadata: { originalName?: string; mimeType?: string; conversationId?: string; twittId?: string; scope?: string } = {}
       try { metadata = JSON.parse(String(form.get('metadata') || '{}')) } catch { return response({ error: 'Invalid metadata' }, 400) }
-      const conversation = safeSegment(metadata.conversationId || 'shared', 'shared')
+      const socialUpload = metadata.scope === 'twitt'
+      const sizeLimit = socialUpload ? socialMaxFileSize : maxFileSize
+      const typeAllowlist = socialUpload ? socialAllowedTypes : allowedTypes
+      if (file.size <= 0 || file.size > sizeLimit) return response({ error: socialUpload ? 'Twitt media must be smaller than 5 MB' : 'Files must be smaller than 50 MB' }, 400)
+      if (!typeAllowlist.has(file.type)) return response({ error: socialUpload ? 'Twitts support photos and PDF files only' : 'This file type is not supported' }, 400)
+      if (socialUpload && !metadata.twittId) return response({ error: 'twittId is required for Twitt media' }, 400)
+      const parent = safeSegment(socialUpload ? metadata.twittId || 'twitt' : metadata.conversationId || 'shared', socialUpload ? 'twitt' : 'shared')
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-120) || 'file'
-      const key = `conversation-media/${conversation}/${safeSegment(uid, 'user')}/${crypto.randomUUID()}-${safeName}`
+      const key = `${socialUpload ? 'twitt-media' : 'conversation-media'}/${parent}/${safeSegment(uid, 'user')}/${crypto.randomUUID()}-${safeName}`
       await s3.send(new PutObjectCommand({ Bucket: config.bucket, Key: key, Body: new Uint8Array(await file.arrayBuffer()), ContentType: file.type, Metadata: { ownerid: uid, originalname: file.name.slice(0, 200) } }))
       return response({ provider: 'backblaze-b2', storageKey: key, url: await signedUrl(s3, config.bucket, key, file.type), originalName: file.name, mimeType: file.type, sizeBytes: file.size })
     }

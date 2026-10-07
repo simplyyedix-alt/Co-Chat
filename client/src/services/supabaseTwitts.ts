@@ -1,6 +1,6 @@
 import { invokeSocialApi, supabase } from '../supabase'
 import { auth } from '../firebase'
-import type { TwittCommunity, TwittComment, TwittRecord } from './twitts'
+import type { TwittAttachment, TwittCommunity, TwittComment, TwittRecord } from './twitts'
 
 const PAGE_SIZE = 20
 
@@ -19,10 +19,12 @@ type SupabaseRow = {
   comments_count: number
   views_count: number
   created_at: string
+  liked?: boolean
+  attachment?: TwittAttachment | null
 }
 
 function fromRow(row: SupabaseRow): TwittRecord {
-  return { id: row.id, uid: row.author_id, community: row.community, body: row.body, likes: row.likes_count, comments: row.comments_count, views: row.views_count, createdAt: { toMillis: () => new Date(row.created_at).getTime() } }
+  return { id: row.id, uid: row.author_id, community: row.community, body: row.body, likes: row.likes_count, comments: row.comments_count, views: row.views_count, liked: Boolean(row.liked), attachment: row.attachment || null, createdAt: { toMillis: () => new Date(row.created_at).getTime() } }
 }
 
 export async function loadSupabaseTwittPage(community: TwittCommunity | 'all', cursor?: string | null): Promise<{ items: TwittRecord[]; cursor: string | null; hasMore: boolean }> {
@@ -31,12 +33,12 @@ export async function loadSupabaseTwittPage(community: TwittCommunity | 'all', c
   return { items: rows.map(fromRow), cursor: rows.length ? rows[rows.length - 1].created_at : null, hasMore: rows.length === PAGE_SIZE }
 }
 
-export async function createSupabaseTwitt(uid: string, body: string, community: TwittCommunity) {
+export async function createSupabaseTwitt(uid: string, body: string, community: TwittCommunity, attachment?: TwittAttachment | null) {
   if (!supabase) throw new Error('Supabase is not configured.')
   const text = body.trim()
   if (!text || text.length > 280) throw new Error('Twitt must be between 1 and 280 characters.')
   void uid
-  const result = await invokeSocialApi(await firebaseToken(), { action: 'create', text, community })
+  const result = await invokeSocialApi(await firebaseToken(), { action: 'create', text, community, attachment: attachment || undefined })
   return String(result.id || '')
 }
 
@@ -54,11 +56,23 @@ export async function recordSupabaseTwittView(twittId: string, uid: string) {
   return Boolean(result.recorded)
 }
 
-export async function createSupabaseTwittComment(twittId: string, uid: string, body: string) {
+export async function createSupabaseTwittComment(twittId: string, uid: string, body: string, attachment?: TwittAttachment | null) {
   if (!supabase) throw new Error('Supabase is not configured.')
   void uid
-  const result = await invokeSocialApi(await firebaseToken(), { action: 'comment', twittId, text: body })
+  const result = await invokeSocialApi(await firebaseToken(), { action: 'comment', twittId, text: body, attachment: attachment || undefined })
   return String(result.id || '')
+}
+
+export async function attachSupabaseTwittMedia(twittId: string, uid: string, attachment: TwittAttachment) {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  void uid
+  await invokeSocialApi(await firebaseToken(), { action: 'attach', twittId, attachment })
+}
+
+export async function attachSupabaseTwittCommentMedia(twittId: string, commentId: string, uid: string, attachment: TwittAttachment) {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  void uid
+  await invokeSocialApi(await firebaseToken(), { action: 'attach-comment', twittId, commentId, attachment })
 }
 
 export async function deleteSupabaseTwitt(twittId: string, uid: string) {
@@ -91,6 +105,6 @@ export async function deleteSupabaseTwittComment(twittId: string, commentId: str
 
 export async function loadSupabaseTwittComments(twittId: string, cursor?: string | null): Promise<{ items: TwittComment[]; cursor: string | null; hasMore: boolean }> {
   if (!supabase) return { items: [], cursor: null, hasMore: false }
-  const rows = (await invokeSocialApi(await firebaseToken(), { action: 'comments', twittId, cursor })).items as Array<{ id: string; author_id: string; body: string; likes_count: number; liked?: boolean; created_at: string }>
-  return { items: rows.map((row) => ({ id: row.id, uid: row.author_id, body: row.body, likes: row.likes_count, liked: row.liked, createdAt: { toMillis: () => new Date(row.created_at).getTime() } })), cursor: rows.length ? rows[rows.length - 1].created_at : null, hasMore: rows.length === PAGE_SIZE }
+  const rows = (await invokeSocialApi(await firebaseToken(), { action: 'comments', twittId, cursor })).items as Array<{ id: string; author_id: string; body: string; likes_count: number; liked?: boolean; attachment?: TwittAttachment | null; created_at: string }>
+  return { items: rows.map((row) => ({ id: row.id, uid: row.author_id, body: row.body, likes: row.likes_count, liked: row.liked, attachment: row.attachment || null, createdAt: { toMillis: () => new Date(row.created_at).getTime() } })), cursor: rows.length ? rows[rows.length - 1].created_at : null, hasMore: rows.length === PAGE_SIZE }
 }

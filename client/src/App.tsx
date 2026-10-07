@@ -60,10 +60,12 @@ import {
   type StudyLeaderboardEntry,
   type UserProfile,
 } from "./services/chat";
-import { createTwitt as createRemoteTwitt, createTwittComment, deleteTwitt, deleteTwittComment, hideTwitt, loadTwittComments, loadTwittPage, recordTwittView, toggleTwittCommentLike, toggleTwittLike, type TwittComment } from "./services/twitts";
+import { attachTwittCommentMedia, attachTwittMedia, createTwitt as createRemoteTwitt, createTwittComment, deleteTwitt, deleteTwittComment, hideTwitt, loadTwittComments, loadTwittPage, recordTwittView, toggleTwittCommentLike, toggleTwittLike, type TwittAttachment, type TwittComment } from "./services/twitts";
+import { StorageManager } from "./services/storageManager";
 import "./index.css";
 import "./group-friend.css";
 import "./community-feed.css";
+import "./discovery-media.css";
 import VoiceCall from "./components/VoiceCall";
 import GroupVoiceCall from "./components/GroupVoiceCall";
 import Avatar from "./components/Avatar";
@@ -578,14 +580,15 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   );
 }
 
-type TwittPreview = { id: string; authorUid: string; author: string; handle: string; avatar: string; body: string; likes: number; comments: number; views: string; age: string; createdAt: number; community: "jee" | "neet" | "study" | "public"; liked?: boolean };
+type TwittPreview = { id: string; authorUid: string; author: string; handle: string; avatar: string; body: string; likes: number; comments: number; views: string; age: string; createdAt: number; community: "jee" | "neet" | "study" | "public"; liked?: boolean; attachment?: TwittAttachment | null };
 
 function CommentSheet({ post, comments, loading, hasMore, names, currentUid, onClose, onLoadMore, onSubmit, onLike, onDelete }: {
   post: TwittPreview; comments: TwittComment[]; loading: boolean; hasMore: boolean; names: Record<string, string>; currentUid?: string;
-  onClose: () => void; onLoadMore: () => void; onSubmit: (body: string) => void; onLike: (comment: TwittComment) => void; onDelete: (comment: TwittComment) => void;
+  onClose: () => void; onLoadMore: () => void; onSubmit: (body: string, file?: File | null) => void; onLike: (comment: TwittComment) => void; onDelete: (comment: TwittComment) => void;
 }) {
   const [draft, setDraft] = useState("");
-  const submit = (event: FormEvent) => { event.preventDefault(); const body = draft.trim(); if (!body) return; onSubmit(body); setDraft(""); };
+  const [file, setFile] = useState<File | null>(null);
+  const submit = (event: FormEvent) => { event.preventDefault(); const body = draft.trim(); if (!body && !file) return; onSubmit(body, file); setDraft(""); setFile(null); };
   return <div className="comment-sheet-backdrop" role="presentation" onMouseDown={onClose}>
     <section className="comment-sheet" role="dialog" aria-modal="true" aria-label="Comments" onMouseDown={(event) => event.stopPropagation()}>
       <div className="sheet-handle" />
@@ -594,10 +597,10 @@ function CommentSheet({ post, comments, loading, hasMore, names, currentUid, onC
       <div className="comment-sheet-list">
         {loading && !comments.length && <p className="comment-loading">Loading comments…</p>}
         {!loading && !comments.length && <div className="comment-empty"><strong>Start the conversation</strong><span>Be the first to leave a helpful comment.</span></div>}
-        {comments.map((comment) => <article className="sheet-comment" key={comment.id}><div className="comment-avatar">{(names[comment.uid] || comment.uid).slice(0, 2).toUpperCase()}</div><div className="sheet-comment-body"><div><strong>@{names[comment.uid] || comment.uid.slice(0, 10)}</strong>{comment.uid === currentUid && <button className="comment-delete" type="button" onClick={() => onDelete(comment)}>Delete</button>}</div><p>{comment.body}</p><button className={comment.liked ? "comment-like liked" : "comment-like"} type="button" onClick={() => onLike(comment)}>♡ {comment.likes || 0}</button></div></article>)}
+        {comments.map((comment) => <article className="sheet-comment" key={comment.id}><div className="comment-avatar">{(names[comment.uid] || comment.uid).slice(0, 2).toUpperCase()}</div><div className="sheet-comment-body"><div><strong>@{names[comment.uid] || comment.uid.slice(0, 10)}</strong>{comment.uid === currentUid && <button className="comment-delete" type="button" onClick={() => onDelete(comment)}>Delete</button>}</div><p>{comment.body}</p>{comment.attachment && <a className="twitt-attachment" href={comment.attachment.url} target="_blank" rel="noreferrer">📎 {comment.attachment.name}</a>}<button className={comment.liked ? "comment-like liked" : "comment-like"} type="button" onClick={() => onLike(comment)}>♡ {comment.likes || 0}</button></div></article>)}
         {hasMore && <button className="load-comments" type="button" disabled={loading} onClick={onLoadMore}>{loading ? "Loading…" : "Load more comments"}</button>}
       </div>
-      <form className="comment-sheet-compose" onSubmit={submit}><input value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 240))} placeholder="Add a thoughtful comment" autoFocus /><button className="primary compact" type="submit" disabled={!draft.trim()}>Send</button></form>
+      <form className="comment-sheet-compose" onSubmit={submit}><input value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 240))} placeholder="Add a thoughtful comment" autoFocus /><label className="comment-media-picker" title="Photo or PDF, max 5 MB">📎<input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label><button className="primary compact" type="submit" disabled={!draft.trim() && !file}>Send</button></form>
     </section>
   </div>;
 }
@@ -614,6 +617,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
   const [draft, setDraft] = useState("");
   const [publishError, setPublishError] = useState("");
   const [draftCommunity, setDraftCommunity] = useState<"jee" | "neet" | "study" | "public">("jee");
+  const [draftFile, setDraftFile] = useState<File | null>(null);
   const [commenting, setCommenting] = useState<string | null>(null);
   const [postMenu, setPostMenu] = useState<string | null>(null);
   const [remoteCursor, setRemoteCursor] = useState<Awaited<ReturnType<typeof loadTwittPage>>["cursor"]>(null);
@@ -641,7 +645,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
       if (!active) return;
       {
         const now = Date.now();
-        setPosts(page.items.map((item) => ({ id: item.id, authorUid: item.uid, author: item.uid === viewerUid ? "You" : "Co-Chat member", handle: item.uid, avatar: item.uid === viewerUid ? "YO" : "CM", body: item.body, likes: item.likes, comments: item.comments, views: String(item.views), age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community })));
+        setPosts(page.items.map((item) => ({ id: item.id, authorUid: item.uid, author: item.uid === viewerUid ? "You" : "Co-Chat member", handle: item.uid, avatar: item.uid === viewerUid ? "YO" : "CM", body: item.body, likes: item.likes, liked: item.liked, comments: item.comments, views: String(item.views), attachment: item.attachment, age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community })));
         setVisible(20);
       }
       setRemoteCursor(page.cursor);
@@ -660,7 +664,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
       try {
         const page = await loadTwittPage("all", remoteCursor);
         const now = Date.now();
-        setPosts((current) => [...current, ...page.items.map((item) => ({ id: item.id, authorUid: item.uid, author: item.uid === auth?.currentUser?.uid ? "You" : "Co-Chat member", handle: item.uid, avatar: item.uid === auth?.currentUser?.uid ? "YO" : "CM", body: item.body, likes: item.likes, comments: item.comments, views: String(item.views), age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community }))]);
+        setPosts((current) => [...current, ...page.items.map((item) => ({ id: item.id, authorUid: item.uid, author: item.uid === auth?.currentUser?.uid ? "You" : "Co-Chat member", handle: item.uid, avatar: item.uid === auth?.currentUser?.uid ? "YO" : "CM", body: item.body, likes: item.likes, liked: item.liked, comments: item.comments, views: String(item.views), attachment: item.attachment, age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community }))]);
         setRemoteCursor(page.cursor);
         setRemoteHasMore(page.hasMore);
         setVisible((current) => current + page.items.length);
@@ -734,7 +738,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
       setCommentMore((current) => ({ ...current, [postId]: page.hasMore }));
     } finally { setCommentLoading(null); }
   };
-  const submitComment = async (post: TwittPreview, body: string) => {
+  const submitComment = async (post: TwittPreview, body: string, file?: File | null) => {
     const uid = auth?.currentUser?.uid || 'you';
     const localId = `local-comment-${Date.now()}`;
     const optimisticComment = { id: localId, uid, body, createdAt: { toMillis: () => Date.now() } };
@@ -742,7 +746,12 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
     setPosts((current) => current.map((item) => item.id === post.id ? { ...item, comments: item.comments + 1 } : item));
     try {
       if (uid !== 'you' && firebaseReady && !post.id.startsWith('local-')) {
-        await createTwittComment(post.id, uid, body);
+        let attachment: TwittAttachment | null = null;
+        if (file) {
+          const uploaded = await StorageManager.upload(file, { ownerId: uid, originalName: file.name, mimeType: file.type, sizeBytes: file.size, twittId: post.id, scope: 'twitt' });
+          attachment = { name: uploaded.originalName, url: uploaded.url, storageKey: uploaded.storageKey, type: uploaded.mimeType, size: uploaded.sizeBytes };
+        }
+        await createTwittComment(post.id, uid, body || '📎 Attachment', attachment);
         setCommentsByPost((current) => ({ ...current, [post.id]: (current[post.id] || []).filter((comment) => comment.id !== localId) }));
       }
       const profile = uid !== 'you' ? await getUserProfile(uid) : null;
@@ -842,11 +851,18 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
     const uid = auth?.currentUser?.uid;
     let id = `local-${Date.now()}`;
     if (uid && firebaseReady) {
-      try { id = await createRemoteTwitt(uid, body, draftCommunity); } catch (error) { setPublishError(error instanceof Error ? error.message : "Could not publish this Twitt. Please try again."); return; }
+      try {
+        id = await createRemoteTwitt(uid, body, draftCommunity);
+        if (draftFile) {
+          const uploaded = await StorageManager.upload(draftFile, { ownerId: uid, originalName: draftFile.name, mimeType: draftFile.type, sizeBytes: draftFile.size, twittId: id, scope: 'twitt' });
+          const attachment = { name: uploaded.originalName, url: uploaded.url, storageKey: uploaded.storageKey, type: uploaded.mimeType, size: uploaded.sizeBytes };
+          await attachTwittMedia(id, uid, attachment);
+        }
+      } catch (error) { setPublishError(error instanceof Error ? error.message : "Could not publish this Twitt. Please try again."); return; }
     }
     const post: TwittPreview = { id, authorUid: uid || "your_profile", author: "You", handle: uid || "your_profile", avatar: "YO", body, likes: 0, comments: 0, views: "0", age: "now", createdAt: Date.now(), community: draftCommunity };
     setPosts((current) => [post, ...current]);
-    setDraft("");
+    setDraft(""); setDraftFile(null);
     setComposerOpen(false);
     setCommunity(draftCommunity);
     setTab("recent");
@@ -854,14 +870,14 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
   };
   return <div className="twitt-feed">
     <section className="discover-intro"><div><span className="kicker">CO-CHAT DISCOVER</span><h2>Ideas worth sharing.</h2><p>Find useful thoughts, study wins, and people learning beside you.</p></div><button className="primary compact" type="button" onClick={() => setComposerOpen(true)}>＋ Write a Twitt</button></section>
-    {composerOpen && <section className="twitt-composer"><div className="composer-heading"><strong>Write to your community</strong><button className="icon" type="button" onClick={() => setComposerOpen(false)}>×</button></div><textarea value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 280))} placeholder="Share a useful thought, question, or study win…" autoFocus />{publishError && <p className="twitt-sync-error">{publishError}</p>}<div className="composer-footer"><select value={draftCommunity} onChange={(event) => setDraftCommunity(event.target.value as typeof draftCommunity)}><option value="jee">JEE Prep</option><option value="neet">NEET Prep</option><option value="study">Study circles</option><option value="public">Public Co-Chat</option></select><span>{draft.length}/280</span><button className="primary compact" type="button" disabled={!draft.trim()} onClick={() => void createTwitt()}>Post Twitt</button></div></section>}
+    {composerOpen && <section className="twitt-composer"><div className="composer-heading"><strong>Write to your community</strong><button className="icon" type="button" onClick={() => setComposerOpen(false)}>×</button></div><textarea value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 280))} placeholder="Share a useful thought, question, or study win…" autoFocus /><label className="twitt-media-picker">📎 Add photo/PDF (max 5 MB)<input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => setDraftFile(event.target.files?.[0] || null)} /></label>{draftFile && <small className="twitt-file-name">{draftFile.name}</small>}{publishError && <p className="twitt-sync-error">{publishError}</p>}<div className="composer-footer"><select value={draftCommunity} onChange={(event) => setDraftCommunity(event.target.value as typeof draftCommunity)}><option value="jee">JEE Prep</option><option value="neet">NEET Prep</option><option value="study">Study circles</option><option value="public">Public Co-Chat</option></select><span>{draft.length}/280</span><button className="primary compact" type="button" disabled={!draft.trim()} onClick={() => void createTwitt()}>Post Twitt</button></div></section>}
     <div className="community-filter" aria-label="Twitt community filter">{([["all", "All"], ["following", "Following"], ["jee", "JEE"], ["neet", "NEET"], ["study", "Study"], ["public", "Public"]] as const).map(([id, label]) => <button key={id} className={community === id ? "active" : ""} onClick={() => { setCommunity(id); setVisible(3); }}>{label}</button>)}</div>
     <div className="feed-tabs"><button className={tab === "recent" ? "active" : ""} onClick={() => setTab("recent")}>Recent <small>{communityLabel} · 24h</small></button><button className={tab === "trending" ? "active" : ""} onClick={() => setTab("trending")}>Trending <small>{communityLabel} · daily</small></button></div>
     <div className="follow-strip"><span>Following: {following.length ? following.map((id) => id.toUpperCase()).join(" · ") : "none"}</span><button onClick={() => setCommunity("following")}>View following</button></div>
     {remoteError && <div className="notice twitt-sync-error">{remoteError}<button className="secondary compact" type="button" onClick={() => window.location.reload()}>Retry</button></div>}
     {remoteLoading && !posts.length && <div className="empty-state">Loading real Twitts…</div>}
-    <div className="twitt-list">{filtered.slice(0, visible).map((post) => <article className="twitt-card" key={post.id}><div className="twitt-head"><span className="avatar">{post.avatar}</span><div><strong>{post.author}</strong><small>@{post.handle} · {post.age} · {post.community.toUpperCase()}</small></div><div className="twitt-actions"><button className="icon" aria-label="Twitt options" aria-expanded={postMenu === post.id} onClick={() => setPostMenu(postMenu === post.id ? null : post.id)}>•••</button>{postMenu === post.id && <div className="twitt-menu">{post.authorUid === auth?.currentUser?.uid ? <button type="button" className="danger" onClick={() => void removePost(post)}>Delete Twitt</button> : <button type="button" onClick={() => void dismissPost(post)}>Not interested</button>}<button type="button" onClick={() => setPostMenu(null)}>Cancel</button></div>}</div></div><p>{post.body}</p><div className="twitt-meta"><button className={post.liked ? "liked" : ""} onClick={() => handleLike(post)}>♡ {post.likes}</button><button onClick={() => void openComments(post.id)}>◌ {post.comments}</button><span>◉ {post.views}</span><button className={following.includes(post.community) ? "followed" : ""} onClick={() => setFollowing((current) => current.includes(post.community) ? current.filter((id) => id !== post.community) : [...current, post.community])}>{following.includes(post.community) ? "Following" : `Follow ${post.community.toUpperCase()}`}</button></div></article>)}</div>
-    {commenting && posts.find((post) => post.id === commenting) && <CommentSheet post={posts.find((post) => post.id === commenting)!} comments={commentsByPost[commenting] || []} loading={commentLoading === commenting} hasMore={Boolean(commentMore[commenting])} names={commentNames} currentUid={auth?.currentUser?.uid} onClose={() => setCommenting(null)} onLoadMore={() => void loadMoreComments(commenting)} onSubmit={(body) => void submitComment(posts.find((post) => post.id === commenting)!, body)} onLike={(comment) => void likeComment(commenting, comment)} onDelete={(comment) => void removeComment(posts.find((post) => post.id === commenting)!, comment)} />}
+    <div className="twitt-list">{filtered.slice(0, visible).map((post) => <article className="twitt-card" key={post.id}><div className="twitt-head"><span className="avatar">{post.avatar}</span><div><strong>{post.author}</strong><small>@{post.handle} · {post.age} · {post.community.toUpperCase()}</small></div><div className="twitt-actions"><button className="icon" aria-label="Twitt options" aria-expanded={postMenu === post.id} onClick={() => setPostMenu(postMenu === post.id ? null : post.id)}>•••</button>{postMenu === post.id && <div className="twitt-menu">{post.authorUid === auth?.currentUser?.uid ? <button type="button" className="danger" onClick={() => void removePost(post)}>Delete Twitt</button> : <button type="button" onClick={() => void dismissPost(post)}>Not interested</button>}<button type="button" onClick={() => setPostMenu(null)}>Cancel</button></div>}</div></div><p>{post.body}</p>{post.attachment && <a className="twitt-attachment" href={post.attachment.url} target="_blank" rel="noreferrer">📎 {post.attachment.name}</a>}<div className="twitt-meta"><button className={post.liked ? "liked" : ""} onClick={() => handleLike(post)}>♡ {post.likes}</button><button onClick={() => void openComments(post.id)}>◌ {post.comments}</button><span>◉ {post.views}</span><button className={following.includes(post.community) ? "followed" : ""} onClick={() => setFollowing((current) => current.includes(post.community) ? current.filter((id) => id !== post.community) : [...current, post.community])}>{following.includes(post.community) ? "Following" : `Follow ${post.community.toUpperCase()}`}</button></div></article>)}</div>
+    {commenting && posts.find((post) => post.id === commenting) && <CommentSheet post={posts.find((post) => post.id === commenting)!} comments={commentsByPost[commenting] || []} loading={commentLoading === commenting} hasMore={Boolean(commentMore[commenting])} names={commentNames} currentUid={auth?.currentUser?.uid} onClose={() => setCommenting(null)} onLoadMore={() => void loadMoreComments(commenting)} onSubmit={(body, file) => void submitComment(posts.find((post) => post.id === commenting)!, body, file)} onLike={(comment) => void likeComment(commenting, comment)} onDelete={(comment) => void removeComment(posts.find((post) => post.id === commenting)!, comment)} />}
     {!remoteLoading && !remoteError && !filtered.length && <div className="empty-state">No Twitts in {communityLabel} yet. Be the first to share something useful.</div>}
     {(visible < filtered.length || remoteHasMore) && <button className="load-more" type="button" onClick={() => void loadMore()} disabled={remoteLoading}>{remoteLoading ? "Loading Twitts…" : "Load 20 more Twitts"}</button>}
     <p className="feed-note">Recent shows the newest posts in this community. Trending is refreshed periodically from eligible posts.</p>

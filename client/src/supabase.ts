@@ -22,7 +22,7 @@ export async function verifyFirebaseIdentity(idToken: string) {
   return data as { uid: string; email: string; displayName: string; photoURL: string }
 }
 
-export async function invokeSocialApi(idToken: string, payload: { action: 'feed' | 'comments' | 'create' | 'view' | 'like' | 'comment' | 'delete-twitt' | 'hide' | 'comment-like' | 'delete-comment'; twittId?: string; commentId?: string; text?: string; community?: string; cursor?: string | null }) {
+export async function invokeSocialApi(idToken: string, payload: { action: 'feed' | 'comments' | 'create' | 'view' | 'like' | 'comment' | 'attach' | 'attach-comment' | 'delete-twitt' | 'hide' | 'comment-like' | 'delete-comment'; twittId?: string; commentId?: string; text?: string; community?: string; cursor?: string | null; attachment?: { name: string; url: string; storageKey?: string; type: string; size: number } }) {
   if (!supabaseReady) throw new Error('Supabase is not configured.')
   const result = await fetch(`${supabaseUrl}/functions/v1/social-api`, {
     method: 'POST',
@@ -31,5 +31,5 @@ export async function invokeSocialApi(idToken: string, payload: { action: 'feed'
   })
   const data = await result.json().catch(() => null)
   if (!result.ok) throw new Error(typeof data?.error === 'string' ? data.error : `Social request failed (${result.status})`)
-  return data as { recorded?: boolean; liked?: boolean; id?: string; items?: unknown[] }
+  return data as { recorded?: boolean; liked?: boolean; deleted?: boolean; id?: string; items?: unknown[] }
 }

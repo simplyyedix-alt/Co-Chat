@@ -2,7 +2,7 @@ import { getDownloadURL, ref, uploadBytes, deleteObject, getMetadata as getStora
 import { auth, storage } from '../firebase'
 import { supabaseAnonKey } from '../supabase'
 
-export type UploadMetadata = { ownerId: string; originalName: string; mimeType: string; sizeBytes: number; conversationId?: string }
+export type UploadMetadata = { ownerId: string; originalName: string; mimeType: string; sizeBytes: number; conversationId?: string; twittId?: string; scope?: 'conversation' | 'twitt' }
 export type StorageObject = { provider: string; storageKey: string; url: string; originalName: string; mimeType: string; sizeBytes: number }
 
 export interface StorageProvider {
@@ -14,6 +14,8 @@ export interface StorageProvider {
 
 const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/webm', 'application/pdf', 'text/plain'])
 const maxFileSize = 50 * 1024 * 1024
+const socialAllowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'])
+const socialMaxFileSize = 5 * 1024 * 1024
 const mediaApiUrl = (import.meta.env.VITE_MEDIA_API_URL || '').replace(/\/$/, '')
 
 async function mediaHeaders() {
@@ -22,7 +24,13 @@ async function mediaHeaders() {
   return { Authorization: `Bearer ${token}`, ...(supabaseAnonKey ? { apikey: supabaseAnonKey } : {}) }
 }
 
-function validateFile(file: File) {
+function validateFile(file: File, metadata?: UploadMetadata) {
+  if (metadata?.scope === 'twitt') {
+    if (!metadata.twittId) throw new Error('Twitt media is missing its post ID.')
+    if (!socialAllowedTypes.has(file.type)) throw new Error('Twitts support photos and PDF files only.')
+    if (file.size > socialMaxFileSize) throw new Error('Twitt media must be smaller than 5 MB.')
+    return
+  }
   if (!allowedTypes.has(file.type)) throw new Error('This file type is not supported.')
   if (file.size > maxFileSize) throw new Error('Files must be smaller than 50 MB.')
 }
@@ -31,7 +39,9 @@ const firebaseProvider: StorageProvider = {
   async upload(file, metadata) {
     if (!storage) throw new Error('Media storage is not configured.')
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const storageKey = `conversation-media/${metadata.conversationId || 'shared'}/${metadata.ownerId}/${crypto.randomUUID()}-${safeName}`
+    const prefix = metadata.scope === 'twitt' ? 'twitt-media' : 'conversation-media'
+    const parent = metadata.scope === 'twitt' ? metadata.twittId || 'twitt' : metadata.conversationId || 'shared'
+    const storageKey = `${prefix}/${parent}/${metadata.ownerId}/${crypto.randomUUID()}-${safeName}`
     const fileRef = ref(storage, storageKey)
     await uploadBytes(fileRef, file, { contentType: file.type })
     return { provider: 'firebase-compatibility', storageKey, url: await getDownloadURL(fileRef), originalName: file.name, mimeType: file.type, sizeBytes: file.size }
@@ -72,7 +82,7 @@ const managedProvider: StorageProvider = {
 // The provider is intentionally selected in one place. A secure B2 provider can replace this
 // without changing chat, Twitt, or profile code; B2 credentials must never ship to the browser.
 export const StorageManager = {
-  async upload(file: File, metadata: UploadMetadata) { validateFile(file); return mediaApiUrl ? managedProvider.upload(file, metadata) : firebaseProvider.upload(file, metadata) },
+  async upload(file: File, metadata: UploadMetadata) { validateFile(file, metadata); return mediaApiUrl ? managedProvider.upload(file, metadata) : firebaseProvider.upload(file, metadata) },
   download: (storageKey: string) => mediaApiUrl ? managedProvider.download(storageKey) : firebaseProvider.download(storageKey),
   delete: (storageKey: string) => mediaApiUrl ? managedProvider.delete(storageKey) : firebaseProvider.delete(storageKey),
   getMetadata: (storageKey: string) => mediaApiUrl ? managedProvider.getMetadata(storageKey) : firebaseProvider.getMetadata(storageKey),
