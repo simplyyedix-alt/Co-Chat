@@ -1,7 +1,7 @@
 const appOrigin = Deno.env.get('APP_ORIGIN') || '*'
 const corsHeaders = {
   'Access-Control-Allow-Origin': appOrigin,
-  'Access-Control-Allow-Headers': 'authorization, content-type',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 

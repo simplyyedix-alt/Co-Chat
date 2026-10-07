@@ -8,7 +8,7 @@ import {
   query,
   runTransaction,
   serverTimestamp,
-  startAfter,
+  Timestamp,
   updateDoc,
   where,
   type DocumentData,
@@ -16,6 +16,8 @@ import {
   type QueryDocumentSnapshot,
 } from 'firebase/firestore'
 import { db } from '../firebase'
+import { socialBackend, supabaseReady } from '../supabase'
+import { createSupabaseTwitt, createSupabaseTwittComment, loadSupabaseTwittComments, loadSupabaseTwittPage, recordSupabaseTwittView, toggleSupabaseTwittLike } from './supabaseTwitts'
 
 export type TwittCommunity = 'jee' | 'neet' | 'study' | 'public'
 
@@ -32,7 +34,7 @@ export type TwittRecord = {
 
 export type TwittPage = {
   items: TwittRecord[]
-  cursor: QueryDocumentSnapshot<DocumentData> | null
+  cursor: string | null
   hasMore: boolean
 }
 
@@ -54,16 +56,19 @@ function fromDoc(item: QueryDocumentSnapshot<DocumentData>): TwittRecord {
   }
 }
 
-export async function loadTwittPage(community: TwittCommunity | 'all', cursor?: QueryDocumentSnapshot<DocumentData> | null): Promise<TwittPage> {
+export async function loadTwittPage(community: TwittCommunity | 'all', cursor?: string | null): Promise<TwittPage> {
+  if (socialBackend === 'supabase' && supabaseReady) return loadSupabaseTwittPage(community, cursor)
   if (!db) return { items: [], cursor: null, hasMore: false }
   const constraints: QueryConstraint[] = community === 'all'
-    ? [orderBy('createdAt', 'desc'), ...(cursor ? [startAfter(cursor)] : []), limit(PAGE_SIZE)]
-    : [where('community', '==', community), orderBy('createdAt', 'desc'), ...(cursor ? [startAfter(cursor)] : []), limit(PAGE_SIZE)]
+    ? [orderBy('createdAt', 'desc'), ...(cursor ? [where('createdAt', '<', Timestamp.fromDate(new Date(cursor)))] : []), limit(PAGE_SIZE)]
+    : [where('community', '==', community), orderBy('createdAt', 'desc'), ...(cursor ? [where('createdAt', '<', Timestamp.fromDate(new Date(cursor)))] : []), limit(PAGE_SIZE)]
   const snapshot = await getDocs(query(collection(db, 'twitts'), ...constraints))
-  return { items: snapshot.docs.map(fromDoc), cursor: snapshot.docs[snapshot.docs.length - 1] || null, hasMore: snapshot.size === PAGE_SIZE }
+  const lastCreatedAt = snapshot.docs[snapshot.docs.length - 1]?.data().createdAt
+  return { items: snapshot.docs.map(fromDoc), cursor: lastCreatedAt?.toDate?.()?.toISOString?.() || null, hasMore: snapshot.size === PAGE_SIZE }
 }
 
 export async function createTwitt(uid: string, body: string, community: TwittCommunity) {
+  if (socialBackend === 'supabase' && supabaseReady) return createSupabaseTwitt(uid, body, community)
   if (!db) throw new Error('Firebase is not configured.')
   const text = body.trim()
   if (!text || text.length > 280) throw new Error('Twitt must be between 1 and 280 characters.')
@@ -72,6 +77,7 @@ export async function createTwitt(uid: string, body: string, community: TwittCom
 }
 
 export async function toggleTwittLike(twittId: string, uid: string) {
+  if (socialBackend === 'supabase' && supabaseReady) return toggleSupabaseTwittLike(twittId, uid)
   if (!db) throw new Error('Firebase is not configured.')
   const twittRef = doc(db, 'twitts', twittId)
   const likeRef = doc(twittRef, 'likes', uid)
@@ -92,6 +98,7 @@ export async function toggleTwittLike(twittId: string, uid: string) {
 }
 
 export async function recordTwittView(twittId: string, uid: string) {
+  if (socialBackend === 'supabase' && supabaseReady) return recordSupabaseTwittView(twittId, uid)
   if (!db) return false
   const twittRef = doc(db, 'twitts', twittId)
   const viewRef = doc(twittRef, 'views', uid)
@@ -106,6 +113,7 @@ export async function recordTwittView(twittId: string, uid: string) {
 }
 
 export async function createTwittComment(twittId: string, uid: string, body: string) {
+  if (socialBackend === 'supabase' && supabaseReady) return createSupabaseTwittComment(twittId, uid, body)
   if (!db) throw new Error('Firebase is not configured.')
   const text = body.trim()
   if (!text || text.length > 240) throw new Error('Comment must be between 1 and 240 characters.')
@@ -120,13 +128,14 @@ export async function createTwittComment(twittId: string, uid: string, body: str
   return commentRef.id
 }
 
-export async function loadTwittComments(twittId: string, cursor?: QueryDocumentSnapshot<DocumentData> | null) {
+export async function loadTwittComments(twittId: string, cursor?: string | null) {
+  if (socialBackend === 'supabase' && supabaseReady) return loadSupabaseTwittComments(twittId, cursor)
   if (!db) return { items: [] as TwittComment[], cursor: null, hasMore: false }
-  const constraints: QueryConstraint[] = [orderBy('createdAt', 'desc'), ...(cursor ? [startAfter(cursor)] : []), limit(PAGE_SIZE)]
+  const constraints: QueryConstraint[] = [orderBy('createdAt', 'desc'), ...(cursor ? [where('createdAt', '<', Timestamp.fromDate(new Date(cursor)))] : []), limit(PAGE_SIZE)]
   const snapshot = await getDocs(query(collection(db, 'twitts', twittId, 'comments'), ...constraints))
   return {
     items: snapshot.docs.map((item) => ({ id: item.id, uid: String(item.data().uid || ''), body: String(item.data().body || ''), createdAt: item.data().createdAt || null })),
-    cursor: snapshot.docs[snapshot.docs.length - 1] || null,
+    cursor: snapshot.docs[snapshot.docs.length - 1]?.data().createdAt?.toDate?.()?.toISOString?.() || null,
     hasMore: snapshot.size === PAGE_SIZE,
   }
 }
