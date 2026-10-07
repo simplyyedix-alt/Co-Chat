@@ -367,11 +367,11 @@ const starterTwitts: TwittPreview[] = [
   { id: "t3", author: "Co-Chat Community", handle: "cochat", avatar: "C", body: "What are you studying this evening? Drop one topic and find someone learning the same thing.", likes: 204, comments: 31, views: "4.6k", age: "5 hr", createdAt: Date.now() - 5 * 3_600_000, community: "public" },
 ];
 
-function TwittFeed() {
+function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "jee" | "neet" | "study" | "public" | "following" }) {
   const [tab, setTab] = useState<"recent" | "trending">("recent");
   const [posts, setPosts] = useState(starterTwitts);
   const [visible, setVisible] = useState(3);
-  const [community, setCommunity] = useState<"all" | "jee" | "neet" | "study" | "public" | "following">("all");
+  const [community, setCommunity] = useState<"all" | "jee" | "neet" | "study" | "public" | "following">(initialCommunity);
   const [following, setFollowing] = useState<string[]>(["jee"]);
   const [composerOpen, setComposerOpen] = useState(false);
   const [draft, setDraft] = useState("");
@@ -387,6 +387,7 @@ function TwittFeed() {
   const [commentCursors, setCommentCursors] = useState<Record<string, Awaited<ReturnType<typeof loadTwittComments>>["cursor"]>>({});
   const [commentMore, setCommentMore] = useState<Record<string, boolean>>({});
   const [commentLoading, setCommentLoading] = useState<string | null>(null);
+  useEffect(() => { setCommunity(initialCommunity); setVisible(3); }, [initialCommunity]);
   useEffect(() => {
     const viewerUid = auth?.currentUser?.uid;
     if (!viewerUid || !firebaseReady) return undefined;
@@ -573,6 +574,7 @@ export default function App() {
   const [voiceRole, setVoiceRole] = useState<"caller" | "callee">("caller");
   const [voiceTarget, setVoiceTarget] = useState<{ id: string; name: string; photoURL?: string; memberIds: string[] } | null>(null);
   const [page, setPage] = useState("chats");
+  const [discoverCommunity, setDiscoverCommunity] = useState<"all" | "jee" | "neet" | "study" | "public" | "following">("all");
   const [conversations, setConversations] =
     useState<Conversation[]>(starterChats);
   const [selected, setSelected] = useState<Conversation | null>(null);
@@ -1631,7 +1633,7 @@ export default function App() {
             {page === "communities" && (
               <>
               <section className="community-hero"><div><span className="kicker">YOUR COMMUNITIES</span><h2>Find your people.</h2><p>Public spaces to learn, share, and stay accountable together.</p></div><span className="community-symbol">♧</span></section>
-              <div className="community-rail"><button type="button" onClick={() => setPage("discover")}><span>JEE</span><strong>JEE Prep</strong><small>Public · 2.4k · View Twitts</small></button><button type="button" onClick={() => setPage("discover")}><span>⌂</span><strong>Study circles</strong><small>Private · 8 members · View Twitts</small></button><button type="button" onClick={() => setShowGroup(true)}><span>+</span><strong>Create one</strong><small>Your space · New group</small></button></div>
+              <div className="community-rail"><button type="button" onClick={() => { setDiscoverCommunity("jee"); setPage("discover"); }}><span>JEE</span><strong>JEE Prep</strong><small>Public · 2.4k · View Twitts</small></button><button type="button" onClick={() => { setDiscoverCommunity("study"); setPage("discover"); }}><span>⌂</span><strong>Study circles</strong><small>Private · 8 members · View Twitts</small></button><button type="button" onClick={() => setShowGroup(true)}><span>+</span><strong>Create one</strong><small>Your space · New group</small></button></div>
               <div className="chat-tools">
                 <button
                   className="secondary compact"
@@ -1787,7 +1789,7 @@ export default function App() {
           </>
         )}
         {page === "study" && <StudyHome />}
-        {page === "discover" && <TwittFeed />}
+        {page === "discover" && <TwittFeed initialCommunity={discoverCommunity} />}
         {page === "search" && <SearchPanel uid={liveUser.uid} onSelect={startConversation} />}
         {page === "status" && (
           <div className="hero-card coming-soon">
