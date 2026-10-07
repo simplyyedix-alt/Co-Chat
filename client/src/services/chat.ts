@@ -162,7 +162,7 @@ export function watchMessages(conversationId: string, uid: string, callback: (it
     cutoff = asTimestamp(snapshot.data()?.hiddenAt?.[uid])
     if (active) callback(visible())
   }).catch(() => undefined)
-  const q = query(collection(db, 'conversations', conversationId, 'messages'))
+  const q = query(collection(db, 'conversations', conversationId, 'messages'), orderBy('createdAt', 'desc'), limit(30))
   const unsubscribe = onSnapshot(q, snapshot => { latest = snapshot.docs.map(item => { const data = item.data(); return { id: item.id, text: String(data.text || ''), senderId: String(data.senderId || ''), createdAt: asTimestamp(data.createdAt), attachment: data.attachment ? { name: String(data.attachment.name || 'file'), url: String(data.attachment.url || ''), type: String(data.attachment.type || ''), size: Number(data.attachment.size || 0) } : null, replyTo: data.replyTo ? { id: String(data.replyTo.id || ''), text: String(data.replyTo.text || ''), senderId: String(data.replyTo.senderId || '') } : null, seenBy: Array.isArray(data.seenBy) ? data.seenBy.map(String) : [], hiddenFor: Array.isArray(data.hiddenFor) ? data.hiddenFor.map(String) : [] } }).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)); if (active) callback(visible()) })
   return () => { active = false; unsubscribe() }
 }
@@ -190,6 +190,8 @@ export async function sendMessage(conversationId: string, senderId: string, text
   if (attachment) messageData.attachment = attachment
   if (replyTo) messageData.replyTo = { id: replyTo.id, text: replyTo.text, senderId: replyTo.senderId }
   await addDoc(collection(conversationRef, 'messages'), { ...messageData, seenBy: [senderId] })
+  const overflow = await getDocs(query(collection(conversationRef, 'messages'), orderBy('createdAt', 'desc'), limit(31)))
+  if (overflow.size > 30) await deleteDoc(overflow.docs[overflow.docs.length - 1].ref)
   const recipients = (conversationData.memberIds || []).filter((id: string) => id !== senderId)
   const unreadUpdates = Object.fromEntries(recipients.map((id: string) => [`unreadCounts.${id}`, increment(1)]))
   await updateDoc(conversationRef, { lastMessage: attachment ? `📎 ${attachment.name}` : text, lastSenderId: senderId, lastMessageAt: serverTimestamp(), hiddenFor: [], ...unreadUpdates })
