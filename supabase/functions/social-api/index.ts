@@ -67,6 +67,17 @@ async function callRest(path: string, init: RequestInit = {}) {
 const socialMediaTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'])
 const socialMediaLimit = 5 * 1024 * 1024
 
+type SocialRequest = {
+  action?: string
+  twittId?: string
+  commentId?: string
+  text?: string
+  community?: string
+  cursor?: string
+  liked?: boolean
+  attachment?: unknown
+}
+
 function validSocialAttachment(value: unknown) {
   if (!value || typeof value !== 'object') return false
   const attachment = value as Record<string, unknown>
@@ -86,7 +97,7 @@ Deno.serve(async (request) => {
   const uid = await verifyFirebaseToken(token)
   if (!uid) return response({ error: 'Invalid Firebase identity token' }, 401)
 
-  const body = await request.json().catch(() => null) as { action?: string; twittId?: string; commentId?: string; text?: string; community?: string; cursor?: string; attachment?: unknown } | null
+  const body = await request.json().catch(() => null) as SocialRequest | null
   if (!body?.action) return response({ error: 'action is required' }, 400)
 
   const communities = new Set(['all', 'jee', 'neet', 'study', 'public'])
