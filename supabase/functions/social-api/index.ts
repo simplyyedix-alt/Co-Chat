@@ -1,4 +1,7 @@
-const appOrigin = Deno.env.get('APP_ORIGIN') || '*'
+const configuredOrigin = Deno.env.get('APP_ORIGIN') || '*'
+const appOrigin = configuredOrigin === '*' ? '*' : (() => {
+  try { return new URL(configuredOrigin).origin } catch { return configuredOrigin.replace(/\/$/, '') }
+})()
 const corsHeaders = {
   'Access-Control-Allow-Origin': appOrigin,
   'Access-Control-Allow-Headers': 'authorization, apikey, content-type',
