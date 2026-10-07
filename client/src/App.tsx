@@ -447,6 +447,7 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   const [studyZoneEntries, setStudyZoneEntries] = useState<StudyLeaderboardEntry[]>([]);
   const [studyFriendIds, setStudyFriendIds] = useState<string[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardRefreshKey, setLeaderboardRefreshKey] = useState(0);
   const [journeyOpen, setJourneyOpen] = useState(false);
   const [timerStartedAt, setTimerStartedAt] = useState<number | null>(() => { try { return Number(JSON.parse(localStorage.getItem(studyKey) || "{}").timerStartedAt) || null; } catch { return null; } });
   const [running, setRunning] = useState(() => { try { const saved = JSON.parse(localStorage.getItem(studyKey) || "{}"); return Boolean(saved.timerRunning && saved.timerStartedAt && saved.targetSeconds); } catch { return false; } });
@@ -479,9 +480,8 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
       }
     };
     void refresh();
-    const timer = window.setInterval(() => void refresh(), 15000);
-    return () => { cancelled = true; window.clearInterval(timer); };
-  }, [uid, weekKey, studyFriendIds, leaderboardMode, leaderboardOpen]);
+    return () => { cancelled = true; };
+  }, [uid, weekKey, studyFriendIds, leaderboardMode, leaderboardOpen, leaderboardRefreshKey]);
   useEffect(() => {
     void updateStudyPresence(running, timerTaskId ? "Working on an active task" : "In a focus session").catch(() => undefined);
     const timer = window.setInterval(() => void updateStudyPresence(running, timerTaskId ? "Working on an active task" : "In a focus session").catch(() => undefined), 30000);
@@ -512,7 +512,7 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   const progress = targetSeconds ? Math.min(100, Math.round((seconds / targetSeconds) * 100)) : Math.min(100, Math.round((seconds / 3600) * 100));
   const saveSession = () => {
     if (seconds <= 0) return;
-    void saveStudySession(seconds, weekKey).catch(() => undefined);
+    void saveStudySession(seconds, weekKey).then(() => setLeaderboardRefreshKey((value) => value + 1)).catch(() => undefined);
     const nextTotal = totalSeconds + seconds;
     const nextWeekly = weeklySeconds + seconds;
     const today = new Date().toISOString().slice(0, 10);
