@@ -114,6 +114,39 @@ Deno.serve(async (request) => {
       await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: 'DELETE' })
       return response({ deleted: true })
     }
+    if (action === 'mark-read') {
+      const conversationId = String(body?.conversationId || '')
+      if (!conversationId || !(await member(conversationId, user.uid))) return response({ error: 'Conversation access denied' }, 403)
+      const rows = await rest(`messages?conversation_id=eq.${encodeURIComponent(conversationId)}&select=id,seen_by&order=created_at.desc&limit=50`)
+      for (const item of rows || []) {
+        const seenBy = Array.isArray(item.seen_by) ? item.seen_by.map(String) : []
+        if (!seenBy.includes(user.uid)) await rest(`messages?id=eq.${encodeURIComponent(String(item.id))}`, { method: 'PATCH', body: JSON.stringify({ seen_by: [...seenBy, user.uid] }) })
+      }
+      await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(user.uid)}`, { method: 'PATCH', body: JSON.stringify({ unread_count: 0, read_at: new Date().toISOString() }) })
+      return response({ ok: true })
+    }
+    if (action === 'unsend-message') {
+      const conversationId = String(body?.conversationId || '')
+      const messageId = String(body?.messageId || '')
+      if (!conversationId || !messageId || !(await member(conversationId, user.uid))) return response({ error: 'Conversation access denied' }, 403)
+      const rows = await rest(`messages?id=eq.${encodeURIComponent(messageId)}&conversation_id=eq.${encodeURIComponent(conversationId)}&select=id,sender_id`)
+      if (!rows?.[0] || String(rows[0].sender_id) !== user.uid) return response({ error: 'You can only unsend your own messages.' }, 403)
+      await rest(`messages?id=eq.${encodeURIComponent(messageId)}`, { method: 'DELETE' })
+      const latest = await rest(`messages?conversation_id=eq.${encodeURIComponent(conversationId)}&select=text,attachment,sender_id,created_at&order=created_at.desc&limit=1`)
+      const item = latest?.[0]
+      await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: 'PATCH', body: JSON.stringify({ last_message: item ? (String(item.text || '') || (item.attachment ? '📎 Attachment' : '')) : '', last_sender_id: item?.sender_id || null, last_message_at: item?.created_at || null }) })
+      return response({ deleted: true })
+    }
+    if (action === 'delete-message-for-me') {
+      const conversationId = String(body?.conversationId || '')
+      const messageId = String(body?.messageId || '')
+      if (!conversationId || !messageId || !(await member(conversationId, user.uid))) return response({ error: 'Conversation access denied' }, 403)
+      const rows = await rest(`messages?id=eq.${encodeURIComponent(messageId)}&conversation_id=eq.${encodeURIComponent(conversationId)}&select=id,hidden_for`)
+      if (!rows?.[0]) return response({ error: 'Message not found' }, 404)
+      const hiddenFor = Array.isArray(rows[0].hidden_for) ? rows[0].hidden_for.map(String) : []
+      if (!hiddenFor.includes(user.uid)) await rest(`messages?id=eq.${encodeURIComponent(messageId)}`, { method: 'PATCH', body: JSON.stringify({ hidden_for: [...hiddenFor, user.uid] }) })
+      return response({ hidden: true })
+    }
     return response({ error: 'Unsupported action' }, 400)
   } catch (error) {
     console.error(error)

@@ -50,6 +50,7 @@ import {
   watchMessages,
   watchStories,
   type CallRecord,
+  type ChatAttachment,
   type ChatMessage,
   type Conversation,
   type Story,
@@ -879,6 +880,7 @@ export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<ChatAttachment | null>(null);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [showNew, setShowNew] = useState(false);
@@ -1673,6 +1675,10 @@ export default function App() {
                       className="message-image"
                       src={item.attachment.url}
                       alt={item.attachment.name}
+                      onClick={() => setImagePreview(item.attachment)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setImagePreview(item.attachment); }}
                     />
                   ) : (
                     <a
@@ -1792,6 +1798,18 @@ export default function App() {
                   </span>
                 </button>
               ))}
+          </div>
+        )}
+        {imagePreview && (
+          <div className="media-preview-backdrop" role="dialog" aria-modal="true" aria-label="Image preview" onClick={() => setImagePreview(null)}>
+            <div className="media-preview-panel" onClick={(event) => event.stopPropagation()}>
+              <button className="icon media-preview-close" type="button" onClick={() => setImagePreview(null)} aria-label="Close image preview">×</button>
+              <img src={imagePreview.url} alt={imagePreview.name} />
+              <div className="media-preview-actions">
+                <a className="primary" href={imagePreview.url} download={imagePreview.name} target="_blank" rel="noreferrer">Save image</a>
+                <button className="secondary" type="button" onClick={() => setImagePreview(null)}>Close</button>
+              </div>
+            </div>
           </div>
         )}
         {replyTarget && (

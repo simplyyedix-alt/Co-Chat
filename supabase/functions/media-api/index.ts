@@ -40,10 +40,11 @@ async function verifyFirebaseToken(request: Request) {
 }
 
 function b2Config() {
+  const clean = (value: string) => value.trim().replace(/^['"]|['"]$/g, '').replace(/\s+/g, '')
   let endpoint = (Deno.env.get('B2_ENDPOINT') || '').trim().replace(/\/$/, '')
-  const keyId = Deno.env.get('B2_KEY_ID') || ''
-  const applicationKey = Deno.env.get('B2_APPLICATION_KEY') || ''
-  const bucket = (Deno.env.get('B2_BUCKET') || '').trim()
+  const keyId = clean(Deno.env.get('B2_KEY_ID') || '')
+  const applicationKey = clean(Deno.env.get('B2_APPLICATION_KEY') || '')
+  const bucket = clean(Deno.env.get('B2_BUCKET') || '')
   if (endpoint && !/^https?:\/\//i.test(endpoint)) endpoint = `https://${endpoint}`
   const region = Deno.env.get('B2_REGION')?.trim() || endpoint.match(/^https?:\/\/s3\.([^.]+)\.backblazeb2\.com$/i)?.[1] || ''
   const missing = [!endpoint && 'B2_ENDPOINT', !keyId && 'B2_KEY_ID', !applicationKey && 'B2_APPLICATION_KEY', !bucket && 'B2_BUCKET', !region && 'B2_REGION (or a regional B2_ENDPOINT)'].filter(Boolean)

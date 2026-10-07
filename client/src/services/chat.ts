@@ -23,7 +23,7 @@ import {
 } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { StorageManager } from './storageManager'
-import { createDirect, deleteConversation as deleteSupabaseConversation, getProfile as getSupabaseProfile, isSupabaseChatEnabled, sendMessage as sendSupabaseMessage, upsertProfile as upsertSupabaseProfile, watchConversations as watchSupabaseConversations, watchMessages as watchSupabaseMessages } from './supabaseChat'
+import { createDirect, deleteConversation as deleteSupabaseConversation, deleteForMe as deleteSupabaseMessageForMe, getProfile as getSupabaseProfile, isSupabaseChatEnabled, markRead as markSupabaseRead, sendMessage as sendSupabaseMessage, unsend as unsendSupabaseMessage, upsertProfile as upsertSupabaseProfile, watchConversations as watchSupabaseConversations, watchMessages as watchSupabaseMessages } from './supabaseChat'
 
 export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; bio?: string; notificationsEnabled?: boolean; discoverable?: boolean; activeStatus?: boolean; theme?: 'light' | 'dark'; lastSeen?: Timestamp | null; profileComplete?: boolean }
 export type Conversation = {
@@ -231,6 +231,7 @@ export async function sendMessage(conversationId: string, senderId: string, text
 }
 
 export async function unsendMessage(conversationId: string, messageId: string) {
+  if (isSupabaseChatEnabled()) { await unsendSupabaseMessage(conversationId, messageId); return }
   if (!db) return
   await deleteDoc(doc(db, 'conversations', conversationId, 'messages', messageId))
   const remaining = await getDocs(query(collection(db, 'conversations', conversationId, 'messages'), orderBy('createdAt', 'desc'), limit(1)))
@@ -243,6 +244,7 @@ export async function unsendMessage(conversationId: string, messageId: string) {
 }
 
 export async function deleteMessageForMe(conversationId: string, messageId: string, uid: string) {
+  if (isSupabaseChatEnabled()) { await deleteSupabaseMessageForMe(conversationId, messageId); return }
   if (!db) return
   await updateDoc(doc(db, 'conversations', conversationId, 'messages', messageId), { hiddenFor: arrayUnion(uid) })
 }
@@ -259,6 +261,7 @@ export async function deleteConversation(conversationId: string, uid: string) {
 }
 
 export async function markConversationRead(conversationId: string, uid: string) {
+  if (isSupabaseChatEnabled()) { await markSupabaseRead(conversationId); return }
   if (!db) return
   const conversationRef = doc(db, 'conversations', conversationId)
   const snapshot = await getDocs(query(collection(conversationRef, 'messages'), orderBy('createdAt', 'desc'), limit(30)))

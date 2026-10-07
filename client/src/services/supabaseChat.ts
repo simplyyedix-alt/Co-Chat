@@ -104,3 +104,7 @@ export async function createDirect(otherUid: string, name: string) {
 export async function deleteConversation(conversationId: string) {
   await request({ action: 'delete-conversation', conversationId })
 }
+
+export async function markRead(conversationId: string) { await request({ action: 'mark-read', conversationId }) }
+export async function unsend(conversationId: string, messageId: string) { await request({ action: 'unsend-message', conversationId, messageId }) }
+export async function deleteForMe(conversationId: string, messageId: string) { await request({ action: 'delete-message-for-me', conversationId, messageId }) }
