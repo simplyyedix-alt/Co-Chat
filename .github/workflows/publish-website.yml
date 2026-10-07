@@ -20,6 +20,7 @@ concurrency:
 
 jobs:
   deploy:
+    timeout-minutes: 15
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -33,7 +34,7 @@ jobs:
           node-version: 20
       - name: Build Co-Chat app
         working-directory: client
-        run: npm install && npm run build
+        run: npm install --no-audit --no-fund --prefer-offline && npm run build
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}

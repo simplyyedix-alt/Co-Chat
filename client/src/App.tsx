@@ -749,8 +749,8 @@ export default function App() {
   }, [selected?.id, liveUser?.uid]);
   useEffect(() => {
     if (!liveUser || !messages.length) return;
-    const ids = [
-      ...new Set(
+    const ids: string[] = [
+      ...new Set<string>(
         messages
           .map((item) => item.senderId)
           .filter((id) => id !== "me" && id !== "them" && id !== liveUser.uid),
@@ -761,11 +761,11 @@ export default function App() {
         const profile = await getUserProfile(id);
         return [id, profile?.displayName || profile?.username || id] as const;
       }),
-    ).then((items) =>
-      setSenderNames((old) =>
-        Object.fromEntries([...Object.entries(old), ...items]),
-      ),
-    );
+    ).then((items) => setSenderNames((old) => {
+      const next = { ...old };
+      items.forEach(([id, name]) => { next[id] = name; });
+      return next;
+    }));
   }, [messages, liveUser?.uid]);
   useEffect(() => {
     if (!liveUser || liveUser.uid === "preview")
@@ -1918,8 +1918,8 @@ function FriendZone({
       .catch(() => undefined);
   }, [uid]);
   useEffect(() => {
-    const ids = [
-      ...new Set(
+    const ids: string[] = [
+      ...new Set<string>(
         requests
           .flatMap((item) => [item.fromUid, item.toUid])
           .filter((id) => id !== uid),
@@ -1927,16 +1927,11 @@ function FriendZone({
     ];
     Promise.all(
       ids.map(async (id) => [id, await getUserProfile(id)] as const),
-    ).then((items) =>
-      setProfiles((old) => ({
-        ...old,
-        ...Object.fromEntries(
-          items.filter((item): item is [string, UserProfile] =>
-            Boolean(item[1]),
-          ),
-        ),
-      })),
-    );
+    ).then((items) => setProfiles((old) => {
+      const next = { ...old };
+      items.forEach(([id, profile]) => { if (profile) next[id] = profile; });
+      return next;
+    }));
   }, [requests, uid]);
   const incoming = requests.filter(
     (item) => item.toUid === uid && !blocked.includes(item.fromUid),

@@ -70,7 +70,7 @@ export default function GroupVoiceCall({ uid, callId, groupName, memberIds, call
       }
     }
     start()
-    return () => { stopped.current = true; unsubscribe?.(); if (expiryTimer.current) window.clearTimeout(expiryTimer.current); streamRef.current?.getTracks().forEach(track => track.stop()); Object.values(peers.current).forEach(item => item.peer.close()) }
+    return () => { stopped.current = true; unsubscribe?.(); if (expiryTimer.current) window.clearTimeout(expiryTimer.current); streamRef.current?.getTracks().forEach(track => track.stop()); (Object.values(peers.current) as PeerState[]).forEach(item => item.peer.close()) }
   }, [callId, uid, onClose])
 
   useEffect(() => {
