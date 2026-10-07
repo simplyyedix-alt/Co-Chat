@@ -153,10 +153,24 @@ const relativeMessageTime = (value?: { toMillis?: () => number } | null) => {
 function AuthScreen({ onPreview }: { onPreview: () => void }) {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const friendlyAuthError = (value: unknown, fallback: string) => {
+    const code = typeof value === "object" && value !== null && "code" in value ? String((value as { code?: string }).code) : "";
+    const messages: Record<string, string> = {
+      "auth/invalid-credential": "That email or password is incorrect.",
+      "auth/email-already-in-use": "An account already exists with this email.",
+      "auth/weak-password": "Choose a password with at least 6 characters.",
+      "auth/invalid-email": "Enter a valid email address.",
+      "auth/popup-closed-by-user": "The Google sign-in window was closed.",
+      "auth/network-request-failed": "Check your internet connection and try again.",
+    };
+    return messages[code] || (value instanceof Error ? value.message.replace("Firebase: ", "").replace(/ \(auth\/[\w-]+\)\.?$/, "") : fallback);
+  };
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!auth) return;
+    if (!auth || busy) return;
     setError("");
+    setBusy(true);
     const data = new FormData(event.currentTarget);
     try {
       if (mode === "signup") {
@@ -175,18 +189,15 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
           String(data.get("password")),
         );
     } catch (e) {
-      setError(
-        e instanceof Error
-          ? e.message
-              .replace("Firebase: ", "")
-              .replace(/ \(auth\/[^)]+\)\.?$/, "")
-          : "Unable to sign in.",
-      );
+      setError(friendlyAuthError(e, "Unable to sign in."));
+    } finally {
+      setBusy(false);
     }
   };
   const google = async () => {
-    if (!auth) return;
+    if (!auth || busy) return;
     setError("");
+    setBusy(true);
     try {
       const isAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
       if (isAndroid) {
@@ -198,11 +209,9 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
         await signInWithPopup(auth, googleProvider);
       }
     } catch (e) {
-      setError(
-        e instanceof Error
-          ? e.message.replace("Firebase: ", "")
-          : "Google sign-in failed.",
-      );
+      setError(friendlyAuthError(e, "Google sign-in failed."));
+    } finally {
+      setBusy(false);
     }
   };
   return (
@@ -229,23 +238,27 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
           <>
             <div className="auth-tabs">
               <button
+                type="button"
                 className={mode === "signin" ? "active" : ""}
                 onClick={() => setMode("signin")}
+                disabled={busy}
               >
                 Sign in
               </button>
               <button
+                type="button"
                 className={mode === "signup" ? "active" : ""}
                 onClick={() => setMode("signup")}
+                disabled={busy}
               >
                 Create account
               </button>
             </div>
-            <form onSubmit={submit}>
+            <form onSubmit={submit} aria-busy={busy}>
               {mode === "signup" && (
                 <label>
                   Display name
-                  <input name="name" required placeholder="Your name" />
+                  <input name="name" autoComplete="name" required placeholder="Your name" disabled={busy} />
                 </label>
               )}
               <label>
@@ -253,8 +266,10 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
                 <input
                   name="email"
                   type="email"
+                  autoComplete="email"
                   required
                   placeholder="you@example.com"
+                  disabled={busy}
                 />
               </label>
               <label>
@@ -262,18 +277,20 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
                 <input
                   name="password"
                   type="password"
+                  autoComplete={mode === "signin" ? "current-password" : "new-password"}
                   minLength={6}
                   required
                   placeholder="At least 6 characters"
+                  disabled={busy}
                 />
               </label>
               {error && <p className="error-text">{error}</p>}
-              <button className="primary">
-                {mode === "signin" ? "Sign in" : "Create account"}
+              <button className="primary" disabled={busy}>
+                {busy ? "Connecting…" : mode === "signin" ? "Sign in" : "Create account"}
               </button>
             </form>
-            <button className="google-button" onClick={google}>
-              Continue with Google
+            <button className="google-button" onClick={google} disabled={busy}>
+              {busy ? "Connecting…" : "Continue with Google"}
             </button>
             <small>Your account syncs securely across devices.</small>
           </>
