@@ -27,6 +27,7 @@ import {
   ensureUserProfile,
   findUsers,
   getFriendship,
+  getStudyLeaderboard,
   getUserProfile,
   listBlockedUsers,
   listFriends,
@@ -36,6 +37,7 @@ import {
   removeGroupMember,
   respondToFriendRequest,
   saveProfile,
+  saveStudySession,
   saveTheme,
   sendFriendRequest,
   sendMessage,
@@ -44,6 +46,7 @@ import {
   unsendMessage,
   updateGroup,
   touchPresence,
+  updateStudyPresence,
   watchCalls,
   watchConversations,
   watchFriendRequests,
@@ -54,6 +57,7 @@ import {
   type ChatMessage,
   type Conversation,
   type Story,
+  type StudyLeaderboardEntry,
   type UserProfile,
 } from "./services/chat";
 import { createTwitt as createRemoteTwitt, createTwittComment, deleteTwitt, deleteTwittComment, hideTwitt, loadTwittComments, loadTwittPage, recordTwittView, toggleTwittCommentLike, toggleTwittLike, type TwittComment } from "./services/twitts";
@@ -382,9 +386,14 @@ function TimerSetupSheet({ initialSeconds, onClose, onApply }: { initialSeconds:
   return <div className="task-sheet-backdrop" role="presentation" onMouseDown={onClose}><section className="timer-setup-sheet" role="dialog" aria-modal="true" aria-label="Set focus timer" onMouseDown={(event) => event.stopPropagation()}><div className="sheet-handle"/><header className="timer-setup-header"><button className="icon" type="button" aria-label="Close timer setup" onClick={onClose}>×</button><div><strong>Set focus timer</strong><small>Choose how long you want to study</small></div><span>◷</span></header><div className="timer-picker"><label><span>Hours</span><select value={hours} onChange={(event) => setHours(Number(event.target.value))}>{Array.from({ length: 9 }, (_, value) => <option value={value} key={value}>{value}</option>)}</select></label><b>:</b><label><span>Minutes</span><select value={minutes} onChange={(event) => setMinutes(Number(event.target.value))}>{[0, 5, 10, 15, 20, 25, 30, 45, 50, 55].map((value) => <option value={value} key={value}>{String(value).padStart(2, "0")}</option>)}</select></label></div><div className="timer-presets">{[[25, "25 min"], [50, "50 min"], [60, "1 hour"], [90, "1h 30m"]].map(([value, label]) => <button type="button" key={value} onClick={() => { setHours(Math.floor(Number(value) / 60)); setMinutes(Number(value) % 60); }}>{label}</button>)}</div><button className="primary timer-apply" type="button" disabled={!seconds} onClick={() => onApply(seconds)}>Use {hours ? `${hours}h ` : ""}{minutes ? `${minutes}m` : ""} timer</button></section></div>;
 }
 
-function LeaderboardSheet({ mode, weeklySeconds, totalSeconds, onModeChange, onClose }: { mode: "friends" | "public"; weeklySeconds: number; totalSeconds: number; onModeChange: (mode: "friends" | "public") => void; onClose: () => void }) {
-  const minutes = Math.floor((mode === "friends" ? weeklySeconds : totalSeconds) / 60);
-  return <div className="task-sheet-backdrop" role="presentation" onMouseDown={onClose}><section className="leaderboard-sheet" role="dialog" aria-modal="true" aria-label="Study leaderboard" onMouseDown={(event) => event.stopPropagation()}><div className="sheet-handle"/><header className="sheet-page-header"><button className="icon" type="button" aria-label="Close leaderboard" onClick={onClose}>×</button><div><strong>{mode === "friends" ? "Friends leaderboard" : "Public leaderboard"}</strong><small>Top 10 · weekly ranks reset every Monday</small></div><span>🏆</span></header><div className="leaderboard-sheet-body"><div className="leaderboard-mode-tabs"><button className={mode === "friends" ? "active" : ""} type="button" onClick={() => onModeChange("friends")}>Friends</button><button className={mode === "public" ? "active" : ""} type="button" onClick={() => onModeChange("public")}>Public</button></div><div className="leaderboard-podium"><article className="rank-two"><span>2</span><strong>Open rank</strong><small>Waiting</small></article><article className="rank-one"><span>1</span><strong>You</strong><small>{minutes} min</small></article><article className="rank-three"><span>3</span><strong>Open rank</strong><small>Waiting</small></article></div><p className="leaderboard-disclaimer">Ranks use finished, saved sessions only. More verified students will appear here as they study.</p><div className="leaderboard-ranks">{Array.from({ length: 7 }, (_, index) => <article key={index}><b>{index + 4}</b><div><strong>Open rank</strong><small>{mode === "friends" ? "Invite friends to compete" : "Waiting for a verified session"}</small></div><span>—</span></article>)}</div></div></section></div>;
+function studyMinutes(seconds: number) {
+  return `${Math.floor(seconds / 60)} min`;
+}
+
+function LeaderboardSheet({ mode, entries, currentUid, loading, onModeChange, onClose }: { mode: "friends" | "public"; entries: StudyLeaderboardEntry[]; currentUid: string; loading: boolean; onModeChange: (mode: "friends" | "public") => void; onClose: () => void }) {
+  const ranked = entries.slice(0, 10);
+  const podium = [ranked[1], ranked[0], ranked[2]];
+  return <div className="task-sheet-backdrop" role="presentation" onMouseDown={onClose}><section className="leaderboard-sheet" role="dialog" aria-modal="true" aria-label="Study leaderboard" onMouseDown={(event) => event.stopPropagation()}><div className="sheet-handle"/><header className="sheet-page-header"><button className="icon" type="button" aria-label="Close leaderboard" onClick={onClose}>×</button><div><strong>{mode === "friends" ? "Friends leaderboard" : "Public leaderboard"}</strong><small>Top 10 · weekly totals reset every Monday</small></div><span>🏆</span></header><div className="leaderboard-sheet-body"><div className="leaderboard-mode-tabs"><button className={mode === "friends" ? "active" : ""} type="button" onClick={() => onModeChange("friends")}>Friends</button><button className={mode === "public" ? "active" : ""} type="button" onClick={() => onModeChange("public")}>Public</button></div>{loading ? <p className="leaderboard-disclaimer">Loading study totals…</p> : !ranked.length ? <p className="leaderboard-disclaimer">No saved study sessions yet.</p> : <><div className="leaderboard-podium">{podium.map((entry, index) => entry ? <article className={`rank-${index === 0 ? "two" : index === 1 ? "one" : "three"}`} key={entry.uid}><span>{index === 0 ? 2 : index === 1 ? 1 : 3}</span><strong>{entry.uid === currentUid ? "You" : entry.displayName}</strong><small>{studyMinutes(entry.weeklySeconds)}</small></article> : <article className={`rank-${index === 0 ? "two" : index === 1 ? "one" : "three"}`} key={`empty-${index}`}><span>{index === 0 ? 2 : index === 1 ? 1 : 3}</span><strong>Open rank</strong><small>Waiting</small></article>)}</div><p className="leaderboard-disclaimer">Finished study sessions saved to your account.</p><div className="leaderboard-ranks">{ranked.slice(3).map((entry, index) => <article key={entry.uid}><b>{index + 4}</b><div><strong>{entry.uid === currentUid ? "You" : entry.displayName}</strong><small>{entry.username ? `@${entry.username}` : mode === "friends" ? "Friend" : "Student"}</small></div><span>{studyMinutes(entry.weeklySeconds)}</span></article>)}</div></>}</div></section></div>;
 }
 
 function JourneySheet({ streak, league, weeklySeconds, totalSeconds, nextStreakMilestone, nextLeaguePromotion, onClose }: { streak: number; league: string; weeklySeconds: number; totalSeconds: number; nextStreakMilestone: number; nextLeaguePromotion: number; onClose: () => void }) {
@@ -397,7 +406,7 @@ function JourneySheet({ streak, league, weeklySeconds, totalSeconds, nextStreakM
   return <div className="task-sheet-backdrop" role="presentation" onMouseDown={onClose}><section className="journey-sheet" role="dialog" aria-modal="true" aria-label="Your study journey" onMouseDown={(event) => event.stopPropagation()}><div className="sheet-handle"/><header className="sheet-page-header"><button className="icon" type="button" aria-label="Close journey" onClick={onClose}>×</button><div><strong>Your journey</strong><small>Weekly league · daily streak</small></div><span>✦</span></header><div className="journey-sheet-body"><section className="journey-highlight"><span>🔥</span><div><small>ACTIVE STREAK</small><strong>{streak} day{streak === 1 ? "" : "s"}</strong><p>Next streak milestone: {nextStreakMilestone} active days</p></div></section><section className="journey-league"><div className="league-heading"><span className="sheet-label">WEEKLY LEAGUE</span><button type="button" className="league-info-button" aria-expanded={showLeagueInfo} aria-label="How league divisions work" onClick={() => setShowLeagueInfo((value) => !value)}>i</button></div><div className="league-current"><i className={`league-crest ${league.split(" ")[0].toLowerCase()}`}>{league === "Legendary" ? "★" : league.split(" ")[1]}</i><div><strong>{league}</strong><p>{Math.floor(monthlySeconds / 3600)}h {Math.floor((monthlySeconds % 3600) / 60)}m this week · {Math.max(0, nextLeaguePromotion - Math.floor(monthlySeconds / 3600))}h to promote</p></div></div><div className="league-zones"><span className="promotion"><b>Promote</b><small>Top 20%</small></span><span className="safe"><b>Stay</b><small>Middle 60%</small></span><span className="demotion"><b>Demote</b><small>Bottom 20%</small></span></div>{showLeagueInfo && <aside className="league-guide"><strong>How weekly promotion works</strong><p>Finished study hours decide rank. Top 20% promote, middle 60% stay, bottom 20% demote. Resets every Monday.</p><div>{divisions.map(([division, hoursRequired]) => { const tier = division.split(" ")[0].toLowerCase(); const roman = division.split(" ")[1] || "★"; const currentHours = Math.floor(monthlySeconds / 3600); return <span className={league === division ? "current" : currentHours >= hoursRequired ? "unlocked" : ""} key={division}><i className={`league-crest ${tier}`}>{roman}</i><b>{division}</b><small>{hoursRequired === 0 ? "Starting rank" : `${hoursRequired}h / week`}</small></span>; })}</div></aside>}</section><section><p className="sheet-label">STREAK MILESTONES</p><div className="journey-milestones">{milestones.map((milestone) => <article className={streak >= milestone ? "reached" : ""} key={milestone}><span>{streak >= milestone ? "✓" : milestone}</span><div><strong>{milestone} days</strong><small>Keep your daily study streak alive</small></div></article>)}</div></section><section className="journey-stats"><article><small>STUDIED TOTAL</small><strong>{hours}h {minutes}m</strong></article><article><small>THIS WEEK</small><strong>{Math.floor(monthlySeconds / 3600)}h {Math.floor((monthlySeconds % 3600) / 60)}m</strong></article></section></div></section></div>;
 }
 
-function StudyHome({ onOpenDiscover }: { onOpenDiscover: () => void }) {
+function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () => void }) {
   const studyKey = `cochat-study-${auth?.currentUser?.uid || "preview"}`;
   const dayNumber = Math.floor(Date.now() / 86_400_000);
   const weekKey = currentStudyWeekKey();
@@ -414,10 +423,57 @@ function StudyHome({ onOpenDiscover }: { onOpenDiscover: () => void }) {
   const [targetSeconds, setTargetSeconds] = useState(() => { try { return Number(JSON.parse(localStorage.getItem(studyKey) || "{}").targetSeconds || 0); } catch { return 0; } });
   const [leaderboardMode, setLeaderboardMode] = useState<"friends" | "public">("friends");
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [leaderboardEntries, setLeaderboardEntries] = useState<StudyLeaderboardEntry[]>([]);
+  const [studyZoneEntries, setStudyZoneEntries] = useState<StudyLeaderboardEntry[]>([]);
+  const [studyFriendIds, setStudyFriendIds] = useState<string[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [journeyOpen, setJourneyOpen] = useState(false);
   const [timerStartedAt, setTimerStartedAt] = useState<number | null>(() => { try { return Number(JSON.parse(localStorage.getItem(studyKey) || "{}").timerStartedAt) || null; } catch { return null; } });
   const [running, setRunning] = useState(() => { try { const saved = JSON.parse(localStorage.getItem(studyKey) || "{}"); return Boolean(saved.timerRunning && saved.timerStartedAt && saved.targetSeconds); } catch { return false; } });
   const timerRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    listFriends(uid).then((friends) => setStudyFriendIds(friends.map((friend) => friend.uid))).catch(() => setStudyFriendIds([]));
+  }, [uid]);
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = async () => {
+      if (leaderboardOpen) setLeaderboardLoading(true);
+      try {
+        if (leaderboardMode === "public" && leaderboardOpen) {
+          const entries = await getStudyLeaderboard("public", [], weekKey);
+          if (!cancelled) setLeaderboardEntries(entries);
+          return;
+        }
+        const entries = await getStudyLeaderboard("friends", [uid, ...studyFriendIds], weekKey);
+        if (!cancelled) {
+          setStudyZoneEntries(entries);
+          if (leaderboardMode === "friends") setLeaderboardEntries(entries);
+        }
+      } catch {
+        if (!cancelled) {
+          setStudyZoneEntries([]);
+          if (leaderboardOpen) setLeaderboardEntries([]);
+        }
+      } finally {
+        if (!cancelled) setLeaderboardLoading(false);
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 15000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [uid, weekKey, studyFriendIds, leaderboardMode, leaderboardOpen]);
+  useEffect(() => {
+    void updateStudyPresence(running, timerTaskId ? "Working on an active task" : "In a focus session").catch(() => undefined);
+    const timer = window.setInterval(() => void updateStudyPresence(running, timerTaskId ? "Working on an active task" : "In a focus session").catch(() => undefined), 30000);
+    return () => window.clearInterval(timer);
+  }, [uid, running, timerTaskId]);
+  useEffect(() => () => { void updateStudyPresence(false).catch(() => undefined); }, [uid]);
+  useEffect(() => {
+    if (!weeklySeconds) return;
+    const syncKey = `${studyKey}-remote-${weekKey}`;
+    try { if (localStorage.getItem(syncKey)) return; } catch { return; }
+    void saveStudySession(weeklySeconds, weekKey).then(() => { try { localStorage.setItem(syncKey, "1"); } catch { /* storage is optional */ } }).catch(() => undefined);
+  }, [studyKey, weeklySeconds, weekKey]);
   useEffect(() => {
     if (!running) return;
     const updateElapsed = () => {
@@ -436,6 +492,7 @@ function StudyHome({ onOpenDiscover }: { onOpenDiscover: () => void }) {
   const progress = targetSeconds ? Math.min(100, Math.round((seconds / targetSeconds) * 100)) : Math.min(100, Math.round((seconds / 3600) * 100));
   const saveSession = () => {
     if (seconds <= 0) return;
+    void saveStudySession(seconds, weekKey).catch(() => undefined);
     const nextTotal = totalSeconds + seconds;
     const nextWeekly = weeklySeconds + seconds;
     const today = new Date().toISOString().slice(0, 10);
@@ -494,10 +551,10 @@ function StudyHome({ onOpenDiscover }: { onOpenDiscover: () => void }) {
       {activeTasks.length > 0 && <section className="active-tasks"><div className="active-tasks-heading"><div><span className="kicker">IN PROGRESS</span><strong>{activeTasks.length} active task{activeTasks.length === 1 ? "" : "s"}</strong></div><button className="secondary compact" type="button" onClick={() => setTaskSheetOpen(true)}>View tasks</button></div>{activeTasks.map((task) => <article key={task.id}><span>◷</span><div><strong>{task.title}</strong><small>{task.action === "discover" ? "Ready to help in Discover" : `Started ${Math.max(1, Math.floor((Date.now() - (task.startedAt || Date.now())) / 60000))} min ago`}</small></div><button className="icon" type="button" aria-label={`Continue ${task.title}`} onClick={() => focusTask(task)}>→</button></article>)}</section>}
       <section className="timer-card" ref={timerRef}><div className="timer-ring" style={{ "--progress": `${progress}%` } as CSSProperties}><strong>{display}</strong><span>{running ? (timerTaskId ? "task timer running" : "focus session running") : targetSeconds ? "timer ready" : "choose a duration"}</span></div>{targetSeconds > 0 && <button className="timer-change" type="button" onClick={() => setTimerSetupOpen(true)}>Change · {Math.floor(targetSeconds / 3600) ? `${Math.floor(targetSeconds / 3600)}h ` : ""}{Math.floor((targetSeconds % 3600) / 60)}m</button>}<div className="timer-actions"><button className="primary" type="button" onClick={toggleTimer}>{running ? "Pause timer" : targetSeconds ? "Start timer" : "Set timer"}</button><button className="secondary" type="button" onClick={saveSession} disabled={!seconds}>Finish & save</button><button className="secondary" type="button" onClick={() => { setRunning(false); setTimerStartedAt(null); setTimerTaskId(null); setSeconds(0); setTargetSeconds(0); }}>Reset</button></div><small className="timer-note">Your countdown keeps its place if you close or background the app. It saves only when you finish.</small></section>
       <div className="study-grid"><article><span className="metric-icon">🔥</span><strong>{activeStreak} days</strong><small>active journey</small></article><article><span className="metric-icon">✦</span><strong>{league}</strong><small>current league</small></article><article><span className="metric-icon">⌁</span><strong>{studiedLabel}</strong><small>studied total</small></article></div>
-      <section className="study-zone"><header><div><span className="kicker">STUDY ZONE</span><h3>Focus together</h3></div><span className="study-zone-count">{running ? "1 studying" : "Quiet right now"}</span></header>{running ? <article className="study-zone-person"><Avatar name={auth?.currentUser?.displayName || "You"} photoURL={auth?.currentUser?.photoURL || undefined}/><div><strong>{auth?.currentUser?.displayName || "You"}</strong><small>{timerTaskId ? "Working on an active task" : "In a focus session"}</small></div><span className="presence-dot"/></article> : <div className="study-zone-empty"><strong>Start a session to enter the zone</strong><span>Friends who are studying or doing tasks will appear here with their profile photos.</span></div>}</section>
+      <section className="study-zone"><header><div><span className="kicker">STUDY ZONE</span><h3>Focus together</h3></div><span className="study-zone-count">{studyZoneEntries.filter((entry) => entry.active).length + (running && !studyZoneEntries.some((entry) => entry.uid === uid) ? 1 : 0)} studying</span></header>{studyZoneEntries.some((entry) => entry.active) || running ? <>{running && <article className="study-zone-person"><Avatar name={auth?.currentUser?.displayName || "You"} photoURL={auth?.currentUser?.photoURL || undefined}/><div><strong>{auth?.currentUser?.displayName || "You"}</strong><small>{timerTaskId ? "Working on an active task" : "In a focus session"}</small></div><span className="presence-dot"/></article>}{studyZoneEntries.filter((entry) => entry.active && entry.uid !== uid).map((entry) => <article className="study-zone-person" key={entry.uid}><Avatar name={entry.displayName} photoURL={entry.photoURL || undefined}/><div><strong>{entry.displayName}</strong><small>{entry.label || "In a focus session"}</small></div><span className="presence-dot"/></article>)}</> : <div className="study-zone-empty"><strong>Start a session to enter the zone</strong><span>Friends who are studying or doing tasks will appear here with their profile photos.</span></div>}</section>
       {taskSheetOpen && <StudyTaskSheet tasks={tasks} onClose={() => setTaskSheetOpen(false)} onStart={startTask} onComplete={completeTask} onAdd={addTask} onRemove={(id) => setTasks((current) => current.filter((task) => task.id !== id))}/>}
       {timerSetupOpen && <TimerSetupSheet initialSeconds={targetSeconds} onClose={() => setTimerSetupOpen(false)} onApply={applyTimer}/>}
-      {leaderboardOpen && <LeaderboardSheet mode={leaderboardMode} weeklySeconds={weeklySeconds} totalSeconds={totalSeconds} onModeChange={setLeaderboardMode} onClose={() => setLeaderboardOpen(false)}/>}
+      {leaderboardOpen && <LeaderboardSheet mode={leaderboardMode} entries={leaderboardEntries} currentUid={uid} loading={leaderboardLoading} onModeChange={setLeaderboardMode} onClose={() => setLeaderboardOpen(false)}/>}
       {journeyOpen && <JourneySheet streak={activeStreak} league={league} weeklySeconds={weeklySeconds} totalSeconds={totalSeconds} nextStreakMilestone={nextStreakMilestone} nextLeaguePromotion={nextLeaguePromotion} onClose={() => setJourneyOpen(false)}/>}
     </div>
   );
@@ -2132,7 +2189,7 @@ export default function App() {
             )}
           </>
         )}
-        {page === "study" && <StudyHome onOpenDiscover={() => { setDiscoverCommunity("all"); setPage("discover"); }} />}
+        {page === "study" && <StudyHome uid={liveUser.uid} onOpenDiscover={() => { setDiscoverCommunity("all"); setPage("discover"); }} />}
         {page === "discover" && <TwittFeed initialCommunity={discoverCommunity} />}
         {page === "search" && <SearchPanel uid={liveUser.uid} onSelect={startConversation} />}
         {page === "status" && (

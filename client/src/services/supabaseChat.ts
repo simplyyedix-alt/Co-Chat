@@ -34,6 +34,8 @@ const attachment = (value: unknown): ChatAttachment | null => {
 
 export function isSupabaseChatEnabled() { return enabled }
 
+export type StudyLeaderboardEntry = { uid: string; displayName: string; username: string; photoURL: string; weeklySeconds: number; totalSeconds: number; active: boolean; label: string }
+
 const profileFromRow = (row: Record<string, unknown> | null | undefined): UserProfile | null => {
   if (!row?.uid) return null
   return { uid: String(row.uid), displayName: String(row.display_name || 'Co-Chat member'), email: String(row.email || ''), username: String(row.username || ''), photoURL: String(row.photo_url || ''), bio: String(row.bio || ''), notificationsEnabled: row.notifications_enabled !== false, discoverable: row.discoverable !== false, activeStatus: row.active_status !== false, lastSeen: timestamp(row.last_seen), profileComplete: true }
@@ -42,6 +44,19 @@ const profileFromRow = (row: Record<string, unknown> | null | undefined): UserPr
 export async function upsertProfile(uid: string, profile: Partial<UserProfile>) {
   await request({ action: 'profile-upsert', displayName: profile.displayName || '', email: profile.email || '', photoURL: profile.photoURL || '', username: profile.username || '', bio: profile.bio || '', notificationsEnabled: profile.notificationsEnabled, discoverable: profile.discoverable, activeStatus: profile.activeStatus })
   return true
+}
+
+export async function saveStudySession(seconds: number, weekKey: string) {
+  await request({ action: 'study-save', seconds, weekKey })
+}
+
+export async function updateStudyPresence(active: boolean, label = '') {
+  await request({ action: 'study-presence', active, label })
+}
+
+export async function getStudyLeaderboard(mode: 'friends' | 'public', uids: string[], weekKey: string) {
+  const data = await request<{ items?: StudyLeaderboardEntry[] }>({ action: 'study-leaderboard', mode, uids, weekKey })
+  return Array.isArray(data.items) ? data.items : []
 }
 
 export async function getProfile(uid: string): Promise<UserProfile | null> {

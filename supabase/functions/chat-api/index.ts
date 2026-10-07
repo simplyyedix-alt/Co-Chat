@@ -57,6 +57,37 @@ Deno.serve(async (request) => {
       await rest('profiles', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ uid: user.uid, display_name: String(body?.displayName || user.displayName || 'Co-Chat member').slice(0, 100), email: String(body?.email || user.email || ''), photo_url: String(body?.photoURL || user.photoURL || ''), username: String(body?.username || user.email.split('@')[0] || user.uid.slice(0, 8)).toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24) || `user_${user.uid.slice(0, 8)}`, bio: String(body?.bio || '').slice(0, 280), notifications_enabled: body?.notificationsEnabled !== false, discoverable: body?.discoverable !== false, active_status: body?.activeStatus !== false, last_seen: new Date().toISOString(), updated_at: new Date().toISOString() }) })
       return response({ ok: true })
     }
+    if (action === 'study-save') {
+      const seconds = Math.max(0, Math.min(86400, Math.floor(Number(body?.seconds || 0))))
+      if (!seconds) return response({ ok: true })
+      const weekKey = String(body?.weekKey || '')
+      const rows = await rest(`profiles?uid=eq.${encodeURIComponent(user.uid)}&select=total_study_seconds,weekly_study_seconds,study_week_key&limit=1`)
+      const current = rows?.[0] || {}
+      const total = Number(current.total_study_seconds || 0) + seconds
+      const weekly = String(current.study_week_key || '') === weekKey ? Number(current.weekly_study_seconds || 0) + seconds : seconds
+      await rest(`profiles?uid=eq.${encodeURIComponent(user.uid)}`, { method: 'PATCH', body: JSON.stringify({ total_study_seconds: total, weekly_study_seconds: weekly, study_week_key: weekKey, updated_at: new Date().toISOString() }) })
+      return response({ ok: true, total, weekly })
+    }
+    if (action === 'study-presence') {
+      const active = body?.active === true
+      const label = String(body?.label || '').slice(0, 120)
+      await rest(`profiles?uid=eq.${encodeURIComponent(user.uid)}`, { method: 'PATCH', body: JSON.stringify({ study_active_until: active ? new Date(Date.now() + 90000).toISOString() : null, study_label: active ? label : '', last_seen: new Date().toISOString(), updated_at: new Date().toISOString() }) })
+      return response({ ok: true })
+    }
+    if (action === 'study-leaderboard') {
+      const mode = body?.mode === 'public' ? 'public' : 'friends'
+      const requested = Array.isArray(body?.uids) ? body.uids.map(String).filter(Boolean).slice(0, 50) : []
+      const uids = mode === 'friends' ? [...new Set([user.uid, ...requested])] : []
+      const filter = uids.length ? `&uid=in.(${uids.map((uid) => encodeURIComponent(uid)).join(',')})` : ''
+      const weekKey = String(body?.weekKey || '')
+      const rows = await rest(`profiles?select=uid,display_name,username,photo_url,weekly_study_seconds,total_study_seconds,study_week_key,study_active_until,study_label${filter}&order=weekly_study_seconds.desc,total_study_seconds.desc&limit=50`)
+      const items = (rows || []).map((item: Record<string, unknown>) => ({
+        uid: String(item.uid || ''), displayName: String(item.display_name || 'Co-Chat member'), username: String(item.username || ''), photoURL: String(item.photo_url || ''),
+        weeklySeconds: String(item.study_week_key || '') === weekKey ? Number(item.weekly_study_seconds || 0) : 0,
+        totalSeconds: Number(item.total_study_seconds || 0), active: Boolean(item.study_active_until && new Date(String(item.study_active_until)).getTime() > Date.now()), label: String(item.study_label || ''),
+      })).sort((a, b) => b.weeklySeconds - a.weeklySeconds || b.totalSeconds - a.totalSeconds)
+      return response({ items })
+    }
     if (action === 'profile') {
       const rows = await rest(`profiles?uid=eq.${encodeURIComponent(String(body?.uid || user.uid))}&limit=1`)
       return response({ profile: rows?.[0] || null })

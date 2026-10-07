@@ -23,7 +23,7 @@ import {
 } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { StorageManager } from './storageManager'
-import { createDirect, deleteConversation as deleteSupabaseConversation, deleteForMe as deleteSupabaseMessageForMe, getProfile as getSupabaseProfile, isSupabaseChatEnabled, markRead as markSupabaseRead, sendMessage as sendSupabaseMessage, unsend as unsendSupabaseMessage, upsertProfile as upsertSupabaseProfile, watchConversations as watchSupabaseConversations, watchMessages as watchSupabaseMessages } from './supabaseChat'
+import { createDirect, deleteConversation as deleteSupabaseConversation, deleteForMe as deleteSupabaseMessageForMe, getProfile as getSupabaseProfile, getStudyLeaderboard as getSupabaseStudyLeaderboard, isSupabaseChatEnabled, markRead as markSupabaseRead, saveStudySession as saveSupabaseStudySession, sendMessage as sendSupabaseMessage, unsend as unsendSupabaseMessage, updateStudyPresence as updateSupabaseStudyPresence, upsertProfile as upsertSupabaseProfile, watchConversations as watchSupabaseConversations, watchMessages as watchSupabaseMessages, type StudyLeaderboardEntry } from './supabaseChat'
 
 export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; bio?: string; notificationsEnabled?: boolean; discoverable?: boolean; activeStatus?: boolean; theme?: 'light' | 'dark'; lastSeen?: Timestamp | null; profileComplete?: boolean }
 export type Conversation = {
@@ -51,6 +51,20 @@ export type ChatMessage = { id: string; text: string; senderId: string; createdA
 export type Story = { id: string; uid: string; displayName: string; text: string; createdAt?: Timestamp | null; expiresAt?: Timestamp | null }
 export type CallRecord = { id: string; type: 'audio' | 'video'; status: string; memberIds: string[]; callerId?: string; calleeId?: string; groupId?: string; groupName?: string; joinedIds?: string[]; leftIds?: string[]; createdAt?: Timestamp | null }
 export type FriendRequest = { id: string; fromUid: string; toUid: string; status: 'pending' | 'accepted' | 'declined'; createdAt?: Timestamp | null }
+
+export type { StudyLeaderboardEntry }
+
+export async function saveStudySession(seconds: number, weekKey: string) {
+  if (isSupabaseChatEnabled()) await saveSupabaseStudySession(seconds, weekKey)
+}
+
+export async function updateStudyPresence(active: boolean, label = '') {
+  if (isSupabaseChatEnabled()) await updateSupabaseStudyPresence(active, label)
+}
+
+export async function getStudyLeaderboard(mode: 'friends' | 'public', uids: string[], weekKey: string): Promise<StudyLeaderboardEntry[]> {
+  return isSupabaseChatEnabled() ? getSupabaseStudyLeaderboard(mode, uids, weekKey) : []
+}
 
 export type BlockRecord = { id: string; blockerId: string; blockedId: string; createdAt?: Timestamp | null }
 
