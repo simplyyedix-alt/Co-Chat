@@ -1675,10 +1675,10 @@ export default function App() {
                       className="message-image"
                       src={item.attachment.url}
                       alt={item.attachment.name}
-                      onClick={() => setImagePreview(item.attachment)}
+                      onClick={() => item.attachment && setImagePreview(item.attachment)}
                       role="button"
                       tabIndex={0}
-                      onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setImagePreview(item.attachment); }}
+                      onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && item.attachment) setImagePreview(item.attachment); }}
                     />
                   ) : (
                     <a
