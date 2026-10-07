@@ -1493,6 +1493,9 @@ export default function App() {
               </section>
             )}
             {page === "communities" && (
+              <>
+              <section className="community-hero"><div><span className="kicker">YOUR COMMUNITIES</span><h2>Find your people.</h2><p>Public spaces to learn, share, and stay accountable together.</p></div><span className="community-symbol">♧</span></section>
+              <div className="community-rail"><button type="button"><span>JEE</span><strong>JEE Prep</strong><small>Public · 2.4k</small></button><button type="button"><span>⌂</span><strong>Study circles</strong><small>Private · 8 members</small></button><button type="button"><span>+</span><strong>Create one</strong><small>Your space</small></button></div>
               <div className="chat-tools">
                 <button
                   className="secondary compact"
@@ -1502,6 +1505,7 @@ export default function App() {
                   ＋ New group
                 </button>
               </div>
+              </>
             )}
             <div className="section-title">
               {page === "communities" ? "COMMUNITY CHATS" : "RECENT CONVERSATIONS"}
