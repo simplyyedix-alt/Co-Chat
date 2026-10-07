@@ -77,6 +77,10 @@ Deno.serve(async (request) => {
   const body = await request.json().catch(() => null) as { action?: string; twittId?: string; text?: string; community?: string; cursor?: string } | null
   if (!body?.action) return response({ error: 'action is required' }, 400)
 
+  const communities = new Set(['all', 'jee', 'neet', 'study', 'public'])
+  if (body.community && !communities.has(body.community)) return response({ error: 'Unsupported community' }, 400)
+  if (body.cursor && Number.isNaN(Date.parse(body.cursor))) return response({ error: 'Invalid pagination cursor' }, 400)
+
   try {
     if (body.action === 'feed') {
       const params = new URLSearchParams({ select: 'id,author_id,community,body,likes_count,comments_count,views_count,created_at', order: 'created_at.desc', limit: '20' })
@@ -108,8 +112,9 @@ Deno.serve(async (request) => {
       return response({ liked: Boolean(await callRpc('toggle_twitt_like', { p_twitt_id: body.twittId, p_user_id: uid })) })
     }
     if (body.action === 'comment') {
-      if (!body.text?.trim()) return response({ error: 'Comment text is required' }, 400)
-      return response({ id: await callRpc('create_twitt_comment', { p_twitt_id: body.twittId, p_user_id: uid, p_body: body.text }) })
+      const comment = body.text?.trim() || ''
+      if (!comment || comment.length > 240) return response({ error: 'Comment must be between 1 and 240 characters' }, 400)
+      return response({ id: await callRpc('create_twitt_comment', { p_twitt_id: body.twittId, p_user_id: uid, p_body: comment }) })
     }
     return response({ error: 'Unsupported action' }, 400)
   } catch (error) {
