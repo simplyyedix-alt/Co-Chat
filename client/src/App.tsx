@@ -244,12 +244,27 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
     }
   };
   return (
-    <main className="auth">
-      <section className="auth-card">
-        <div className="brand-mark">C</div>
-        <h1>Co Chat</h1>
-        <p>Chat bright. Feel right.</p>
-        <div className="auth-trust" aria-label="Co-Chat highlights"><span>✦ Study together</span><span>◌ Find your people</span><span>⌁ Keep your streak</span></div>
+    <main className="auth auth-shell">
+      <section className="auth-showcase" aria-label="Co-Chat introduction">
+        <div className="auth-brand"><span className="brand-mark">C</span><span>Co-Chat</span></div>
+        <div className="auth-showcase-copy">
+          <span className="auth-kicker">A calmer place to connect</span>
+          <h1>Make space for the conversations that matter.</h1>
+          <p>Study together, share the small wins, and stay close to the people who keep you moving.</p>
+        </div>
+        <div className="auth-feature-grid">
+          <span><b>01</b><strong>Focus together</strong><small>Turn study time into momentum.</small></span>
+          <span><b>02</b><strong>Find your circle</strong><small>Meet people learning beside you.</small></span>
+          <span><b>03</b><strong>Keep it personal</strong><small>Your space, your pace, your people.</small></span>
+        </div>
+        <div className="auth-orb auth-orb-one" /><div className="auth-orb auth-orb-two" />
+      </section>
+      <section className="auth-card auth-panel">
+        <div className="auth-panel-heading">
+          <span className="auth-panel-eyebrow">Welcome back</span>
+          <h2>{mode === "signin" ? "Sign in to Co-Chat" : "Create your Co-Chat account"}</h2>
+          <p>{mode === "signin" ? "Pick up exactly where you left off." : "It only takes a minute to get started."}</p>
+        </div>
         {!firebaseReady ? (
           <>
             <div className="hero-card">
@@ -284,15 +299,15 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
                 Create account
               </button>
             </div>
-            <form onSubmit={submit} aria-busy={busy}>
+            <form className="auth-form" onSubmit={submit} aria-busy={busy}>
               {mode === "signup" && (
-                <label>
-                  Display name
+                <label className="auth-field">
+                  <span>Display name</span>
                   <input name="name" autoComplete="name" required placeholder="Your name" disabled={busy} />
                 </label>
               )}
-              <label>
-                Email
+              <label className="auth-field">
+                <span>Email address</span>
                 <input
                   name="email"
                   type="email"
@@ -302,8 +317,8 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
                   disabled={busy}
                 />
               </label>
-              <label>
-                Password
+              <label className="auth-field">
+                <span>Password</span>
                 <input
                   name="password"
                   type="password"
@@ -328,7 +343,7 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
                 Forgot password?
               </button>
             )}
-            <small>Your account syncs securely across devices.</small>
+            <div className="auth-helper"><span>⌁</span>Your account syncs securely across devices.</div>
           </>
         )}
       </section>
@@ -2281,54 +2296,38 @@ export default function App() {
           </div>
         )}
         {(page === "profile" || page === "settings") && (
-          <>
-            <form className="profile-card" onSubmit={save}>
-              <Avatar name={profileName || liveUser.email || "U"} photoURL={liveUser.photoURL || undefined} className="avatar large" />
-              <h2>{profileName || "Co Chat member"}</h2>
-              <p>{liveUser.email}</p>
+          <div className="settings-page">
+            <div className="settings-hero">
+              <div><span className="settings-eyebrow">ACCOUNT CENTER</span><h1>{page === "settings" ? "Settings & profile" : "Your profile"}</h1><p>Shape how you show up in Co-Chat.</p></div>
+              <div className="settings-hero-mark">✦</div>
+            </div>
+            <form className="profile-card settings-profile-card" onSubmit={save}>
+              <div className="settings-profile-heading"><div className="settings-avatar-wrap"><Avatar name={profileName || liveUser.email || "U"} photoURL={liveUser.photoURL || undefined} className="avatar large" /><span className={`settings-presence ${activeStatus ? "online" : ""}`} /></div><div><span className="settings-eyebrow">PROFILE</span><h2>{profileName || "Co Chat member"}</h2><p>{liveUser.email}</p></div></div>
               <div className="profile-details" aria-label="Profile details">
                 <span><b>@</b>{profileUsername || "choose a username"}</span>
                 <span><b>✦</b>{liveUser.emailVerified ? "Verified account" : "Email verification pending"}</span>
                 <span><b>◌</b>{activeStatus ? "Available to friends" : "Activity hidden"}</span>
               </div>
-              <label className="field-label">
-                Display name
-                <input
-                  value={profileName}
-                  onChange={(e) => setProfileName(e.target.value)}
-                  required
-                />
-              </label>
-              <label className="field-label">
-                Username
-                <input
-                  value={profileUsername}
-                  onChange={(e) =>
-                    setProfileUsername(
-                      e.target.value
-                        .replace(/[^a-zA-Z0-9_]/g, "")
-                        .toLowerCase(),
-                    )
-                  }
-                  minLength={3}
-                  maxLength={24}
-                  pattern="[a-z0-9_]+"
-                  required
-                />
-                <small>
-                  Unique, 3–24 characters: letters, numbers, and underscores.
-                </small>
-              </label>
-              <button type="submit" className="primary" disabled={preview}>
-                {profileSaved ? "Saved ✓" : "Save profile"}
-              </button>
+              <div className="settings-form-grid">
+                <label className="field-label">Display name<input value={profileName} onChange={(e) => setProfileName(e.target.value)} required /></label>
+                <label className="field-label">Username<input value={profileUsername} onChange={(e) => setProfileUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase())} minLength={3} maxLength={24} pattern="[a-z0-9_]+" required /><small>3–24 characters: letters, numbers, and underscores.</small></label>
+              </div>
+              <label className="field-label settings-bio-field">About you<textarea value={profileBio} onChange={(e) => setProfileBio(e.target.value)} maxLength={160} placeholder="A short line about what you are learning…" /></label>
+              <div className="settings-save-row"><span>{profileSaved ? "Profile saved successfully" : "Changes sync across your devices"}</span><button type="submit" className="primary" disabled={preview}>{profileSaved ? "Saved ✓" : "Save profile"}</button></div>
             </form>
-            <div className="settings">
+            <div className="settings settings-list">
+              <div className="settings-section-label">PREFERENCES</div>
               <button
                 type="button"
                 onClick={() => setDarkMode((value) => !value)}
               >
                 <span className="settings-row-icon">◐</span>Appearance <span className="settings-value">{darkMode ? "Dark" : "Light"} <span className="chevron">›</span></span>
+              </button>
+              <button type="button" onClick={() => setNotificationsEnabled((value) => !value)}>
+                <span className="settings-row-icon">⌁</span><span className="settings-option-copy"><b>Notifications</b><small>Get updates about messages and study activity</small></span><span className={`settings-toggle ${notificationsEnabled ? "on" : ""}`} aria-label={notificationsEnabled ? "Notifications on" : "Notifications off"}><span /></span>
+              </button>
+              <button type="button" onClick={() => setDiscoverable((value) => !value)}>
+                <span className="settings-row-icon">◎</span><span className="settings-option-copy"><b>Discoverability</b><small>Let friends find you in People and Discover</small></span><span className={`settings-toggle ${discoverable ? "on" : ""}`} aria-label={discoverable ? "Discoverability on" : "Discoverability off"}><span /></span>
               </button>
               <button
                 type="button"
@@ -2336,11 +2335,11 @@ export default function App() {
               >
                 <span className={`settings-row-icon ${activeStatus ? "online" : ""}`}>●</span>Active Status <span className={`settings-toggle ${activeStatus ? "on" : ""}`} aria-label={activeStatus ? "Active status on" : "Active status off"}><span /></span>
               </button>
-              <button type="button" onClick={logout}>
-                ↪ Log out <span>›</span>
+              <button type="button" className="settings-danger" onClick={logout}>
+                <span className="settings-row-icon">↪</span><span className="settings-option-copy"><b>Log out</b><small>Sign out of this device</small></span><span>›</span>
               </button>
             </div>
-          </>
+          </div>
         )}
       </section>
       <Nav page={page} setPage={setPage} />
