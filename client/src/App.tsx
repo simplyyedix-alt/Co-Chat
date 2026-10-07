@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -173,6 +173,7 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
       "auth/email-already-in-use": "An account already exists with this email.",
       "auth/weak-password": "Choose a password with at least 6 characters.",
       "auth/invalid-email": "Enter a valid email address.",
+      "auth/too-many-requests": "Too many attempts. Wait a minute before trying again.",
       "auth/popup-closed-by-user": "The Google sign-in window was closed.",
       "auth/network-request-failed": "Check your internet connection and try again.",
     };
@@ -446,11 +447,32 @@ function LeaderboardSheet({ mode, entries, currentUid, loading, onModeChange, on
 function JourneySheet({ streak, league, weeklySeconds, totalSeconds, nextStreakMilestone, nextLeaguePromotion, onClose }: { streak: number; league: string; weeklySeconds: number; totalSeconds: number; nextStreakMilestone: number; nextLeaguePromotion: number; onClose: () => void }) {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const monthlySeconds = weeklySeconds;
   const milestones = [7, 30, 100, 365];
   const [showLeagueInfo, setShowLeagueInfo] = useState(false);
   const divisions = [["Bronze I", 0], ["Bronze II", 10], ["Bronze III", 20], ["Silver I", 35], ["Silver II", 50], ["Silver III", 70], ["Gold I", 90], ["Gold II", 120], ["Gold III", 160], ["Platinum I", 220], ["Platinum II", 300], ["Platinum III", 400], ["Legendary", 550]] as const;
-  return <div className="task-sheet-backdrop" role="presentation" onMouseDown={onClose}><section className="journey-sheet" role="dialog" aria-modal="true" aria-label="Your study journey" onMouseDown={(event) => event.stopPropagation()}><div className="sheet-handle"/><header className="sheet-page-header"><button className="icon" type="button" aria-label="Close journey" onClick={onClose}>×</button><div><strong>Your journey</strong><small>Weekly league · daily streak</small></div><span>✦</span></header><div className="journey-sheet-body"><section className="journey-highlight"><span>🔥</span><div><small>ACTIVE STREAK</small><strong>{streak} day{streak === 1 ? "" : "s"}</strong><p>Next streak milestone: {nextStreakMilestone} active days</p></div></section><section className="journey-league"><div className="league-heading"><span className="sheet-label">WEEKLY LEAGUE</span><button type="button" className="league-info-button" aria-expanded={showLeagueInfo} aria-label="How league divisions work" onClick={() => setShowLeagueInfo((value) => !value)}>i</button></div><div className="league-current"><i className={`league-crest ${league.split(" ")[0].toLowerCase()}`}>{league === "Legendary" ? "★" : league.split(" ")[1]}</i><div><strong>{league}</strong><p>{Math.floor(monthlySeconds / 3600)}h {Math.floor((monthlySeconds % 3600) / 60)}m this week · {Math.max(0, nextLeaguePromotion - Math.floor(monthlySeconds / 3600))}h to promote</p></div></div><div className="league-zones"><span className="promotion"><b>Promote</b><small>Top 20%</small></span><span className="safe"><b>Stay</b><small>Middle 60%</small></span><span className="demotion"><b>Demote</b><small>Bottom 20%</small></span></div>{showLeagueInfo && <aside className="league-guide"><strong>How weekly promotion works</strong><p>Finished study hours decide rank. Top 20% promote, middle 60% stay, bottom 20% demote. Resets every Monday.</p><div>{divisions.map(([division, hoursRequired]) => { const tier = division.split(" ")[0].toLowerCase(); const roman = division.split(" ")[1] || "★"; const currentHours = Math.floor(monthlySeconds / 3600); return <span className={league === division ? "current" : currentHours >= hoursRequired ? "unlocked" : ""} key={division}><i className={`league-crest ${tier}`}>{roman}</i><b>{division}</b><small>{hoursRequired === 0 ? "Starting rank" : `${hoursRequired}h / week`}</small></span>; })}</div></aside>}</section><section><p className="sheet-label">STREAK MILESTONES</p><div className="journey-milestones">{milestones.map((milestone) => <article className={streak >= milestone ? "reached" : ""} key={milestone}><span>{streak >= milestone ? "✓" : milestone}</span><div><strong>{milestone} days</strong><small>Keep your daily study streak alive</small></div></article>)}</div></section><section className="journey-stats"><article><small>STUDIED TOTAL</small><strong>{hours}h {minutes}m</strong></article><article><small>THIS WEEK</small><strong>{Math.floor(monthlySeconds / 3600)}h {Math.floor((monthlySeconds % 3600) / 60)}m</strong></article></section></div></section></div>;
+  const toggleInfo = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    setShowLeagueInfo((value) => !value);
+  };
+  return (
+    <div className="task-sheet-backdrop" role="presentation" onMouseDown={onClose}>
+      <section className="journey-sheet" role="dialog" aria-modal="true" aria-label="Your study journey" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="sheet-handle" />
+        <header className="sheet-page-header"><button className="icon" type="button" aria-label="Close journey" onClick={onClose}>×</button><div><strong>Your journey</strong><small>Weekly league · daily streak</small></div><span>✦</span></header>
+        <div className="journey-sheet-body">
+          <section className="journey-highlight"><span>🔥</span><div><small>ACTIVE STREAK</small><strong>{streak} day{streak === 1 ? "" : "s"}</strong><p>Next streak milestone: {nextStreakMilestone} active days</p></div></section>
+          <section className="journey-league">
+            <div className="league-heading"><span className="sheet-label">WEEKLY LEAGUE</span><button type="button" className="league-info-button" aria-expanded={showLeagueInfo} aria-label="How league divisions work" onMouseDown={(event) => event.stopPropagation()} onClick={toggleInfo}>i</button></div>
+            <div className="league-current"><i className={`league-crest ${league.split(" ")[0].toLowerCase()}`}>{league === "Legendary" ? "★" : league.split(" ")[1]}</i><div><strong>{league}</strong><p>{Math.floor(weeklySeconds / 3600)}h {Math.floor((weeklySeconds % 3600) / 60)}m this week · {Math.max(0, nextLeaguePromotion - Math.floor(weeklySeconds / 3600))}h to promote</p></div></div>
+            <div className="league-zones"><span className="promotion"><b>Promote</b><small>Top 20%</small></span><span className="safe"><b>Stay</b><small>Middle 60%</small></span><span className="demotion"><b>Demote</b><small>Bottom 20%</small></span></div>
+            {showLeagueInfo && <aside className="league-guide"><strong>How weekly promotion works</strong><p>Finished study hours decide rank. Top 20% promote, middle 60% stay, bottom 20% demote. Resets every Monday.</p><div>{divisions.map(([division, hoursRequired]) => { const tier = division.split(" ")[0].toLowerCase(); const roman = division.split(" ")[1] || "★"; const currentHours = Math.floor(weeklySeconds / 3600); return <span className={league === division ? "current" : currentHours >= hoursRequired ? "unlocked" : ""} key={division}><i className={`league-crest ${tier}`}>{roman}</i><b>{division}</b><small>{hoursRequired === 0 ? "Starting rank" : `${hoursRequired}h / week`}</small></span>; })}</div></aside>}
+          </section>
+          <section><p className="sheet-label">STREAK MILESTONES</p><div className="journey-milestones">{milestones.map((milestone) => <article className={streak >= milestone ? "reached" : ""} key={milestone}><span>{streak >= milestone ? "✓" : milestone}</span><div><strong>{milestone} days</strong><small>Keep your daily study streak alive</small></div></article>)}</div></section>
+          <section className="journey-stats"><article><small>STUDIED TOTAL</small><strong>{hours}h {minutes}m</strong></article><article><small>THIS WEEK</small><strong>{Math.floor(weeklySeconds / 3600)}h {Math.floor((weeklySeconds % 3600) / 60)}m</strong></article></section>
+        </div>
+      </section>
+    </div>
+  );
 }
 
 function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () => void }) {
@@ -1056,6 +1078,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
+  const [verificationCooldown, setVerificationCooldown] = useState(0);
   const [showGroup, setShowGroup] = useState(false);
   const [needsUsername, setNeedsUsername] = useState(false);
   const [senderNames, setSenderNames] = useState<Record<string, string>>({});
@@ -1111,14 +1134,22 @@ export default function App() {
       } as User)
     : user;
   const resendVerification = async () => {
-    if (!user) return;
+    if (!user || verificationCooldown > 0) return;
     try {
       await sendEmailVerification(user);
       setVerificationSent(true);
+      setVerificationCooldown(60);
     } catch (e) {
-      setError(e instanceof Error ? e.message.replace("Firebase: ", "") : "Could not resend the verification email.");
+      const code = typeof e === "object" && e !== null && "code" in e ? String((e as { code?: string }).code) : "";
+      if (code === "auth/too-many-requests") setVerificationCooldown(60);
+      setError(code === "auth/too-many-requests" ? "Too many resend attempts. Please wait a minute before trying again." : e instanceof Error ? e.message.replace("Firebase: ", "") : "Could not resend the verification email.");
     }
   };
+  useEffect(() => {
+    if (!verificationCooldown) return;
+    const timer = window.setInterval(() => setVerificationCooldown((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [verificationCooldown]);
   useEffect(() => {
     if (!auth) {
       setLoading(false);
@@ -2132,7 +2163,8 @@ export default function App() {
       </header>
       {user && !user.emailVerified && (
         <div className="notice" role="status">
-          Verify your email to keep your account secure. {verificationSent ? "Check your inbox." : <button type="button" className="secondary compact" onClick={() => void resendVerification()}>Resend email</button>}
+          <span>Verify your email to keep your account secure. {verificationSent ? "Check your inbox." : ""}</span>
+          {!verificationSent && <button type="button" className="secondary compact" disabled={verificationCooldown > 0} onClick={() => void resendVerification()}>{verificationCooldown > 0 ? `Resend in ${verificationCooldown}s` : "Resend email"}</button>}
         </div>
       )}
       {(page === "chats" || page === "communities") && showFriendRequests && (
