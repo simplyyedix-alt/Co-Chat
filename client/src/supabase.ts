@@ -16,12 +16,12 @@ export async function verifyFirebaseIdentity(idToken: string) {
   return data as { uid: string; email: string; displayName: string; photoURL: string }
 }
 
-export async function invokeSocialApi(idToken: string, payload: { action: 'view' | 'like' | 'comment'; twittId: string; text?: string }) {
+export async function invokeSocialApi(idToken: string, payload: { action: 'feed' | 'comments' | 'create' | 'view' | 'like' | 'comment'; twittId?: string; text?: string; community?: string; cursor?: string | null }) {
   if (!supabase) throw new Error('Supabase is not configured.')
   const { data, error } = await supabase.functions.invoke('social-api', {
     body: payload,
     headers: { Authorization: `Bearer ${idToken}` },
   })
   if (error) throw error
-  return data as { recorded?: boolean; liked?: boolean; id?: string }
+  return data as { recorded?: boolean; liked?: boolean; id?: string; items?: unknown[] }
 }

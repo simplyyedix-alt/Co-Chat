@@ -43,6 +43,24 @@ async function callRpc(name: string, args: Record<string, unknown>) {
   return payload
 }
 
+async function callRest(path: string, init: RequestInit = {}) {
+  const url = Deno.env.get('SUPABASE_URL') || ''
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+  if (!url || !serviceKey) throw new Error('Missing Supabase server configuration')
+  const result = await fetch(`${url}/rest/v1/${path}`, {
+    ...init,
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      'Content-Type': 'application/json',
+      ...(init.headers || {}),
+    },
+  })
+  const payload = await result.json().catch(() => null)
+  if (!result.ok) throw new Error(typeof payload?.message === 'string' ? payload.message : `Database request failed (${result.status})`)
+  return payload
+}
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (request.method !== 'POST') return response({ error: 'POST required' }, 405)
@@ -53,10 +71,33 @@ Deno.serve(async (request) => {
   const uid = await verifyFirebaseToken(token)
   if (!uid) return response({ error: 'Invalid Firebase identity token' }, 401)
 
-  const body = await request.json().catch(() => null) as { action?: string; twittId?: string; text?: string } | null
-  if (!body?.action || !body.twittId) return response({ error: 'action and twittId are required' }, 400)
+  const body = await request.json().catch(() => null) as { action?: string; twittId?: string; text?: string; community?: string; cursor?: string } | null
+  if (!body?.action) return response({ error: 'action is required' }, 400)
 
   try {
+    if (body.action === 'feed') {
+      const params = new URLSearchParams({ select: 'id,author_id,community,body,likes_count,comments_count,views_count,created_at', order: 'created_at.desc', limit: '20' })
+      if (body.community && body.community !== 'all') params.set('community', `eq.${body.community}`)
+      if (body.cursor) params.set('created_at', `lt.${body.cursor}`)
+      const rows = await callRest(`twitts?${params.toString()}`)
+      return response({ items: rows || [] })
+    }
+    if (body.action === 'comments') {
+      if (!body.twittId) return response({ error: 'twittId is required' }, 400)
+      const params = new URLSearchParams({ select: 'id,author_id,body,created_at', twitt_id: `eq.${body.twittId}`, order: 'created_at.desc', limit: '20' })
+      if (body.cursor) params.set('created_at', `lt.${body.cursor}`)
+      const rows = await callRest(`twitt_comments?${params.toString()}`)
+      return response({ items: rows || [] })
+    }
+    if (body.action === 'create') {
+      const text = body.text?.trim() || ''
+      if (!text || text.length > 280 || !['jee', 'neet', 'study', 'public'].includes(body.community || '')) {
+        return response({ error: 'Valid text and community are required' }, 400)
+      }
+      const rows = await callRest('twitts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ author_id: uid, body: text, community: body.community }) })
+      return response({ id: rows?.[0]?.id || null })
+    }
+    if (!body.twittId) return response({ error: 'twittId is required' }, 400)
     if (body.action === 'view') {
       return response({ recorded: Boolean(await callRpc('record_twitt_view', { p_twitt_id: body.twittId, p_user_id: uid })) })
     }
