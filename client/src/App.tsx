@@ -317,6 +317,7 @@ function StudyHome() {
   const dayNumber = Math.floor(Date.now() / 86_400_000);
   const [seconds, setSeconds] = useState(0);
   const [totalSeconds, setTotalSeconds] = useState(() => { try { return Number(JSON.parse(localStorage.getItem(studyKey) || "{}").totalSeconds || 0); } catch { return 0; } });
+  const [studyDays, setStudyDays] = useState<string[]>(() => { try { const value = JSON.parse(localStorage.getItem(studyKey) || "{}").studyDays; return Array.isArray(value) ? value.filter((day): day is string => typeof day === "string") : []; } catch { return []; } });
   const [questDone, setQuestDone] = useState(() => { try { return JSON.parse(localStorage.getItem(studyKey) || "{}").questDay === dayNumber; } catch { return false; } });
   const [running, setRunning] = useState(false);
   useEffect(() => {
@@ -330,24 +331,31 @@ function StudyHome() {
   const saveSession = () => {
     if (seconds <= 0) return;
     const nextTotal = totalSeconds + seconds;
+    const today = new Date().toISOString().slice(0, 10);
+    const nextDays = studyDays.includes(today) ? studyDays : [...studyDays, today].slice(-365);
     setTotalSeconds(nextTotal);
+    setStudyDays(nextDays);
     setSeconds(0);
     setRunning(false);
-    try { localStorage.setItem(studyKey, JSON.stringify({ totalSeconds: nextTotal, questDay: questDone ? dayNumber : null })); } catch { /* storage is optional */ }
+    try { localStorage.setItem(studyKey, JSON.stringify({ totalSeconds: nextTotal, studyDays: nextDays, questDay: questDone ? dayNumber : null })); } catch { /* storage is optional */ }
   };
   const completeQuest = () => {
     const next = !questDone;
     setQuestDone(next);
-    try { localStorage.setItem(studyKey, JSON.stringify({ totalSeconds, questDay: next ? dayNumber : null })); } catch { /* storage is optional */ }
+    try { localStorage.setItem(studyKey, JSON.stringify({ totalSeconds, studyDays, questDay: next ? dayNumber : null })); } catch { /* storage is optional */ }
   };
   const studiedHours = Math.floor(totalSeconds / 3600);
+  const today = new Date();
+  const activeStreak = (() => { let streak = 0; for (let index = 0; index < 365; index += 1) { const date = new Date(today); date.setDate(today.getDate() - index); if (!studyDays.includes(date.toISOString().slice(0, 10))) break; streak += 1; } return streak; })();
+  const league = activeStreak >= 365 ? "Legendary" : activeStreak >= 200 ? "Gold III" : activeStreak >= 100 ? "Gold II" : activeStreak >= 60 ? "Gold I" : activeStreak >= 30 ? "Silver III" : activeStreak >= 15 ? "Silver II" : activeStreak >= 7 ? "Silver I" : activeStreak >= 4 ? "Bronze III" : activeStreak >= 2 ? "Bronze II" : "Bronze I";
+  const nextMilestone = [7, 30, 100, 200, 365].find((milestone) => milestone > activeStreak) || 365;
   return (
     <div className="study-home">
       <section className="study-hero"><div><span className="kicker">TODAY’S QUEST</span><h2>One focused hour.</h2><p>Build your journey one calm session at a time.</p></div><div className="quest-badge">✦</div></section>
       <section className="timer-card"><div className="timer-ring" style={{ "--progress": `${progress}%` } as CSSProperties}><strong>{display}</strong><span>focus time</span></div><div className="timer-actions"><button className="primary" type="button" onClick={() => setRunning((value) => !value)}>{running ? "Pause session" : "Start session"}</button><button className="secondary" type="button" onClick={saveSession} disabled={!seconds}>Finish & save</button><button className="secondary" type="button" onClick={() => { setRunning(false); setSeconds(0); }}>Reset</button></div><small className="timer-note">Your session is saved when you finish, not every second.</small></section>
-      <div className="study-grid"><article><span className="metric-icon">🔥</span><strong>43 days</strong><small>active journey</small></article><article><span className="metric-icon">✦</span><strong>Silver II</strong><small>current league</small></article><article><span className="metric-icon">⌁</span><strong>{studiedHours} h</strong><small>studied total</small></article></div>
+      <div className="study-grid"><article><span className="metric-icon">🔥</span><strong>{activeStreak} days</strong><small>active journey</small></article><article><span className="metric-icon">✦</span><strong>{league}</strong><small>current league</small></article><article><span className="metric-icon">⌁</span><strong>{studiedHours} h</strong><small>studied total</small></article></div>
       <section className={`quest-card ${questDone ? "completed" : ""}`}><div><span className="kicker">DAILY QUEST</span><h3>{quests[dayNumber % quests.length]}</h3><p>Small actions compound into a stronger community.</p></div><button className="quest-check" type="button" onClick={completeQuest} aria-label={questDone ? "Mark quest incomplete" : "Complete daily quest"}>{questDone ? "✓" : "○"}</button></section>
-      <section className="journey-card"><div className="section-title">YOUR JOURNEY <span>7 → 30 → 365 days</span></div><div className="journey-track"><span className="journey-dot done">✓</span><span className="journey-line done"/><span className="journey-dot active">II</span><span className="journey-line"/><span className="journey-dot">G</span></div><p>Keep showing up. Your next milestone is 30 active days.</p></section>
+      <section className="journey-card"><div className="section-title">YOUR JOURNEY <span>7 → 30 → 365 days</span></div><div className="journey-track"><span className={`journey-dot ${activeStreak >= 7 ? "done" : "active"}`}>{activeStreak >= 7 ? "✓" : "I"}</span><span className={`journey-line ${activeStreak >= 7 ? "done" : ""}`}/><span className={`journey-dot ${activeStreak >= 30 ? "done" : activeStreak >= 7 ? "active" : ""}`}>{activeStreak >= 30 ? "✓" : "II"}</span><span className={`journey-line ${activeStreak >= 30 ? "done" : ""}`}/><span className={`journey-dot ${activeStreak >= 365 ? "done" : activeStreak >= 30 ? "active" : ""}`}>{activeStreak >= 365 ? "✓" : "G"}</span></div><p>Keep showing up. Your next milestone is {nextMilestone} active day{nextMilestone === 1 ? "" : "s"}.</p></section>
     </div>
   );
 }
