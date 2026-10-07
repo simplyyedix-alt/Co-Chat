@@ -1468,6 +1468,18 @@ export default function App() {
       .slice(0, 8);
   }, [conversations, friendProfiles, liveUser?.uid, presenceNow]);
   const closeGroupCall = useCallback(() => setGroupCall(null), []);
+  // Keep notification hooks above every conditional return so React sees the
+  // same hook order before and after authentication/profile loading.
+  useEffect(() => {
+    if (!incomingCall) return;
+    void notifyIncomingCall(incomingCall.groupId ? (incomingCall.groupName || "Group call") : incomingCallerName, incomingCall.id, Boolean(incomingCall.groupId));
+  }, [incomingCall?.id, incomingCallerName]);
+  useEffect(() => listenNotificationActions((event) => {
+    if (event.tag?.startsWith("cochat-call-") || event.data?.type === "call") {
+      if (event.action === "answer-call") void acceptIncomingCall();
+      if (event.action === "decline-call") void declineIncomingCall();
+    }
+  }), [incomingCall, liveUser, incomingCallerName]);
   if (loading)
     return (
       <main className="auth">
@@ -1677,16 +1689,6 @@ export default function App() {
     setVoiceRole("callee");
     setShowVoiceCall(true);
   };
-  useEffect(() => {
-    if (!incomingCall) return;
-    void notifyIncomingCall(incomingCall.groupId ? (incomingCall.groupName || "Group call") : incomingCallerName, incomingCall.id, Boolean(incomingCall.groupId));
-  }, [incomingCall?.id, incomingCallerName]);
-  useEffect(() => listenNotificationActions((event) => {
-    if (event.tag?.startsWith("cochat-call-") || event.data?.type === "call") {
-      if (event.action === "answer-call") void acceptIncomingCall();
-      if (event.action === "decline-call") void declineIncomingCall();
-    }
-  }), [incomingCall, liveUser, incomingCallerName]);
   const activeGroupCount = selected?.type === "group"
     ? Math.min(selected.memberIds.length, groupMembers.filter((member) => member.activeStatus !== false && Boolean(member.lastSeen) && presenceNow - (member.lastSeen?.toMillis() || 0) < 90000).length)
     : 0;
