@@ -517,6 +517,32 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
       setCommentMore((current) => ({ ...current, [postId]: page.hasMore }));
     } finally { setCommentLoading(null); }
   };
+  const submitComment = async (post: TwittPreview, body: string) => {
+    const uid = auth?.currentUser?.uid || 'you';
+    const localId = `local-comment-${Date.now()}`;
+    const optimisticComment = { id: localId, uid, body, createdAt: { toMillis: () => Date.now() } };
+    setCommentsByPost((current) => ({ ...current, [post.id]: [...(current[post.id] || []), optimisticComment] }));
+    setPosts((current) => current.map((item) => item.id === post.id ? { ...item, comments: item.comments + 1 } : item));
+    try {
+      if (uid !== 'you' && firebaseReady && !post.id.startsWith('local-')) await createTwittComment(post.id, uid, body);
+    } catch {
+      setCommentsByPost((current) => ({ ...current, [post.id]: (current[post.id] || []).filter((comment) => comment.id !== localId) }));
+      setPosts((current) => current.map((item) => item.id === post.id ? { ...item, comments: Math.max(0, item.comments - 1) } : item));
+    }
+  };
+  useEffect(() => {
+    const onCommentCreated = (event: Event) => {
+      const detail = (event as CustomEvent<{ twittId?: string; id?: string; uid?: string; body?: string }>).detail;
+      if (!detail?.twittId || !detail.id || !detail.uid || !detail.body) return;
+      setCommentsByPost((current) => {
+        const comments = current[detail.twittId!] || [];
+        if (comments.some((comment) => comment.id === detail.id)) return current;
+        return { ...current, [detail.twittId!]: [...comments, { id: detail.id!, uid: detail.uid!, body: detail.body!, createdAt: { toMillis: () => Date.now() } }] };
+      });
+    };
+    window.addEventListener('cochat-comment-created', onCommentCreated);
+    return () => window.removeEventListener('cochat-comment-created', onCommentCreated);
+  }, []);
   const communityLabel = { all: "All public", jee: "JEE Prep", neet: "NEET Prep", study: "Study circles", public: "Public Co-Chat", following: "Following" }[community];
   const createTwitt = async () => {
     if (!draft.trim()) return;

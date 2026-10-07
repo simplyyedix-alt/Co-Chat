@@ -113,7 +113,11 @@ export async function recordTwittView(twittId: string, uid: string) {
 }
 
 export async function createTwittComment(twittId: string, uid: string, body: string) {
-  if (socialBackend === 'supabase' && supabaseReady) return createSupabaseTwittComment(twittId, uid, body)
+  if (socialBackend === 'supabase' && supabaseReady) {
+    const id = await createSupabaseTwittComment(twittId, uid, body)
+    window.dispatchEvent(new CustomEvent('cochat-comment-created', { detail: { twittId, id, uid, body: body.trim() } }))
+    return id
+  }
   if (!db) throw new Error('Firebase is not configured.')
   const text = body.trim()
   if (!text || text.length > 240) throw new Error('Comment must be between 1 and 240 characters.')
@@ -125,6 +129,7 @@ export async function createTwittComment(twittId: string, uid: string, body: str
     transaction.set(commentRef, { uid, body: text, createdAt: serverTimestamp() })
     transaction.update(twittRef, { comments: Math.max(0, Number(twitt.data().comments || 0)) + 1 })
   })
+  window.dispatchEvent(new CustomEvent('cochat-comment-created', { detail: { twittId, id: commentRef.id, uid, body: text } }))
   return commentRef.id
 }
 
