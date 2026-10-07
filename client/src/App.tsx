@@ -11,6 +11,7 @@ import {
   type User,
 } from "firebase/auth";
 import { auth, firebaseReady, googleProvider } from "./firebase";
+import { supabaseReady, verifyFirebaseIdentity } from "./supabase";
 import {
   addGroupMembers,
   blockUser,
@@ -672,6 +673,19 @@ export default function App() {
       unsubscribe();
     };
   }, []);
+  useEffect(() => {
+    if (!user || !supabaseReady) return;
+    let cancelled = false;
+    void user
+      .getIdToken()
+      .then((idToken) => verifyFirebaseIdentity(idToken))
+      .catch(() => {
+        if (!cancelled) setError("Signed in, but secure social services are unavailable right now.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
     localStorage.setItem("cochat-theme", darkMode ? "dark" : "light");
