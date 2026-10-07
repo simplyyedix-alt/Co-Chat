@@ -2517,6 +2517,7 @@ function FriendZone({
   const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
   const [focused, setFocused] = useState<UserProfile | null>(null);
   const [blocked, setBlocked] = useState<string[]>([]);
+  const [removedFriendIds, setRemovedFriendIds] = useState<string[]>([]);
   const [profileExpanded, setProfileExpanded] = useState(false);
   useEffect(() => watchFriendRequests(uid, setRequests), [uid]);
   useEffect(() => {
@@ -2546,8 +2547,19 @@ function FriendZone({
   const friends = requests.filter(
     (item) =>
       item.status === "accepted" &&
+      !removedFriendIds.includes(item.fromUid === uid ? item.toUid : item.fromUid) &&
       !blocked.includes(item.fromUid === uid ? item.toUid : item.fromUid),
   );
+  const unfriend = async (profile: UserProfile) => {
+    if (!window.confirm(`Remove ${profile.displayName} from your friends?`)) return;
+    try {
+      await removeFriend(uid, profile.uid);
+      setRemovedFriendIds((current) => [...new Set([...current, profile.uid])]);
+      setFocused(null);
+    } catch {
+      // Keep the profile open so the user can retry.
+    }
+  };
   const shareProfile = async (profile: UserProfile) => {
     const message = `${profile.displayName} is on Co-Chat — @${profile.username}`;
     try {
@@ -2689,6 +2701,7 @@ function FriendZone({
             <button className="secondary" type="button" onClick={() => void shareProfile(focused)}>
               Share
             </button>
+            {friends.some((item) => (item.fromUid === uid ? item.toUid : item.fromUid) === focused.uid) && <button className="secondary danger-outline" type="button" onClick={() => void unfriend(focused)}>Unfriend</button>}
             <button
               className="secondary"
               type="button"
@@ -2784,6 +2797,16 @@ function SearchPanel({
           ? error.message
           : "Could not update this connection.",
       );
+    }
+  };
+  const unfriend = async (profile: UserProfile) => {
+    if (!window.confirm(`Remove ${profile.displayName} from your friends?`)) return;
+    try {
+      await removeFriend(uid, profile.uid);
+      setRelationships((old) => ({ ...old, [profile.uid]: "none" }));
+      setFocused(null);
+    } catch {
+      setActionError("Could not remove this friend.");
     }
   };
   const shareProfile = async (profile: UserProfile) => {
@@ -2948,6 +2971,7 @@ function SearchPanel({
               <button className="secondary" type="button" disabled>{relationships[focused.uid] === "incoming" ? "Request received" : "Request sent"}</button>
             )}
             <button className="secondary" type="button" onClick={() => void shareProfile(focused)}>Share</button>
+            {relationships[focused.uid] === "friends" && <button className="secondary danger-outline" type="button" onClick={() => void unfriend(focused)}>Unfriend</button>}
           </div>
         </div>
       )}
