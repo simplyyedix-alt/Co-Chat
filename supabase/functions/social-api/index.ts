@@ -100,8 +100,8 @@ Deno.serve(async (request) => {
   const body = await request.json().catch(() => null) as SocialRequest | null
   if (!body?.action) return response({ error: 'action is required' }, 400)
 
-  const communities = new Set(['all', 'jee', 'neet', 'study', 'public'])
-  if (body.community && !communities.has(body.community)) return response({ error: 'Unsupported community' }, 400)
+  const normalizedCommunity = body.community?.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')
+  if (body.community && (!normalizedCommunity || normalizedCommunity.length < 2 || normalizedCommunity.length > 32)) return response({ error: 'Choose a tag between 2 and 32 characters.' }, 400)
   if (body.cursor && Number.isNaN(Date.parse(body.cursor))) return response({ error: 'Invalid pagination cursor' }, 400)
 
   try {
@@ -129,10 +129,10 @@ Deno.serve(async (request) => {
     }
     if (body.action === 'create') {
       const text = body.text?.trim() || ''
-      if (!text || text.length > 280 || !['jee', 'neet', 'study', 'public'].includes(body.community || '') || (body.attachment !== undefined && !validSocialAttachment(body.attachment))) {
+      if (!text || text.length > 280 || !normalizedCommunity || (body.attachment !== undefined && !validSocialAttachment(body.attachment))) {
         return response({ error: 'Valid text and community are required' }, 400)
       }
-      const rows = await callRest('twitts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ author_id: uid, body: text, community: body.community, attachment: body.attachment || null }) })
+      const rows = await callRest('twitts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ author_id: uid, body: text, community: normalizedCommunity, attachment: body.attachment || null }) })
       return response({ id: rows?.[0]?.id || null })
     }
     if (!body.twittId) return response({ error: 'twittId is required' }, 400)

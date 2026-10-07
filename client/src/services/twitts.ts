@@ -19,7 +19,7 @@ import { db } from '../firebase'
 import { socialBackend, supabaseReady } from '../supabase'
 import { attachSupabaseTwittCommentMedia, attachSupabaseTwittMedia, createSupabaseTwitt, createSupabaseTwittComment, deleteSupabaseTwitt, deleteSupabaseTwittComment, hideSupabaseTwitt, loadSupabaseTwittComments, loadSupabaseTwittPage, recordSupabaseTwittView, toggleSupabaseTwittCommentLike, toggleSupabaseTwittLike } from './supabaseTwitts'
 
-export type TwittCommunity = 'jee' | 'neet' | 'study' | 'public'
+export type TwittCommunity = string
 export type TwittAttachment = { name: string; url: string; storageKey?: string; type: string; size: number }
 
 export type TwittRecord = {
@@ -51,7 +51,7 @@ function fromDoc(item: QueryDocumentSnapshot<DocumentData>): TwittRecord {
     id: item.id,
     uid: String(data.uid || ''),
     body: String(data.body || ''),
-    community: data.community === 'neet' || data.community === 'study' || data.community === 'public' ? data.community : 'jee',
+    community: String(data.community || 'study').toLowerCase(),
     createdAt: data.createdAt || null,
     likes: Number(data.likes || 0),
     comments: Number(data.comments || 0),
