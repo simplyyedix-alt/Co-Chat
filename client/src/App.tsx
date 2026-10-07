@@ -1608,6 +1608,18 @@ export default function App() {
       setError(e instanceof Error ? e.message : "Profile could not be saved.");
     }
   };
+  const updatePreference = async (field: "notificationsEnabled" | "discoverable" | "activeStatus", value: boolean) => {
+    if (preview) return;
+    const next = { notificationsEnabled, discoverable, activeStatus, [field]: value };
+    if (field === "notificationsEnabled") setNotificationsEnabled(value);
+    if (field === "discoverable") setDiscoverable(value);
+    if (field === "activeStatus") setActiveStatus(value);
+    try {
+      await saveProfile(liveUser.uid, { displayName: profileName, username: profileUsername, bio: profileBio, ...next });
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Could not update that preference.");
+    }
+  };
   const shareProfile = async (displayName: string, username: string) => {
     const handle = username.trim() ? `@${username.trim()}` : displayName.trim();
     const message = `${displayName.trim() || "A Co-Chat member"} is on Co-Chat — ${handle}`;
@@ -2385,15 +2397,15 @@ export default function App() {
               >
                 <span className="settings-row-icon">◐</span><span className="settings-option-copy"><b>Appearance</b><small>Choose the {darkMode ? "dark" : "light"} Co‑Chat theme</small></span><span className="settings-value">{darkMode ? "Dark" : "Light"} <span className="chevron">›</span></span>
               </button>
-              <button type="button" onClick={() => setNotificationsEnabled((value) => !value)}>
+              <button type="button" onClick={() => void updatePreference("notificationsEnabled", !notificationsEnabled)}>
                 <span className="settings-row-icon">⌁</span><span className="settings-option-copy"><b>Notifications</b><small>Get updates about messages and study activity</small></span><span className={`settings-toggle ${notificationsEnabled ? "on" : ""}`} aria-label={notificationsEnabled ? "Notifications on" : "Notifications off"}><span /></span>
               </button>
-              <button type="button" onClick={() => setDiscoverable((value) => !value)}>
+              <button type="button" onClick={() => void updatePreference("discoverable", !discoverable)}>
                 <span className="settings-row-icon">◎</span><span className="settings-option-copy"><b>Discoverability</b><small>Let friends find you in People and Discover</small></span><span className={`settings-toggle ${discoverable ? "on" : ""}`} aria-label={discoverable ? "Discoverability on" : "Discoverability off"}><span /></span>
               </button>
               <button
                 type="button"
-                onClick={() => setActiveStatus((value) => !value)}
+                onClick={() => void updatePreference("activeStatus", !activeStatus)}
               >
                 <span className={`settings-row-icon ${activeStatus ? "online" : ""}`}>●</span><span className="settings-option-copy"><b>Active status</b><small>Let friends see when you are available</small></span><span className={`settings-toggle ${activeStatus ? "on" : ""}`} aria-label={activeStatus ? "Active status on" : "Active status off"}><span /></span>
               </button>
