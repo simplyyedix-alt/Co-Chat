@@ -340,7 +340,8 @@ function Nav({
         ["chats", "💬", "Chats"],
         ["study", "◷", "Study"],
         ["communities", "👥", "Communities"],
-        ["discover", "⌕", "Discover"],
+        ["search", "⌕", "People"],
+        ["discover", "✦", "Discover"],
         ["settings", "⚙", "Settings"],
       ].map(([id, icon, label]) => (
         <button
