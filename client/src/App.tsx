@@ -412,6 +412,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
   const [tab, setTab] = useState<"recent" | "trending">("recent");
   const [posts, setPosts] = useState<TwittPreview[]>([]);
   const [authorNames, setAuthorNames] = useState<Record<string, string>>({});
+  const [authorProfiles, setAuthorProfiles] = useState<Record<string, UserProfile>>({});
   const [visible, setVisible] = useState(20);
   const [community, setCommunity] = useState<"all" | "jee" | "neet" | "study" | "public" | "following">(initialCommunity);
   const followKey = `cochat-following-${auth?.currentUser?.uid || "preview"}`;
@@ -480,6 +481,11 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
       setAuthorNames((current) => {
         const next = { ...current };
         items.forEach(([uid, profile]) => { if (profile?.username) { next[uid] = profile.username; next[profile.username] = profile.username; } });
+        return next;
+      });
+      setAuthorProfiles((current) => {
+        const next = { ...current };
+        items.forEach(([uid, profile]) => { if (profile) { next[uid] = profile; if (profile.username) next[profile.username] = profile; } });
         return next;
       });
       setPosts((current) => current.map((post) => {
@@ -561,6 +567,20 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
     window.addEventListener('cochat-comment-created', onCommentCreated);
     return () => window.removeEventListener('cochat-comment-created', onCommentCreated);
   }, []);
+  useEffect(() => {
+    const cards = Array.from(document.querySelectorAll<HTMLElement>('.twitt-card'));
+    cards.forEach((card, index) => {
+      const post = filtered[index];
+      const photoURL = post ? authorProfiles[post.handle]?.photoURL : '';
+      const avatar = card.querySelector<HTMLElement>('.twitt-head > .avatar');
+      if (!avatar || !photoURL) return;
+      avatar.textContent = '';
+      const image = document.createElement('img');
+      image.src = photoURL;
+      image.alt = '';
+      avatar.appendChild(image);
+    });
+  }, [filtered, authorProfiles]);
   const communityLabel = { all: "All public", jee: "JEE Prep", neet: "NEET Prep", study: "Study circles", public: "Public Co-Chat", following: "Following" }[community];
   const createTwitt = async () => {
     if (!draft.trim()) return;
