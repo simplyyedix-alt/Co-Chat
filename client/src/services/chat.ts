@@ -121,8 +121,28 @@ async function reserveUsername(uid: string, requested: string, fallback: string)
 
 export async function ensureUserProfile(uid: string, profile: Partial<UserProfile>) {
   if (isSupabaseChatEnabled()) {
-    const existing = await getSupabaseProfile(uid)
-    if (!existing) await upsertSupabaseProfile(uid, { ...profile, username: normalizeUsername(profile.username || profile.displayName || profile.email?.split('@')[0] || `user${uid.slice(0, 8)}`) })
+    const [existing, firestoreProfile] = await Promise.all([
+      getSupabaseProfile(uid),
+      getFirestoreUserProfile(uid),
+    ])
+    // Firestore may contain the username the user explicitly chose before the
+    // chat backend was migrated. Keep both profile stores in sync so the
+    // study leaderboard never falls back to the Gmail local-part.
+    const username = normalizeUsername(
+      firestoreProfile?.username || existing?.username || profile.username ||
+      profile.displayName || profile.email?.split('@')[0] || `user${uid.slice(0, 8)}`,
+    )
+    await upsertSupabaseProfile(uid, {
+      ...profile,
+      displayName: firestoreProfile?.displayName || existing?.displayName || profile.displayName || '',
+      email: firestoreProfile?.email || existing?.email || profile.email || '',
+      photoURL: firestoreProfile?.photoURL || existing?.photoURL || profile.photoURL || '',
+      username,
+      bio: firestoreProfile?.bio || existing?.bio || profile.bio || '',
+      notificationsEnabled: firestoreProfile?.notificationsEnabled ?? existing?.notificationsEnabled ?? profile.notificationsEnabled,
+      discoverable: firestoreProfile?.discoverable ?? existing?.discoverable ?? profile.discoverable,
+      activeStatus: firestoreProfile?.activeStatus ?? existing?.activeStatus ?? profile.activeStatus,
+    })
     return !existing?.username
   }
   if (!db) return false
@@ -465,6 +485,28 @@ export async function saveProfile(uid: string, values: Pick<UserProfile, 'displa
     const username = normalizeUsername(values.username)
     if (username.length < 3) throw new Error('Username must be at least 3 characters.')
     await upsertSupabaseProfile(uid, { ...values, username, email: current?.email || auth?.currentUser?.email || '', photoURL: current?.photoURL || auth?.currentUser?.photoURL || '' })
+    // Keep the legacy profile document aligned as well. It is still used as
+    // the fallback for profile display and may contain the user's chosen
+    // username from before the Supabase migration.
+    if (db) {
+      try {
+        await setDoc(doc(db, 'users', uid), {
+          displayName: values.displayName.trim(),
+          email: current?.email || auth?.currentUser?.email || '',
+          username,
+          photoURL: current?.photoURL || auth?.currentUser?.photoURL || '',
+          bio: String(values.bio || '').trim().slice(0, 280),
+          notificationsEnabled: values.notificationsEnabled,
+          discoverable: values.discoverable,
+          activeStatus: values.activeStatus !== false,
+          profileComplete: true,
+          updatedAt: serverTimestamp(),
+        }, { merge: true })
+      } catch {
+        // Supabase remains the primary profile store while the legacy mirror
+        // is best-effort (for example, when Firestore rules are unavailable).
+      }
+    }
     return
   }
   if (!db) throw new Error('Profile service is unavailable. Check your connection and try again.')

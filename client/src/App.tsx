@@ -390,10 +390,28 @@ function studyMinutes(seconds: number) {
   return `${Math.floor(seconds / 60)} min`;
 }
 
+function LeaderboardPodiumCard({ entry, rank, currentUid, mode }: { entry?: StudyLeaderboardEntry; rank: 1 | 2 | 3; currentUid: string; mode: "friends" | "public" }) {
+  const medal = rank === 1 ? "🏆" : rank === 2 ? "🥈" : "🥉";
+  return <article className={`leaderboard-podium-card rank-${rank}`}>
+    <span className="leaderboard-medal" aria-label={`Rank ${rank}`}>{medal}</span>
+    {entry ? <>
+      <Avatar name={entry.displayName} photoURL={entry.photoURL} className="leaderboard-avatar" />
+      <strong>{entry.uid === currentUid ? "You" : entry.displayName}</strong>
+      <small>{entry.username ? `@${entry.username}` : mode === "friends" ? "Friend" : "Student"}</small>
+      <b>{studyMinutes(entry.weeklySeconds)}</b>
+    </> : <>
+      <span className="leaderboard-avatar leaderboard-avatar-empty">—</span>
+      <strong>Open rank</strong>
+      <small>Waiting</small>
+    </>}
+  </article>;
+}
+
 function LeaderboardSheet({ mode, entries, currentUid, loading, onModeChange, onClose }: { mode: "friends" | "public"; entries: StudyLeaderboardEntry[]; currentUid: string; loading: boolean; onModeChange: (mode: "friends" | "public") => void; onClose: () => void }) {
   const ranked = entries.slice(0, 10);
-  const podium = [ranked[1], ranked[0], ranked[2]];
-  return <div className="task-sheet-backdrop" role="presentation" onMouseDown={onClose}><section className="leaderboard-sheet" role="dialog" aria-modal="true" aria-label="Study leaderboard" onMouseDown={(event) => event.stopPropagation()}><div className="sheet-handle"/><header className="sheet-page-header"><button className="icon" type="button" aria-label="Close leaderboard" onClick={onClose}>×</button><div><strong>{mode === "friends" ? "Friends leaderboard" : "Public leaderboard"}</strong><small>Top 10 · weekly totals reset every Monday</small></div><span>🏆</span></header><div className="leaderboard-sheet-body"><div className="leaderboard-mode-tabs"><button className={mode === "friends" ? "active" : ""} type="button" onClick={() => onModeChange("friends")}>Friends</button><button className={mode === "public" ? "active" : ""} type="button" onClick={() => onModeChange("public")}>Public</button></div>{loading ? <p className="leaderboard-disclaimer">Loading study totals…</p> : !ranked.length ? <p className="leaderboard-disclaimer">No saved study sessions yet.</p> : <><div className={`leaderboard-podium ${ranked.length > 3 ? "has-full-ranking" : ""}`}>{podium.map((entry, index) => entry ? <article className={`rank-${index === 0 ? "two" : index === 1 ? "one" : "three"}`} key={entry.uid}><span>{index === 0 ? 2 : index === 1 ? 1 : 3}</span><strong>{entry.uid === currentUid ? "You" : entry.displayName}</strong><small>{studyMinutes(entry.weeklySeconds)}</small></article> : <article className={`rank-${index === 0 ? "two" : index === 1 ? "one" : "three"}`} key={`empty-${index}`}><span>{index === 0 ? 2 : index === 1 ? 1 : 3}</span><strong>Open rank</strong><small>Waiting</small></article>)}</div><p className="leaderboard-disclaimer">Finished study sessions saved to your account.</p><div className="leaderboard-ranks">{ranked.map((entry, index) => <article key={entry.uid}><b>{index + 1}</b><div><strong>{entry.uid === currentUid ? "You" : entry.displayName}</strong><small>{entry.username ? `@${entry.username}` : mode === "friends" ? "Friend" : "Student"}</small></div><span>{studyMinutes(entry.weeklySeconds)}</span></article>)}</div></>}</div></section></div>;
+  const podium = [ranked[1], ranked[0], ranked[2]] as const;
+  const lowerRanks = ranked.slice(3);
+  return <div className="task-sheet-backdrop" role="presentation" onMouseDown={onClose}><section className="leaderboard-sheet" role="dialog" aria-modal="true" aria-label="Study leaderboard" onMouseDown={(event) => event.stopPropagation()}><div className="sheet-handle"/><header className="sheet-page-header"><button className="icon" type="button" aria-label="Close leaderboard" onClick={onClose}>×</button><div><strong>{mode === "friends" ? "Friends leaderboard" : "Public leaderboard"}</strong><small>Top 10 · weekly totals reset every Monday</small></div><span>🏆</span></header><div className="leaderboard-sheet-body"><div className="leaderboard-mode-tabs"><button className={mode === "friends" ? "active" : ""} type="button" onClick={() => onModeChange("friends")}>Friends</button><button className={mode === "public" ? "active" : ""} type="button" onClick={() => onModeChange("public")}>Public</button></div>{loading ? <p className="leaderboard-disclaimer">Loading study totals…</p> : !ranked.length ? <p className="leaderboard-disclaimer">No saved study sessions yet.</p> : <><div className="leaderboard-podium">{podium.map((entry, index) => <LeaderboardPodiumCard key={entry?.uid || `empty-${index}`} entry={entry} rank={index === 0 ? 2 : index === 1 ? 1 : 3} currentUid={currentUid} mode={mode} />)}</div><p className="leaderboard-disclaimer">Finished study sessions saved to your account.</p>{lowerRanks.length > 0 && <><p className="leaderboard-section-label">Ranks 4–10</p><div className="leaderboard-ranks">{lowerRanks.map((entry, index) => <article key={entry.uid}><b>{index + 4}</b><div><strong>{entry.uid === currentUid ? "You" : entry.displayName}</strong><small>{entry.username ? `@${entry.username}` : mode === "friends" ? "Friend" : "Student"}</small></div><span>{studyMinutes(entry.weeklySeconds)}</span></article>)}</div></>}</>}</div></section></div>;
 }
 
 function JourneySheet({ streak, league, weeklySeconds, totalSeconds, nextStreakMilestone, nextLeaguePromotion, onClose }: { streak: number; league: string; weeklySeconds: number; totalSeconds: number; nextStreakMilestone: number; nextLeaguePromotion: number; onClose: () => void }) {
