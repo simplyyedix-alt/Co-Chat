@@ -108,12 +108,14 @@ html{background:#f5f4fb}body{min-width:320px;-webkit-font-smoothing:antialiased}
 .leaderboard-podium-card.rank-2{background:linear-gradient(155deg,#eef2f6,var(--cc-surface-soft))!important}
 .leaderboard-podium-card.rank-3{background:linear-gradient(155deg,#f8e5d2,var(--cc-surface-soft))!important}
 .leaderboard-medal{width:31px!important;height:31px!important;display:grid;place-items:center;border-radius:50%;background:#ffffffaa!important;font-size:17px!important;box-shadow:0 2px 8px #00000012}
-.leaderboard-avatar{width:54px;height:54px;border-radius:18px;font-size:16px;box-shadow:0 4px 12px #0002}
-.leaderboard-podium-card.rank-1 .leaderboard-avatar{width:64px;height:64px;border-radius:21px}
+.leaderboard-podium-card>.leaderboard-avatar{width:54px;height:54px;border-radius:50%;font-size:16px;box-shadow:0 4px 12px #0002;overflow:hidden}
+.leaderboard-podium-card>.leaderboard-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block}
+.leaderboard-podium-card.rank-1>.leaderboard-avatar{width:58px;height:58px;border-radius:50%}
 .leaderboard-avatar-empty{display:grid;place-items:center;color:var(--cc-muted);background:var(--cc-surface)!important;font-weight:900}
 .leaderboard-podium-card strong{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .leaderboard-podium-card small{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .leaderboard-podium-card b{color:var(--cc-primary);font-size:12px}
+.leaderboard-ranks .rank-waiting{opacity:.62}.leaderboard-ranks .rank-waiting b{color:var(--cc-muted);background:transparent;border:1px dashed var(--cc-border)}
 .leaderboard-section-label{margin:0;color:var(--cc-muted);font-size:10px;font-weight:850;letter-spacing:.12em;text-transform:uppercase}
 :root.dark .leaderboard-podium-card.rank-1{border-color:#806928;background:linear-gradient(155deg,#453b1d,#20242a)!important;box-shadow:0 10px 28px #0004}
 :root.dark .leaderboard-podium-card.rank-2{background:linear-gradient(155deg,#30363d,#20242a)!important}
