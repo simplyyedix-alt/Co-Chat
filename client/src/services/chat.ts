@@ -24,6 +24,7 @@ import {
 import { auth, db } from '../firebase'
 import { StorageManager } from './storageManager'
 import { createDirect, deleteConversation as deleteSupabaseConversation, deleteForMe as deleteSupabaseMessageForMe, getProfile as getSupabaseProfile, getStudyLeaderboard as getSupabaseStudyLeaderboard, isSupabaseChatEnabled, markRead as markSupabaseRead, saveStudySession as saveSupabaseStudySession, sendMessage as sendSupabaseMessage, unsend as unsendSupabaseMessage, updateStudyPresence as updateSupabaseStudyPresence, upsertProfile as upsertSupabaseProfile, watchConversations as watchSupabaseConversations, watchMessages as watchSupabaseMessages, type StudyLeaderboardEntry } from './supabaseChat'
+export { isSupabaseChatEnabled } from './supabaseChat'
 
 export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; bio?: string; notificationsEnabled?: boolean; discoverable?: boolean; activeStatus?: boolean; theme?: 'light' | 'dark'; lastSeen?: Timestamp | null; profileComplete?: boolean }
 export type Conversation = {

@@ -603,7 +603,7 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   };
   return (
     <div className="study-home">
-      <section className="study-hero"><div><span className="kicker">YOUR STUDY SPACE</span><h2>One focused hour.</h2><p>Build your journey one calm session at a time.</p></div><div className="quest-badge">✦</div></section>
+      <section className="study-hero"><div><span className="kicker">YOUR STUDY SPACE</span><h2>Lock in, one session at a time.</h2><p>Small wins stack into a study rhythm that actually lasts.</p></div><div className="quest-badge">✦</div></section>
       <section className="study-shortcuts"><button type="button" onClick={() => setTaskSheetOpen(true)}><span>✓</span><div><strong>Tasks</strong><small>{tasks.filter((task) => task.completedAt).length}/{tasks.length} complete</small></div></button><button type="button" onClick={() => setLeaderboardOpen(true)}><span>🏆</span><div><strong>Leaderboard</strong><small>Friends & public</small></div></button><button type="button" onClick={() => setJourneyOpen(true)}><span>✦</span><div><strong>Journey</strong><small>{league}</small></div></button></section>
       {activeTasks.length > 0 && <section className="active-tasks"><div className="active-tasks-heading"><div><span className="kicker">IN PROGRESS</span><strong>{activeTasks.length} active task{activeTasks.length === 1 ? "" : "s"}</strong></div><button className="secondary compact" type="button" onClick={() => setTaskSheetOpen(true)}>View tasks</button></div>{activeTasks.map((task) => <article key={task.id}><span>◷</span><div><strong>{task.title}</strong><small>{task.action === "discover" ? "Ready to help in Discover" : `Started ${Math.max(1, Math.floor((Date.now() - (task.startedAt || Date.now())) / 60000))} min ago`}</small></div><button className="icon" type="button" aria-label={`Continue ${task.title}`} onClick={() => focusTask(task)}>→</button></article>)}</section>}
       <section className="timer-card" ref={timerRef}><div className="timer-ring" style={{ "--progress": `${progress}%` } as CSSProperties}><strong>{display}</strong><span>{running ? (timerTaskId ? "task timer running" : "focus session running") : targetSeconds ? "timer ready" : "choose a duration"}</span></div>{targetSeconds > 0 && <button className="timer-change" type="button" onClick={() => setTimerSetupOpen(true)}>Change · {Math.floor(targetSeconds / 3600) ? `${Math.floor(targetSeconds / 3600)}h ` : ""}{Math.floor((targetSeconds % 3600) / 60)}m</button>}<div className="timer-actions"><button className="primary" type="button" onClick={toggleTimer}>{running ? "Pause timer" : targetSeconds ? "Start timer" : "Set timer"}</button><button className="secondary" type="button" onClick={saveSession} disabled={!seconds}>Finish & save</button><button className="secondary" type="button" onClick={() => { setRunning(false); setTimerStartedAt(null); setTimerTaskId(null); setSeconds(0); setTargetSeconds(0); }}>Reset</button></div><small className="timer-note">Your countdown keeps its place if you close or background the app. It saves only when you finish.</small></section>
@@ -930,7 +930,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
     setPublishing(false);
   };
   return <div className="twitt-feed">
-    <section className="discover-intro"><div><span className="kicker">CO-CHAT DISCOVER</span><h2>Ideas worth sharing.</h2><p>Find useful thoughts, study wins, and people learning beside you.</p></div><button className="primary compact" type="button" onClick={() => setComposerOpen(true)}>＋ Write a Twitt</button></section>
+    <section className="discover-intro"><div><span className="kicker">CO-CHAT DISCOVER</span><h2>Drop something useful.</h2><p>Study wins, real questions, and people learning alongside you.</p></div><button className="primary compact" type="button" onClick={() => setComposerOpen(true)}>＋ Write a Twitt</button></section>
     {composerOpen && <section className="twitt-composer"><div className="composer-heading"><strong>Write to your community</strong><button className="icon" type="button" disabled={publishing} onClick={() => setComposerOpen(false)}>×</button></div><textarea disabled={publishing} value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 280))} placeholder="Share a useful thought, question, or study win…" autoFocus /><label className="twitt-media-picker">📎 Add photo/PDF (max 5 MB)<input disabled={publishing} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => setDraftFile(event.target.files?.[0] || null)} /></label>{draftFile && <small className="twitt-file-name">{draftFile.name}</small>}{publishError && <p className="twitt-sync-error">{publishError}</p>}<div className="composer-footer"><div className="tag-input"><span>#</span><input disabled={publishing} list="twitt-tag-suggestions" value={draftCommunity} onChange={(event) => setDraftCommunity(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} placeholder="Add a tag (required)" /><datalist id="twitt-tag-suggestions">{tagSuggestions.map((tag) => <option value={tag} key={tag} />)}</datalist></div><span>{draft.length}/280</span><button className="primary compact" type="button" disabled={!draft.trim() || !draftCommunity || publishing} onClick={() => void createTwitt()}>{publishing ? "◌ Uploading…" : "Post Twitt"}</button></div></section>}
     <div className="community-filter" aria-label="Twitt tag filter">{[["all", "All"], ["following", "Following"], ...popularTags.map((tag) => [tag, `#${tag}`] as const)].map(([id, label]) => <button key={id} className={community === id ? "active" : ""} onClick={() => { setCommunity(id); setVisible(3); }}>{label}</button>)}</div>
     <div className="feed-tabs"><button className={tab === "recent" ? "active" : ""} onClick={() => setTab("recent")}>Recent <small>{communityLabel} · 24h</small></button><button className={tab === "trending" ? "active" : ""} onClick={() => setTab("trending")}>Trending <small>{communityLabel} · daily</small></button></div>
@@ -2158,7 +2158,7 @@ export default function App() {
             )}
             {page === "communities" && (
               <>
-              <section className="community-hero"><div><span className="kicker">YOUR COMMUNITIES</span><h2>Find your people.</h2><p>Public spaces to learn, share, and stay accountable together.</p></div><span className="community-symbol">♧</span></section>
+              <section className="community-hero"><div><span className="kicker">YOUR COMMUNITIES</span><h2>Find your people.</h2><p>Find your lane, swap ideas, and stay accountable together.</p></div><span className="community-symbol">♧</span></section>
               <div className="community-rail"><button type="button" onClick={() => { setDiscoverCommunity("jee"); setPage("discover"); }}><span>JEE</span><strong>JEE Prep</strong><small>Public · 2.4k · View Twitts</small></button><button type="button" onClick={() => { setDiscoverCommunity("study"); setPage("discover"); }}><span>⌂</span><strong>Study circles</strong><small>Private · 8 members · View Twitts</small></button><button type="button" onClick={() => setShowGroup(true)}><span>+</span><strong>Create one</strong><small>Your space · New group</small></button></div>
               <div className="chat-tools">
                 <button
@@ -2227,7 +2227,7 @@ export default function App() {
               {!visible.filter((item) =>
                 page === "communities" ? item.type === "group" : item.type !== "group",
               ).length && (
-                <div className="empty-state">No conversations found.</div>
+                <div className="empty-state"><strong>No chats yet.</strong><span>Find someone from People and start the conversation.</span></div>
               )}
             </div>
             {conversationMenu && (
@@ -2320,17 +2320,17 @@ export default function App() {
         {page === "status" && (
           <div className="hero-card coming-soon">
             <span>◉</span>
-            <h2>Stories are coming soon</h2>
+            <h2>Stories are on the way</h2>
             <p>
-              We’re focusing today’s release on fast, reliable conversations.
-              Stories will follow in a future release.
+              We’re keeping Co‑Chat focused on fast, reliable conversations first.
+              Stories will land when they’re ready.
             </p>
           </div>
         )}
         {(page === "profile" || page === "settings") && (
           <div className="settings-page">
             <div className="settings-hero">
-              <div><span className="settings-eyebrow">ACCOUNT CENTER</span><h1>{page === "settings" ? "Settings & profile" : "Your profile"}</h1><p>Shape how you show up in Co-Chat.</p></div>
+              <div><span className="settings-eyebrow">ACCOUNT CENTER</span><h1>{page === "settings" ? "Settings & profile" : "Your profile"}</h1><p>Make Co‑Chat feel like your space.</p></div>
               <div className="settings-hero-mark">✦</div>
             </div>
             <form className="profile-card settings-profile-card" onSubmit={save}>
