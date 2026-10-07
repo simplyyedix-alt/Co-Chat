@@ -63,13 +63,20 @@ set search_path = public
 as $$
   delete from public.twitt_trending_daily where ranking_date = p_ranking_date;
   insert into public.twitt_trending_daily (ranking_date, twitt_id, rank, score)
-  select p_ranking_date, id,
-    row_number() over (order by (likes_count * 3 + comments_count * 5 + views_count * 0.1) desc, created_at desc)::integer,
-    (likes_count * 3 + comments_count * 5 + views_count * 0.1)
-  from public.twitts
-  where created_at >= p_ranking_date - interval '7 days'
-    and created_at < p_ranking_date + interval '1 day'
-  order by score desc, created_at desc
+  select p_ranking_date, ranked.id, ranked.rank, ranked.score
+  from (
+    select id,
+      row_number() over (
+        order by (likes_count * 3 + comments_count * 5 + views_count * 0.1) desc,
+          created_at desc
+      )::integer as rank,
+      (likes_count * 3 + comments_count * 5 + views_count * 0.1) as score,
+      created_at
+    from public.twitts
+    where created_at >= p_ranking_date - interval '7 days'
+      and created_at < p_ranking_date + interval '1 day'
+  ) as ranked
+  order by ranked.score desc, ranked.created_at desc
   limit 10;
 $$;
 
