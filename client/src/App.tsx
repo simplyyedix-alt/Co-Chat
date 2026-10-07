@@ -52,7 +52,7 @@ import {
   type Story,
   type UserProfile,
 } from "./services/chat";
-import { createTwitt as createRemoteTwitt } from "./services/twitts";
+import { createTwitt as createRemoteTwitt, loadTwittPage } from "./services/twitts";
 import "./index.css";
 import "./group-friend.css";
 import "./community-feed.css";
@@ -352,12 +352,43 @@ function TwittFeed() {
   const [commenting, setCommenting] = useState<string | null>(null);
   const [commentDraft, setCommentDraft] = useState("");
   const [postMenu, setPostMenu] = useState<string | null>(null);
+  const [remoteCursor, setRemoteCursor] = useState<Awaited<ReturnType<typeof loadTwittPage>>["cursor"]>(null);
+  const [remoteHasMore, setRemoteHasMore] = useState(false);
+  const [remoteLoading, setRemoteLoading] = useState(false);
+  useEffect(() => {
+    if (!auth?.currentUser?.uid || !firebaseReady) return undefined;
+    let active = true;
+    setRemoteLoading(true);
+    loadTwittPage("all").then((page) => {
+      if (!active) return;
+      if (page.items.length) {
+        const now = Date.now();
+        setPosts(page.items.map((item) => ({ id: item.id, author: item.uid === auth.currentUser?.uid ? "You" : "Co-Chat learner", handle: item.uid.slice(0, 10), avatar: item.uid === auth.currentUser?.uid ? "YO" : "CL", body: item.body, likes: item.likes, comments: item.comments, views: String(item.views), age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community })));
+        setVisible(3);
+      }
+      setRemoteCursor(page.cursor);
+      setRemoteHasMore(page.hasMore);
+    }).catch(() => undefined).finally(() => { if (active) setRemoteLoading(false); });
+    return () => { active = false; };
+  }, []);
   const list = useMemo(() => {
     const now = Date.now();
     const eligible = posts.filter((post) => now - post.createdAt <= (tab === "recent" ? 24 : 24 * 7) * 3_600_000);
     return (tab === "recent" ? eligible.sort((a, b) => b.createdAt - a.createdAt) : eligible.sort((a, b) => b.likes - a.likes || b.comments - a.comments || b.createdAt - a.createdAt).slice(0, 10));
   }, [posts, tab]);
-  const loadMore = () => {
+  const loadMore = async () => {
+    if (remoteCursor && remoteHasMore && !remoteLoading) {
+      setRemoteLoading(true);
+      try {
+        const page = await loadTwittPage("all", remoteCursor);
+        const now = Date.now();
+        setPosts((current) => [...current, ...page.items.map((item) => ({ id: item.id, author: item.uid === auth?.currentUser?.uid ? "You" : "Co-Chat learner", handle: item.uid.slice(0, 10), avatar: item.uid === auth?.currentUser?.uid ? "YO" : "CL", body: item.body, likes: item.likes, comments: item.comments, views: String(item.views), age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community }))]);
+        setRemoteCursor(page.cursor);
+        setRemoteHasMore(page.hasMore);
+        setVisible((current) => current + page.items.length);
+      } finally { setRemoteLoading(false); }
+      return;
+    }
     const next = Array.from({ length: 20 }, (_, index) => ({ id: `t${posts.length + index + 1}`, author: "Co-Chat learner", handle: `learner${posts.length + index + 1}`, avatar: "CL", body: "Sharing a little progress from today’s study session. What helped you focus?", likes: Math.max(4, 48 - index), comments: index % 8, views: `${120 + index * 7}`, age: `${index + 1} hr`, createdAt: Date.now() - (index + 1) * 3_600_000, community: (["jee", "neet", "study", "public"] as const)[index % 4] }));
     setPosts((current) => [...current, ...next]);
     setVisible((current) => current + 20);
@@ -385,7 +416,7 @@ function TwittFeed() {
     <div className="follow-strip"><span>Following: {following.length ? following.map((id) => id.toUpperCase()).join(" · ") : "none"}</span><button onClick={() => setCommunity("following")}>View following</button></div>
     <div className="twitt-list">{filtered.slice(0, visible).map((post) => <article className="twitt-card" key={post.id}><div className="twitt-head"><span className="avatar">{post.avatar}</span><div><strong>{post.author}</strong><small>@{post.handle} · {post.age} · {post.community.toUpperCase()}</small></div><div className="twitt-actions"><button className="icon" aria-label="Twitt options" aria-expanded={postMenu === post.id} onClick={() => setPostMenu(postMenu === post.id ? null : post.id)}>•••</button>{postMenu === post.id && <div className="twitt-menu"><button type="button" onClick={() => { setPosts((current) => current.filter((item) => item.id !== post.id)); setPostMenu(null); }}>Hide this Twitt</button><button type="button" onClick={() => setPostMenu(null)}>Cancel</button></div>}</div></div><p>{post.body}</p><div className="twitt-meta"><button className={post.liked ? "liked" : ""} onClick={() => setPosts((current) => current.map((item) => item.id === post.id ? { ...item, likes: item.likes + (item.liked ? -1 : 1), liked: !item.liked } : item))}>♡ {post.likes}</button><button onClick={() => { setCommenting(commenting === post.id ? null : post.id); setCommentDraft(""); }}>◌ {post.comments}</button><span>◉ {post.views}</span><button className={following.includes(post.community) ? "followed" : ""} onClick={() => setFollowing((current) => current.includes(post.community) ? current.filter((id) => id !== post.community) : [...current, post.community])}>{following.includes(post.community) ? "Following" : `Follow ${post.community.toUpperCase()}`}</button></div>{commenting === post.id && <form className="twitt-comment" onSubmit={(event) => { event.preventDefault(); if (!commentDraft.trim()) return; setPosts((current) => current.map((item) => item.id === post.id ? { ...item, comments: item.comments + 1 } : item)); setCommentDraft(""); }}><input value={commentDraft} onChange={(event) => setCommentDraft(event.target.value.slice(0, 240))} placeholder="Add a thoughtful comment" autoFocus /><button className="primary compact" type="submit">Send</button></form>}</article>)}</div>
     {!filtered.length && <div className="empty-state">No Twitts in {communityLabel} yet.</div>}
-    {visible < filtered.length && <button className="load-more" type="button" onClick={loadMore}>Load 20 more Twitts</button>}
+    {(visible < filtered.length || remoteHasMore) && <button className="load-more" type="button" onClick={() => void loadMore()} disabled={remoteLoading}>{remoteLoading ? "Loading Twitts…" : "Load 20 more Twitts"}</button>}
     <p className="feed-note">Recent shows the newest posts in this community. Trending is refreshed periodically from eligible posts.</p>
   </div>;
 }
