@@ -376,6 +376,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
   const [following, setFollowing] = useState<string[]>(() => { try { const value = JSON.parse(localStorage.getItem(followKey) || "null"); return Array.isArray(value) ? value.filter((id): id is string => ["jee", "neet", "study", "public"].includes(id)) : ["jee"]; } catch { return ["jee"]; } });
   const [composerOpen, setComposerOpen] = useState(false);
   const [draft, setDraft] = useState("");
+  const [publishError, setPublishError] = useState("");
   const [draftCommunity, setDraftCommunity] = useState<"jee" | "neet" | "study" | "public">("jee");
   const [commenting, setCommenting] = useState<string | null>(null);
   const [commentDraft, setCommentDraft] = useState("");
@@ -470,12 +471,15 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
     } finally { setCommentLoading(null); }
   };
   const communityLabel = { all: "All public", jee: "JEE Prep", neet: "NEET Prep", study: "Study circles", public: "Public Co-Chat", following: "Following" }[community];
-  const createTwitt = () => {
+  const createTwitt = async () => {
     if (!draft.trim()) return;
     const body = draft.trim();
+    setPublishError("");
     const post: TwittPreview = { id: `local-${Date.now()}`, author: "You", handle: "your_profile", avatar: "YO", body, likes: 0, comments: 0, views: "0", age: "now", createdAt: Date.now(), community: draftCommunity };
     const uid = auth?.currentUser?.uid;
-    if (uid && firebaseReady) void createRemoteTwitt(uid, body, draftCommunity).catch(() => undefined);
+    if (uid && firebaseReady) {
+      try { await createRemoteTwitt(uid, body, draftCommunity); } catch { setPublishError("Shown here, but it could not sync online. Please try posting again."); }
+    }
     setPosts((current) => [post, ...current]);
     setDraft("");
     setComposerOpen(false);
@@ -485,7 +489,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
   };
   return <div className="twitt-feed">
     <section className="discover-intro"><div><span className="kicker">CO-CHAT DISCOVER</span><h2>Ideas worth sharing.</h2><p>Find useful thoughts, study wins, and people learning beside you.</p></div><button className="primary compact" type="button" onClick={() => setComposerOpen(true)}>＋ Write a Twitt</button></section>
-    {composerOpen && <section className="twitt-composer"><div className="composer-heading"><strong>Write to your community</strong><button className="icon" type="button" onClick={() => setComposerOpen(false)}>×</button></div><textarea value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 280))} placeholder="Share a useful thought, question, or study win…" autoFocus /><div className="composer-footer"><select value={draftCommunity} onChange={(event) => setDraftCommunity(event.target.value as typeof draftCommunity)}><option value="jee">JEE Prep</option><option value="neet">NEET Prep</option><option value="study">Study circles</option><option value="public">Public Co-Chat</option></select><span>{draft.length}/280</span><button className="primary compact" type="button" disabled={!draft.trim()} onClick={createTwitt}>Post Twitt</button></div></section>}
+    {composerOpen && <section className="twitt-composer"><div className="composer-heading"><strong>Write to your community</strong><button className="icon" type="button" onClick={() => setComposerOpen(false)}>×</button></div><textarea value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 280))} placeholder="Share a useful thought, question, or study win…" autoFocus />{publishError && <p className="twitt-sync-error">{publishError}</p>}<div className="composer-footer"><select value={draftCommunity} onChange={(event) => setDraftCommunity(event.target.value as typeof draftCommunity)}><option value="jee">JEE Prep</option><option value="neet">NEET Prep</option><option value="study">Study circles</option><option value="public">Public Co-Chat</option></select><span>{draft.length}/280</span><button className="primary compact" type="button" disabled={!draft.trim()} onClick={() => void createTwitt()}>Post Twitt</button></div></section>}
     <div className="community-filter" aria-label="Twitt community filter">{([["all", "All"], ["following", "Following"], ["jee", "JEE"], ["neet", "NEET"], ["study", "Study"], ["public", "Public"]] as const).map(([id, label]) => <button key={id} className={community === id ? "active" : ""} onClick={() => { setCommunity(id); setVisible(3); }}>{label}</button>)}</div>
     <div className="feed-tabs"><button className={tab === "recent" ? "active" : ""} onClick={() => setTab("recent")}>Recent <small>{communityLabel} · 24h</small></button><button className={tab === "trending" ? "active" : ""} onClick={() => setTab("trending")}>Trending <small>{communityLabel} · daily</small></button></div>
     <div className="follow-strip"><span>Following: {following.length ? following.map((id) => id.toUpperCase()).join(" · ") : "none"}</span><button onClick={() => setCommunity("following")}>View following</button></div>
