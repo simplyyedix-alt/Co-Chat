@@ -2663,6 +2663,11 @@ function FriendZone({
           <Avatar profile={focused} className="avatar large" />
           <h3>{focused.displayName}</h3>
           <p>@{focused.username}</p>
+          <div className="public-profile-atmosphere">
+            <div className="public-profile-level"><span className="profile-rank-badge">I</span><div><b>Bronze I</b><small>Study level · building momentum</small></div><span className="profile-online-pill">{focused.activeStatus === false ? "Offline" : "Available"}</span></div>
+            <div className="public-profile-stats"><span><b>0h</b><small>study logged</small></span><span><b>0</b><small>day streak</small></span><span><b>New</b><small>member</small></span></div>
+            <div className="public-profile-achievements"><small>ACHIEVEMENTS</small><div><span>{focused.profileComplete ? "✦ Profile complete" : "○ Profile in progress"}</span><span>♧ Community ready</span></div></div>
+          </div>
           {profileExpanded && (
             <div className="public-profile-details">
               <span>{focused.bio?.trim() || "This person has not added a bio yet."}</span>
@@ -2919,6 +2924,11 @@ function SearchPanel({
           <Avatar profile={focused} className="avatar large" />
           <h3>{focused.displayName}</h3>
           <p>@{focused.username}</p>
+          <div className="public-profile-atmosphere">
+            <div className="public-profile-level"><span className="profile-rank-badge">I</span><div><b>Bronze I</b><small>Study level · building momentum</small></div><span className="profile-online-pill">{focused.activeStatus === false ? "Offline" : "Available"}</span></div>
+            <div className="public-profile-stats"><span><b>0h</b><small>study logged</small></span><span><b>0</b><small>day streak</small></span><span><b>New</b><small>member</small></span></div>
+            <div className="public-profile-achievements"><small>ACHIEVEMENTS</small><div><span>{focused.profileComplete ? "✦ Profile complete" : "○ Profile in progress"}</span><span>♧ Community ready</span></div></div>
+          </div>
           <small>
             {relationships[focused.uid] === "friends"
               ? "Friend on Co-Chat"
