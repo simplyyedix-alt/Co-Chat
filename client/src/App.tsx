@@ -1573,6 +1573,20 @@ export default function App() {
       setError(e instanceof Error ? e.message : "Profile could not be saved.");
     }
   };
+  const shareProfile = async (displayName: string, username: string) => {
+    const handle = username.trim() ? `@${username.trim()}` : displayName.trim();
+    const message = `${displayName.trim() || "A Co-Chat member"} is on Co-Chat — ${handle}`;
+    try {
+      if (navigator.share) await navigator.share({ title: "Co-Chat profile", text: message, url: window.location.href });
+      else {
+        await navigator.clipboard.writeText(message);
+        setError("Profile details copied to your clipboard.");
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setError("Could not share this profile.");
+    }
+  };
   const call = async (type: "audio" | "video") => {
     if (!selected || preview || selected.memberIds.length < 2) {
       setError("Sign in and start a conversation with another person to call.");
@@ -2312,11 +2326,14 @@ export default function App() {
                 <label className="field-label">Display name<input value={profileName} onChange={(e) => setProfileName(e.target.value)} required /></label>
                 <label className="field-label">Username<input value={profileUsername} onChange={(e) => setProfileUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase())} minLength={3} maxLength={24} pattern="[a-z0-9_]+" required /><small>3–24 characters: letters, numbers, and underscores.</small></label>
               </div>
-              <label className="field-label settings-bio-field">About you<textarea value={profileBio} onChange={(e) => setProfileBio(e.target.value)} maxLength={160} placeholder="A short line about what you are learning…" /></label>
+              <label className="field-label settings-bio-field">About you<textarea value={profileBio} onChange={(e) => setProfileBio(e.target.value)} maxLength={160} placeholder="A short line about what you are learning…" /><small>Shown when someone opens your profile from People or your friend list.</small></label>
               <div className="settings-save-row"><span>{profileSaved ? "Profile saved successfully" : "Changes sync across your devices"}</span><button type="submit" className="primary" disabled={preview}>{profileSaved ? "Saved ✓" : "Save profile"}</button></div>
             </form>
             <div className="settings settings-list">
               <div className="settings-section-label">PREFERENCES</div>
+              <button type="button" onClick={() => void shareProfile(profileName, profileUsername)}>
+                <span className="settings-row-icon">↗</span><span className="settings-option-copy"><b>Share your profile</b><small>Send your name and handle to a friend</small></span><span>›</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setDarkMode((value) => !value)}
@@ -2424,6 +2441,15 @@ function FriendZone({
       item.status === "accepted" &&
       !blocked.includes(item.fromUid === uid ? item.toUid : item.fromUid),
   );
+  const shareProfile = async (profile: UserProfile) => {
+    const message = `${profile.displayName} is on Co-Chat — @${profile.username}`;
+    try {
+      if (navigator.share) await navigator.share({ title: "Co-Chat profile", text: message, url: window.location.href });
+      else await navigator.clipboard.writeText(message);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+    }
+  };
   return (
     <div className="friend-zone">
       <div className="section-title">FRIEND ZONE</div>
@@ -2525,7 +2551,13 @@ function FriendZone({
           <Avatar profile={focused} className="avatar large" />
           <h3>{focused.displayName}</h3>
           <p>@{focused.username}</p>
-          {profileExpanded && <small>Friend on Co-Chat · Public profile</small>}
+          {profileExpanded && (
+            <div className="public-profile-details">
+              <span>{focused.bio?.trim() || "This person has not added a bio yet."}</span>
+              <small>Friend on Co-Chat · Public profile</small>
+              {focused.activeStatus === false && <small>Active status hidden</small>}
+            </div>
+          )}
           <div className="profile-actions">
             <button
               className="primary"
@@ -2536,6 +2568,9 @@ function FriendZone({
               }}
             >
               Message
+            </button>
+            <button className="secondary" type="button" onClick={() => void shareProfile(focused)}>
+              Share
             </button>
             <button
               className="secondary"
@@ -2632,6 +2667,19 @@ function SearchPanel({
           ? error.message
           : "Could not update this connection.",
       );
+    }
+  };
+  const shareProfile = async (profile: UserProfile) => {
+    const message = `${profile.displayName} is on Co-Chat — @${profile.username}`;
+    try {
+      if (navigator.share) await navigator.share({ title: "Co-Chat profile", text: message, url: window.location.href });
+      else {
+        await navigator.clipboard.writeText(message);
+        setActionError("Profile details copied to your clipboard.");
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setActionError("Could not share this profile.");
     }
   };
   return (
@@ -2764,24 +2812,21 @@ function SearchPanel({
               ? "Friend on Co-Chat"
               : "Co-Chat profile"}
           </small>
-          {relationships[focused.uid] === "friends" && (
-            <button
-              className="primary"
-              type="button"
-              onClick={() => {
-                setFocused(null);
-                onSelect(focused);
-              }}
-            >
-              Message
-            </button>
-          )}
-          {profileExpanded && (
-            <div className="public-profile-details">
-              <small>Username: @{focused.username}</small>
-              {focused.activeStatus === false && <small>Active status hidden</small>}
-            </div>
-          )}
+          <div className="public-profile-details">
+            <span>{focused.bio?.trim() || "This person has not added a bio yet."}</span>
+            <small>Username: @{focused.username}</small>
+            {focused.activeStatus === false && <small>Active status hidden</small>}
+          </div>
+          <div className="profile-actions">
+            {relationships[focused.uid] === "friends" ? (
+              <button className="primary" type="button" onClick={() => { setFocused(null); onSelect(focused); }}>Message</button>
+            ) : relationships[focused.uid] === "none" ? (
+              <button className="primary" type="button" onClick={() => void action(focused)}>Add friend</button>
+            ) : (
+              <button className="secondary" type="button" disabled>{relationships[focused.uid] === "incoming" ? "Request received" : "Request sent"}</button>
+            )}
+            <button className="secondary" type="button" onClick={() => void shareProfile(focused)}>Share</button>
+          </div>
         </div>
       )}
     </section>
