@@ -21,8 +21,8 @@ import {
   type DocumentData,
   type Unsubscribe,
 } from 'firebase/firestore'
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
-import { auth, db, storage } from '../firebase'
+import { auth, db } from '../firebase'
+import { StorageManager } from './storageManager'
 
 export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; bio?: string; notificationsEnabled?: boolean; discoverable?: boolean; activeStatus?: boolean; theme?: 'light' | 'dark'; lastSeen?: Timestamp | null; profileComplete?: boolean }
 export type Conversation = {
@@ -180,11 +180,8 @@ export async function sendMessage(conversationId: string, senderId: string, text
   }
   let attachment: ChatAttachment | null = null
   if (file) {
-    if (!storage) throw new Error('Storage is not configured')
-    if (file.size > 10 * 1024 * 1024) throw new Error('Files must be smaller than 10 MB')
-    const fileRef = ref(storage, `conversation-media/${conversationId}/${senderId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`)
-    await uploadBytes(fileRef, file)
-    attachment = { name: file.name, url: await getDownloadURL(fileRef), type: file.type, size: file.size }
+    const stored = await StorageManager.upload(file, { ownerId: senderId, originalName: file.name, mimeType: file.type, sizeBytes: file.size, conversationId })
+    attachment = { name: stored.originalName, url: stored.url, type: stored.mimeType, size: stored.sizeBytes }
   }
   const messageData: { text: string; senderId: string; createdAt: ReturnType<typeof serverTimestamp>; attachment?: ChatAttachment; replyTo?: { id: string; text: string; senderId: string } } = { text, senderId, createdAt: serverTimestamp() }
   if (attachment) messageData.attachment = attachment
