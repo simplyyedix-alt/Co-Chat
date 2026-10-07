@@ -127,8 +127,8 @@ const presenceLabel = (
   active?: boolean,
   lastSeen?: { toMillis?: () => number } | null,
 ) => {
-  if (active) return "Active now";
   const timestamp = lastSeen?.toMillis?.() || 0;
+  if (active && timestamp > 0 && Date.now() - timestamp < 90000) return "Active now";
   if (!timestamp) return "Offline";
   const minutes = Math.max(1, Math.floor((Date.now() - timestamp) / 60000));
   if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;

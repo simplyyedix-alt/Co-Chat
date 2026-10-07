@@ -56,13 +56,15 @@ export async function listConversations(uid: string): Promise<Conversation[]> {
     const members = Array.isArray(item.member_ids) ? item.member_ids.map(value => typeof value === 'object' && value ? String((value as Record<string, unknown>).uid || '') : String(value)) : []
     const profile = profileFromRow(item.other_profile as Record<string, unknown> | null)
     const name = String(nested.type === 'group' ? (nested.name || 'Group chat') : (profile?.displayName || nested.name || 'Conversation'))
+    const lastSeen = profile?.lastSeen || null
+    const lastSeenMs = lastSeen?.toMillis() || 0
     return {
       id: String(nested.id || item.conversation_id || ''), name, memberIds: members,
       type: nested.type === 'group' ? ('group' as const) : ('direct' as const), adminId: nested.admin_id ? String(nested.admin_id) : undefined,
       lastMessage: String(nested.last_message || ''), lastSenderId: nested.last_sender_id ? String(nested.last_sender_id) : undefined,
       lastMessageAt: timestamp(nested.last_message_at), createdAt: timestamp(nested.created_at), username: profile?.username || '',
       avatar: name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'U',
-      active: profile?.activeStatus !== false, lastSeen: profile?.lastSeen || null, photoURL: profile?.photoURL || '', unreadCount: Number(item.unread_count || 0), hiddenFor: item.hidden_at ? [uid] : [],
+      active: profile?.activeStatus !== false && lastSeenMs > 0 && Date.now() - lastSeenMs < 90000, lastSeen, photoURL: profile?.photoURL || '', unreadCount: Number(item.unread_count || 0), hiddenFor: item.hidden_at ? [uid] : [],
     }
   }).filter(item => item.id && !item.hiddenFor?.includes(uid)).sort((a, b) => (b.lastMessageAt?.toMillis() || b.createdAt?.toMillis() || 0) - (a.lastMessageAt?.toMillis() || a.createdAt?.toMillis() || 0)).filter((item, index, items) => item.type !== 'direct' || items.findIndex(candidate => candidate.type === 'direct' && [...candidate.memberIds].sort().join(':') === [...item.memberIds].sort().join(':')) === index)
 }

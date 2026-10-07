@@ -152,7 +152,11 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
       if (item.type !== 'direct') return item
       const otherUid = item.memberIds.find(memberId => memberId !== uid)
       const profile = otherUid ? await getFirestoreUserProfile(otherUid) : null
-      return profile ? { ...item, name: profile.displayName || item.name, username: profile.username || item.username, photoURL: profile.photoURL || item.photoURL, lastSeen: profile.lastSeen || item.lastSeen, active: profile.activeStatus !== false } : item
+      if (!profile) return item
+      const lastSeen = profile.lastSeen || item.lastSeen
+      const lastSeenMs = lastSeen?.toMillis() || 0
+      const active = profile.activeStatus !== false && lastSeenMs > 0 && Date.now() - lastSeenMs < 90000
+      return { ...item, name: profile.displayName || item.name, username: profile.username || item.username, photoURL: profile.photoURL || item.photoURL, lastSeen, active }
     })).then(callback)
   })
   if (!db) return undefined
@@ -275,6 +279,10 @@ export async function markConversationRead(conversationId: string, uid: string) 
 }
 
 export async function touchPresence(uid: string, activeStatus: boolean) {
+  if (isSupabaseChatEnabled()) {
+    await upsertSupabaseProfile(uid, { activeStatus })
+    return
+  }
   if (!db) return
   await updateDoc(doc(db, 'users', uid), { activeStatus, lastSeen: serverTimestamp() })
 }
