@@ -581,6 +581,12 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
       avatar.appendChild(image);
     });
   }, [filtered, authorProfiles]);
+  useEffect(() => {
+    if (!postMenu) return;
+    const menu = document.querySelector<HTMLElement>('.twitt-menu');
+    const first = menu?.querySelector<HTMLButtonElement>('button');
+    if (first) first.textContent = 'Not interested';
+  }, [postMenu]);
   const communityLabel = { all: "All public", jee: "JEE Prep", neet: "NEET Prep", study: "Study circles", public: "Public Co-Chat", following: "Following" }[community];
   const createTwitt = async () => {
     if (!draft.trim()) return;
