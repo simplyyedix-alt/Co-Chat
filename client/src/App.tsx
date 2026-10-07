@@ -359,17 +359,18 @@ function Nav({
   );
 }
 
-type StudyTask = { id: string; title: string; kind: "daily" | "personal"; startedAt?: number; completedAt?: number };
+type StudyTask = { id: string; title: string; kind: "daily" | "personal"; action: "timer" | "discover"; startedAt?: number; completedAt?: number };
 const studyRecommendations = ["Solve five focused problems", "Revise one difficult chapter", "Study for 60 minutes", "Answer one student’s doubt", "Make short revision notes", "Complete a timed practice set"];
 const currentStudyWeekKey = () => { const date = new Date(); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() - ((date.getDay() + 6) % 7)); return date.toISOString().slice(0, 10); };
+const studyTaskAction = (title: string): StudyTask["action"] => /answer.*doubt|help.*student/i.test(title) ? "discover" : "timer";
 
-function StudyTaskSheet({ tasks, onClose, onStart, onComplete, onAdd, onRemove }: { tasks: StudyTask[]; onClose: () => void; onStart: (id: string) => void; onComplete: (id: string) => void; onAdd: (title: string) => void; onRemove: (id: string) => void }) {
+function StudyTaskSheet({ tasks, onClose, onStart, onComplete, onAdd, onRemove }: { tasks: StudyTask[]; onClose: () => void; onStart: (task: StudyTask) => void; onComplete: (id: string) => void; onAdd: (title: string) => void; onRemove: (id: string) => void }) {
   const [draft, setDraft] = useState("");
   const active = tasks.filter((task) => task.startedAt && !task.completedAt);
   const recommended = tasks.filter((task) => task.kind === "daily");
   const personal = tasks.filter((task) => task.kind === "personal");
   const submit = (event: FormEvent) => { event.preventDefault(); const title = draft.trim(); if (!title) return; onAdd(title); setDraft(""); };
-  const taskRow = (task: StudyTask) => <article className={`task-row ${task.completedAt ? "completed" : task.startedAt ? "active" : ""}`} key={task.id}><span className="task-status">{task.completedAt ? "✓" : task.startedAt ? "◷" : "○"}</span><div><strong>{task.title}</strong><small>{task.completedAt ? "Completed today" : task.startedAt ? "In progress" : task.kind === "daily" ? "Picked for you today" : "Your personal task"}</small></div>{task.completedAt ? <span className="task-finished">Done</span> : task.startedAt ? <button className="secondary compact" type="button" onClick={() => onComplete(task.id)}>Complete</button> : <button className="primary compact" type="button" onClick={() => onStart(task.id)}>Start</button>}{task.kind === "personal" && !task.startedAt && !task.completedAt && <button className="task-remove" type="button" aria-label={`Remove ${task.title}`} onClick={() => onRemove(task.id)}>×</button>}</article>;
+  const taskRow = (task: StudyTask) => <article className={`task-row ${task.completedAt ? "completed" : task.startedAt ? "active" : ""}`} key={task.id}><span className="task-status">{task.completedAt ? "✓" : task.startedAt ? "◷" : "○"}</span><div><strong>{task.title}</strong><small>{task.completedAt ? "Completed today" : task.startedAt ? "In progress" : task.action === "discover" ? "Opens Discover to help someone" : task.kind === "daily" ? "Picked for you today" : "Your personal task"}</small></div>{task.completedAt ? <span className="task-finished">Done</span> : task.startedAt ? <button className="secondary compact" type="button" onClick={() => onComplete(task.id)}>Complete</button> : <button className="primary compact" type="button" onClick={() => onStart(task)}>{task.action === "discover" ? "Open" : "Start"}</button>}{task.kind === "personal" && !task.startedAt && !task.completedAt && <button className="task-remove" type="button" aria-label={`Remove ${task.title}`} onClick={() => onRemove(task.id)}>×</button>}</article>;
   return <div className="task-sheet-backdrop" role="presentation" onMouseDown={onClose}><section className="task-sheet" role="dialog" aria-modal="true" aria-label="Study tasks" onMouseDown={(event) => event.stopPropagation()}><div className="sheet-handle"/><header className="task-sheet-header"><button className="icon" type="button" aria-label="Close tasks" onClick={onClose}>×</button><div><strong>Today’s tasks</strong><small>{active.length} in progress · {tasks.filter((task) => task.completedAt).length} complete</small></div><span>✦</span></header><div className="task-sheet-scroll"><section><p className="sheet-label">RECOMMENDED FOR YOU</p>{recommended.map(taskRow)}</section><section><div className="task-section-heading"><p className="sheet-label">MY TASKS</p><small>{personal.length}/5</small></div>{personal.map(taskRow)}{!personal.length && <p className="task-empty">Create optional tasks for anything you want to finish today.</p>}<form className="task-create" onSubmit={submit}><input value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 80))} placeholder={personal.length >= 5 ? "Maximum 5 personal tasks" : "Create a personal task"} disabled={personal.length >= 5}/><button className="secondary compact" type="submit" disabled={!draft.trim() || personal.length >= 5}>Add</button></form></section></div></section></div>;
 }
 
@@ -380,31 +381,49 @@ function TimerSetupSheet({ initialSeconds, onClose, onApply }: { initialSeconds:
   return <div className="task-sheet-backdrop" role="presentation" onMouseDown={onClose}><section className="timer-setup-sheet" role="dialog" aria-modal="true" aria-label="Set focus timer" onMouseDown={(event) => event.stopPropagation()}><div className="sheet-handle"/><header className="timer-setup-header"><button className="icon" type="button" aria-label="Close timer setup" onClick={onClose}>×</button><div><strong>Set focus timer</strong><small>Choose how long you want to study</small></div><span>◷</span></header><div className="timer-picker"><label><span>Hours</span><select value={hours} onChange={(event) => setHours(Number(event.target.value))}>{Array.from({ length: 9 }, (_, value) => <option value={value} key={value}>{value}</option>)}</select></label><b>:</b><label><span>Minutes</span><select value={minutes} onChange={(event) => setMinutes(Number(event.target.value))}>{[0, 5, 10, 15, 20, 25, 30, 45, 50, 55].map((value) => <option value={value} key={value}>{String(value).padStart(2, "0")}</option>)}</select></label></div><div className="timer-presets">{[[25, "25 min"], [50, "50 min"], [60, "1 hour"], [90, "1h 30m"]].map(([value, label]) => <button type="button" key={value} onClick={() => { setHours(Math.floor(Number(value) / 60)); setMinutes(Number(value) % 60); }}>{label}</button>)}</div><button className="primary timer-apply" type="button" disabled={!seconds} onClick={() => onApply(seconds)}>Use {hours ? `${hours}h ` : ""}{minutes ? `${minutes}m` : ""} timer</button></section></div>;
 }
 
-function StudyHome() {
+function LeaderboardSheet({ mode, weeklySeconds, totalSeconds, onModeChange, onClose }: { mode: "friends" | "public"; weeklySeconds: number; totalSeconds: number; onModeChange: (mode: "friends" | "public") => void; onClose: () => void }) {
+  const minutes = Math.floor((mode === "friends" ? weeklySeconds : totalSeconds) / 60);
+  return <div className="task-sheet-backdrop" role="presentation" onMouseDown={onClose}><section className="leaderboard-sheet" role="dialog" aria-modal="true" aria-label="Study leaderboard" onMouseDown={(event) => event.stopPropagation()}><div className="sheet-handle"/><header className="sheet-page-header"><button className="icon" type="button" aria-label="Close leaderboard" onClick={onClose}>×</button><div><strong>{mode === "friends" ? "Friends leaderboard" : "Public leaderboard"}</strong><small>Top 10 · weekly ranks reset every Monday</small></div><span>🏆</span></header><div className="leaderboard-sheet-body"><div className="leaderboard-mode-tabs"><button className={mode === "friends" ? "active" : ""} type="button" onClick={() => onModeChange("friends")}>Friends</button><button className={mode === "public" ? "active" : ""} type="button" onClick={() => onModeChange("public")}>Public</button></div><div className="leaderboard-podium"><article className="rank-two"><span>2</span><strong>Open rank</strong><small>Waiting</small></article><article className="rank-one"><span>1</span><strong>You</strong><small>{minutes} min</small></article><article className="rank-three"><span>3</span><strong>Open rank</strong><small>Waiting</small></article></div><p className="leaderboard-disclaimer">Ranks use finished, saved sessions only. More verified students will appear here as they study.</p><div className="leaderboard-ranks">{Array.from({ length: 7 }, (_, index) => <article key={index}><b>{index + 4}</b><div><strong>Open rank</strong><small>{mode === "friends" ? "Invite friends to compete" : "Waiting for a verified session"}</small></div><span>—</span></article>)}</div></div></section></div>;
+}
+
+function JourneySheet({ streak, league, totalSeconds, nextMilestone, onClose }: { streak: number; league: string; totalSeconds: number; nextMilestone: number; onClose: () => void }) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const milestones = [7, 30, 100, 200, 365];
+  return <div className="task-sheet-backdrop" role="presentation" onMouseDown={onClose}><section className="journey-sheet" role="dialog" aria-modal="true" aria-label="Your study journey" onMouseDown={(event) => event.stopPropagation()}><div className="sheet-handle"/><header className="sheet-page-header"><button className="icon" type="button" aria-label="Close journey" onClick={onClose}>×</button><div><strong>Your journey</strong><small>Every finished session moves you forward</small></div><span>✦</span></header><div className="journey-sheet-body"><section className="journey-highlight"><span>🔥</span><div><small>ACTIVE STREAK</small><strong>{streak} day{streak === 1 ? "" : "s"}</strong><p>Next milestone: {nextMilestone} active days</p></div></section><section className="journey-league"><span className="sheet-label">LEAGUE DIVISION</span><strong>{league}</strong><p>Show up consistently to unlock the next division.</p></section><section><p className="sheet-label">MILESTONES</p><div className="journey-milestones">{milestones.map((milestone) => <article className={streak >= milestone ? "reached" : ""} key={milestone}><span>{streak >= milestone ? "✓" : milestone}</span><div><strong>{milestone} days</strong><small>{milestone === 365 ? "Legendary" : milestone >= 200 ? "Gold" : milestone >= 30 ? "Silver" : "Bronze"}</small></div></article>)}</div></section><section className="journey-stats"><article><small>STUDIED TOTAL</small><strong>{hours}h {minutes}m</strong></article><article><small>NEXT STEP</small><strong>{Math.max(0, nextMilestone - streak)} days</strong></article></section></div></section></div>;
+}
+
+function StudyHome({ onOpenDiscover }: { onOpenDiscover: () => void }) {
   const studyKey = `cochat-study-${auth?.currentUser?.uid || "preview"}`;
   const dayNumber = Math.floor(Date.now() / 86_400_000);
   const weekKey = currentStudyWeekKey();
-  const [seconds, setSeconds] = useState(0);
+  const [seconds, setSeconds] = useState(() => { try { return Number(JSON.parse(localStorage.getItem(studyKey) || "{}").elapsedSeconds || 0); } catch { return 0; } });
   const [totalSeconds, setTotalSeconds] = useState(() => { try { return Number(JSON.parse(localStorage.getItem(studyKey) || "{}").totalSeconds || 0); } catch { return 0; } });
   const [weeklySeconds, setWeeklySeconds] = useState(() => { try { const saved = JSON.parse(localStorage.getItem(studyKey) || "{}"); return saved.weekKey === weekKey ? Number(saved.weeklySeconds || 0) : 0; } catch { return 0; } });
   const [studyDays, setStudyDays] = useState<string[]>(() => { try { const value = JSON.parse(localStorage.getItem(studyKey) || "{}").studyDays; return Array.isArray(value) ? value.filter((day): day is string => typeof day === "string") : []; } catch { return []; } });
-  const [tasks, setTasks] = useState<StudyTask[]>(() => { try { const saved = JSON.parse(localStorage.getItem(studyKey) || "{}"); if (saved.dailyDay === dayNumber && Array.isArray(saved.tasks)) return saved.tasks; } catch { /* local data is optional */ } return [0, 1].map((offset) => ({ id: `daily-${dayNumber}-${offset}`, title: studyRecommendations[(dayNumber + offset) % studyRecommendations.length], kind: "daily" })); });
+  const [tasks, setTasks] = useState<StudyTask[]>(() => { try { const saved = JSON.parse(localStorage.getItem(studyKey) || "{}"); if (saved.dailyDay === dayNumber && Array.isArray(saved.tasks)) return saved.tasks.map((task: Partial<StudyTask>) => ({ ...task, action: task.action || studyTaskAction(task.title || "") })) as StudyTask[]; } catch { /* local data is optional */ } return [0, 1].map((offset) => { const title = studyRecommendations[(dayNumber + offset) % studyRecommendations.length]; return { id: `daily-${dayNumber}-${offset}`, title, kind: "daily" as const, action: studyTaskAction(title) }; }); });
   const [taskSheetOpen, setTaskSheetOpen] = useState(false);
   const [timerSetupOpen, setTimerSetupOpen] = useState(false);
   const [timerTaskId, setTimerTaskId] = useState<string | null>(null);
   const [targetSeconds, setTargetSeconds] = useState(() => { try { return Number(JSON.parse(localStorage.getItem(studyKey) || "{}").targetSeconds || 0); } catch { return 0; } });
-  const [leaderboardTab, setLeaderboardTab] = useState<"week" | "all">("week");
-  const [running, setRunning] = useState(false);
+  const [leaderboardMode, setLeaderboardMode] = useState<"friends" | "public">("friends");
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [journeyOpen, setJourneyOpen] = useState(false);
+  const [timerStartedAt, setTimerStartedAt] = useState<number | null>(() => { try { return Number(JSON.parse(localStorage.getItem(studyKey) || "{}").timerStartedAt) || null; } catch { return null; } });
+  const [running, setRunning] = useState(() => { try { const saved = JSON.parse(localStorage.getItem(studyKey) || "{}"); return Boolean(saved.timerRunning && saved.timerStartedAt && saved.targetSeconds); } catch { return false; } });
   const timerRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (!running) return;
-    const timer = window.setInterval(() => setSeconds((value) => {
-      const next = value + 1;
-      if (targetSeconds && next >= targetSeconds) { setRunning(false); return targetSeconds; }
-      return next;
-    }), 1000);
+    const updateElapsed = () => {
+      if (!timerStartedAt) return;
+      const elapsed = Math.min(targetSeconds || Number.MAX_SAFE_INTEGER, Math.max(0, Math.floor((Date.now() - timerStartedAt) / 1000)));
+      setSeconds(elapsed);
+      if (targetSeconds && elapsed >= targetSeconds) setRunning(false);
+    };
+    updateElapsed();
+    const timer = window.setInterval(updateElapsed, 1000);
     return () => window.clearInterval(timer);
-  }, [running, targetSeconds]);
+  }, [running, targetSeconds, timerStartedAt]);
   const shownSeconds = targetSeconds ? Math.max(0, targetSeconds - seconds) : seconds;
   const minutes = Math.floor(shownSeconds / 60);
   const display = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}:${String(shownSeconds % 60).padStart(2, "0")}`;
@@ -420,11 +439,12 @@ function StudyHome() {
     setStudyDays(nextDays);
     setSeconds(0);
     setTargetSeconds(0);
-    setRunning(false);
-    try { localStorage.setItem(studyKey, JSON.stringify({ totalSeconds: nextTotal, weeklySeconds: nextWeekly, weekKey, studyDays: nextDays, tasks, dailyDay: dayNumber, targetSeconds: 0 })); } catch { /* storage is optional */ }
+    setRunning(false); setTimerStartedAt(null); setTimerTaskId(null);
+    try { localStorage.setItem(studyKey, JSON.stringify({ totalSeconds: nextTotal, weeklySeconds: nextWeekly, weekKey, studyDays: nextDays, tasks, dailyDay: dayNumber, targetSeconds: 0, elapsedSeconds: 0, timerStartedAt: null, timerRunning: false })); } catch { /* storage is optional */ }
   };
   useEffect(() => { try { const saved = JSON.parse(localStorage.getItem(studyKey) || "{}"); if (saved.weekKey !== weekKey) setWeeklySeconds(0); } catch { /* local data is optional */ } }, [studyKey, weekKey]);
-  useEffect(() => { try { localStorage.setItem(studyKey, JSON.stringify({ totalSeconds, weeklySeconds, weekKey, studyDays, tasks, dailyDay: dayNumber, targetSeconds })); } catch { /* local data is optional */ } }, [studyKey, totalSeconds, weeklySeconds, weekKey, studyDays, tasks, dayNumber, targetSeconds]);
+  // The timestamp carries a running timer across reloads; avoid writing local state every second.
+  useEffect(() => { try { localStorage.setItem(studyKey, JSON.stringify({ totalSeconds, weeklySeconds, weekKey, studyDays, tasks, dailyDay: dayNumber, targetSeconds, elapsedSeconds: seconds, timerStartedAt, timerRunning: running })); } catch { /* local data is optional */ } }, [studyKey, totalSeconds, weeklySeconds, weekKey, studyDays, tasks, dayNumber, targetSeconds, timerStartedAt, running]);
   const studiedHours = Math.floor(totalSeconds / 3600);
   const studiedMinutes = Math.floor((totalSeconds % 3600) / 60);
   const studiedLabel = `${studiedHours}h ${studiedMinutes}m`;
@@ -433,33 +453,42 @@ function StudyHome() {
   const league = activeStreak >= 365 ? "Legendary" : activeStreak >= 200 ? "Gold III" : activeStreak >= 100 ? "Gold II" : activeStreak >= 60 ? "Gold I" : activeStreak >= 30 ? "Silver III" : activeStreak >= 15 ? "Silver II" : activeStreak >= 7 ? "Silver I" : activeStreak >= 4 ? "Bronze III" : activeStreak >= 2 ? "Bronze II" : "Bronze I";
   const nextMilestone = [7, 30, 100, 200, 365].find((milestone) => milestone > activeStreak) || 365;
   const activeTasks = tasks.filter((task) => task.startedAt && !task.completedAt);
-  const startTask = (id: string) => {
-    setTasks((current) => current.map((task) => task.id === id ? { ...task, startedAt: task.startedAt || Date.now() } : task));
-    setTimerTaskId((current) => current || id);
+  const startTask = (task: StudyTask) => {
+    setTasks((current) => current.map((item) => item.id === task.id ? { ...item, startedAt: item.startedAt || Date.now() } : item));
+    if (task.action === "discover") { setTaskSheetOpen(false); onOpenDiscover(); return; }
+    setTimerTaskId((current) => current || task.id);
+    setTaskSheetOpen(false);
+    setTimerSetupOpen(true);
   };
   const completeTask = (id: string) => {
     setTasks((current) => current.map((task) => task.id === id ? { ...task, completedAt: Date.now() } : task));
     setTimerTaskId((current) => current === id ? null : current);
   };
-  const addTask = (title: string) => setTasks((current) => current.filter((task) => task.kind !== "personal").length >= 5 ? current : [...current, { id: `personal-${Date.now()}`, title, kind: "personal" }]);
-  const startTaskTimer = (id: string) => {
-    startTask(id);
-    setTimerTaskId(id);
+  const addTask = (title: string) => setTasks((current) => current.filter((task) => task.kind !== "personal").length >= 5 ? current : [...current, { id: `personal-${Date.now()}`, title, kind: "personal", action: "timer" }]);
+  const focusTask = (task: StudyTask) => {
+    if (task.action === "discover") { onOpenDiscover(); return; }
+    setTimerTaskId(task.id);
     setTimerSetupOpen(true);
   };
-  const applyTimer = (duration: number) => { setRunning(false); setSeconds(0); setTargetSeconds(duration); setTimerSetupOpen(false); window.setTimeout(() => timerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 0); };
+  const applyTimer = (duration: number) => { setRunning(false); setTimerStartedAt(null); setSeconds(0); setTargetSeconds(duration); setTimerSetupOpen(false); window.setTimeout(() => timerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 0); };
+  const toggleTimer = () => {
+    if (!targetSeconds) { setTimerSetupOpen(true); return; }
+    if (running) { setRunning(false); setTimerStartedAt(null); return; }
+    if (seconds >= targetSeconds) { setSeconds(0); setTimerStartedAt(Date.now()); } else setTimerStartedAt(Date.now() - seconds * 1000);
+    setRunning(true);
+  };
   return (
     <div className="study-home">
       <section className="study-hero"><div><span className="kicker">YOUR STUDY SPACE</span><h2>One focused hour.</h2><p>Build your journey one calm session at a time.</p></div><div className="quest-badge">✦</div></section>
-      {activeTasks.length > 0 && <section className="active-tasks"><div className="active-tasks-heading"><div><span className="kicker">IN PROGRESS</span><strong>{activeTasks.length} active task{activeTasks.length === 1 ? "" : "s"}</strong></div><button className="secondary compact" type="button" onClick={() => setTaskSheetOpen(true)}>View tasks</button></div>{activeTasks.map((task) => <article key={task.id}><span>◷</span><div><strong>{task.title}</strong><small>Started {Math.max(1, Math.floor((Date.now() - (task.startedAt || Date.now())) / 60000))} min ago</small></div><button className="icon" type="button" aria-label={`Focus on ${task.title}`} onClick={() => startTaskTimer(task.id)}>→</button></article>)}</section>}
-      <section className="study-task-entry"><div><span className="kicker">DAILY TASKS</span><strong>{tasks.filter((task) => task.completedAt).length}/{tasks.length} completed</strong><small>Two recommendations daily, plus up to five tasks you create.</small></div><button className="primary compact" type="button" onClick={() => setTaskSheetOpen(true)}>Open tasks</button></section>
-      <section className="timer-card" ref={timerRef}><div className="timer-ring" style={{ "--progress": `${progress}%` } as CSSProperties}><strong>{display}</strong><span>{running ? (timerTaskId ? "task timer running" : "focus session running") : targetSeconds ? "timer ready" : "choose a duration"}</span></div>{targetSeconds > 0 && <button className="timer-change" type="button" onClick={() => setTimerSetupOpen(true)}>Change · {Math.floor(targetSeconds / 3600) ? `${Math.floor(targetSeconds / 3600)}h ` : ""}{Math.floor((targetSeconds % 3600) / 60)}m</button>}<div className="timer-actions"><button className="primary" type="button" onClick={() => targetSeconds ? setRunning((value) => !value) : setTimerSetupOpen(true)}>{running ? "Pause timer" : targetSeconds ? "Start timer" : "Set timer"}</button><button className="secondary" type="button" onClick={saveSession} disabled={!seconds}>Finish & save</button><button className="secondary" type="button" onClick={() => { setRunning(false); setSeconds(0); setTargetSeconds(0); }}>Reset</button></div><small className="timer-note">Pick a duration, then start the timer. Your session saves only when you finish.</small></section>
+      <section className="study-shortcuts"><button type="button" onClick={() => setTaskSheetOpen(true)}><span>✓</span><div><strong>Tasks</strong><small>{tasks.filter((task) => task.completedAt).length}/{tasks.length} complete</small></div></button><button type="button" onClick={() => setLeaderboardOpen(true)}><span>🏆</span><div><strong>Leaderboard</strong><small>Friends & public</small></div></button><button type="button" onClick={() => setJourneyOpen(true)}><span>✦</span><div><strong>Journey</strong><small>{league}</small></div></button></section>
+      {activeTasks.length > 0 && <section className="active-tasks"><div className="active-tasks-heading"><div><span className="kicker">IN PROGRESS</span><strong>{activeTasks.length} active task{activeTasks.length === 1 ? "" : "s"}</strong></div><button className="secondary compact" type="button" onClick={() => setTaskSheetOpen(true)}>View tasks</button></div>{activeTasks.map((task) => <article key={task.id}><span>◷</span><div><strong>{task.title}</strong><small>{task.action === "discover" ? "Ready to help in Discover" : `Started ${Math.max(1, Math.floor((Date.now() - (task.startedAt || Date.now())) / 60000))} min ago`}</small></div><button className="icon" type="button" aria-label={`Continue ${task.title}`} onClick={() => focusTask(task)}>→</button></article>)}</section>}
+      <section className="timer-card" ref={timerRef}><div className="timer-ring" style={{ "--progress": `${progress}%` } as CSSProperties}><strong>{display}</strong><span>{running ? (timerTaskId ? "task timer running" : "focus session running") : targetSeconds ? "timer ready" : "choose a duration"}</span></div>{targetSeconds > 0 && <button className="timer-change" type="button" onClick={() => setTimerSetupOpen(true)}>Change · {Math.floor(targetSeconds / 3600) ? `${Math.floor(targetSeconds / 3600)}h ` : ""}{Math.floor((targetSeconds % 3600) / 60)}m</button>}<div className="timer-actions"><button className="primary" type="button" onClick={toggleTimer}>{running ? "Pause timer" : targetSeconds ? "Start timer" : "Set timer"}</button><button className="secondary" type="button" onClick={saveSession} disabled={!seconds}>Finish & save</button><button className="secondary" type="button" onClick={() => { setRunning(false); setTimerStartedAt(null); setTimerTaskId(null); setSeconds(0); setTargetSeconds(0); }}>Reset</button></div><small className="timer-note">Your countdown keeps its place if you close or background the app. It saves only when you finish.</small></section>
       <div className="study-grid"><article><span className="metric-icon">🔥</span><strong>{activeStreak} days</strong><small>active journey</small></article><article><span className="metric-icon">✦</span><strong>{league}</strong><small>current league</small></article><article><span className="metric-icon">⌁</span><strong>{studiedLabel}</strong><small>studied total</small></article></div>
-      <section className="study-leaderboard"><header><div><span className="kicker">LEADERBOARD</span><h3>Study momentum</h3></div><div className="leaderboard-tabs"><button className={leaderboardTab === "week" ? "active" : ""} type="button" onClick={() => setLeaderboardTab("week")}>Weekly</button><button className={leaderboardTab === "all" ? "active" : ""} type="button" onClick={() => setLeaderboardTab("all")}>All time</button></div></header><p className="leaderboard-note">Top 10 only · weekly ranks reset every Monday</p><div className="leaderboard-podium"><article className="rank-two"><span>2</span><strong>—</strong><small>Waiting</small></article><article className="rank-one"><span>1</span><strong>You</strong><small>{Math.floor((leaderboardTab === "week" ? weeklySeconds : totalSeconds) / 60)} min</small></article><article className="rank-three"><span>3</span><strong>—</strong><small>Waiting</small></article></div><p className="leaderboard-empty">Your finished sessions are ready to contribute. Friends appear here once the shared weekly aggregate is connected.</p></section>
       <section className="study-zone"><header><div><span className="kicker">STUDY ZONE</span><h3>Focus together</h3></div><span className="study-zone-count">{running ? "1 studying" : "Quiet right now"}</span></header>{running ? <article className="study-zone-person"><Avatar name={auth?.currentUser?.displayName || "You"} photoURL={auth?.currentUser?.photoURL || undefined}/><div><strong>{auth?.currentUser?.displayName || "You"}</strong><small>{timerTaskId ? "Working on an active task" : "In a focus session"}</small></div><span className="presence-dot"/></article> : <div className="study-zone-empty"><strong>Start a session to enter the zone</strong><span>Friends who are studying or doing tasks will appear here with their profile photos.</span></div>}</section>
-      <section className="journey-card"><div className="section-title">YOUR JOURNEY <span>7 → 30 → 365 days</span></div><div className="journey-track"><span className={`journey-dot ${activeStreak >= 7 ? "done" : "active"}`}>{activeStreak >= 7 ? "✓" : "I"}</span><span className={`journey-line ${activeStreak >= 7 ? "done" : ""}`}/><span className={`journey-dot ${activeStreak >= 30 ? "done" : activeStreak >= 7 ? "active" : ""}`}>{activeStreak >= 30 ? "✓" : "II"}</span><span className={`journey-line ${activeStreak >= 30 ? "done" : ""}`}/><span className={`journey-dot ${activeStreak >= 365 ? "done" : activeStreak >= 30 ? "active" : ""}`}>{activeStreak >= 365 ? "✓" : "G"}</span></div><p>Keep showing up. Your next milestone is {nextMilestone} active day{nextMilestone === 1 ? "" : "s"}.</p></section>
       {taskSheetOpen && <StudyTaskSheet tasks={tasks} onClose={() => setTaskSheetOpen(false)} onStart={startTask} onComplete={completeTask} onAdd={addTask} onRemove={(id) => setTasks((current) => current.filter((task) => task.id !== id))}/>}
       {timerSetupOpen && <TimerSetupSheet initialSeconds={targetSeconds} onClose={() => setTimerSetupOpen(false)} onApply={applyTimer}/>}
+      {leaderboardOpen && <LeaderboardSheet mode={leaderboardMode} weeklySeconds={weeklySeconds} totalSeconds={totalSeconds} onModeChange={setLeaderboardMode} onClose={() => setLeaderboardOpen(false)}/>}
+      {journeyOpen && <JourneySheet streak={activeStreak} league={league} totalSeconds={totalSeconds} nextMilestone={nextMilestone} onClose={() => setJourneyOpen(false)}/>}
     </div>
   );
 }
@@ -2076,7 +2105,7 @@ export default function App() {
             )}
           </>
         )}
-        {page === "study" && <StudyHome />}
+        {page === "study" && <StudyHome onOpenDiscover={() => { setDiscoverCommunity("all"); setPage("discover"); }} />}
         {page === "discover" && <TwittFeed initialCommunity={discoverCommunity} />}
         {page === "search" && <SearchPanel uid={liveUser.uid} onSelect={startConversation} />}
         {page === "status" && (
