@@ -1045,6 +1045,7 @@ export default function App() {
   const [discoverCommunity, setDiscoverCommunity] = useState<"all" | "jee" | "neet" | "study" | "public" | "following">("all");
   const [conversations, setConversations] =
     useState<Conversation[]>(starterChats);
+  const [conversationsLoading, setConversationsLoading] = useState(false);
   const notificationConversationSeen = useRef<Record<string, number>>({});
   const [selected, setSelected] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -1206,7 +1207,9 @@ export default function App() {
   useEffect(() => {
     if (!liveUser || liveUser.uid === "preview") return;
     const uid = liveUser.uid;
+    setConversationsLoading(true);
     return watchConversations(uid, (items) => {
+      setConversationsLoading(false);
       setConversations(items);
       if (!notificationsEnabled) return;
       const seen = notificationConversationSeen.current;
@@ -2215,6 +2218,7 @@ export default function App() {
               {page === "communities" ? "COMMUNITY CHATS" : "RECENT CONVERSATIONS"}
             </div>
             <div className="list">
+              {conversationsLoading && <div className="chat-skeleton-list" aria-label="Loading conversations">{[1, 2, 3].map((item) => <div className="chat-skeleton" key={item}><span/><div><b/><i/></div><em/></div>)}</div>}
               {visible
                 .filter((item) =>
                   page === "communities" ? item.type === "group" : item.type !== "group",
