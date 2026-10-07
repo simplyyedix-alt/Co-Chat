@@ -242,6 +242,7 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
         <div className="brand-mark">C</div>
         <h1>Co Chat</h1>
         <p>Chat bright. Feel right.</p>
+        <div className="auth-trust" aria-label="Co-Chat highlights"><span>✦ Study together</span><span>◌ Find your people</span><span>⌁ Keep your streak</span></div>
         {!firebaseReady ? (
           <>
             <div className="hero-card">
@@ -367,6 +368,7 @@ function StudyHome() {
   const [studyDays, setStudyDays] = useState<string[]>(() => { try { const value = JSON.parse(localStorage.getItem(studyKey) || "{}").studyDays; return Array.isArray(value) ? value.filter((day): day is string => typeof day === "string") : []; } catch { return []; } });
   const [questDone, setQuestDone] = useState(() => { try { return JSON.parse(localStorage.getItem(studyKey) || "{}").questDay === dayNumber; } catch { return false; } });
   const [running, setRunning] = useState(false);
+  const timerRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (!running) return;
     const timer = window.setInterval(() => setSeconds((value) => value + 1), 1000);
@@ -396,10 +398,15 @@ function StudyHome() {
   const activeStreak = (() => { let streak = 0; for (let index = 0; index < 365; index += 1) { const date = new Date(today); date.setDate(today.getDate() - index); if (!studyDays.includes(date.toISOString().slice(0, 10))) break; streak += 1; } return streak; })();
   const league = activeStreak >= 365 ? "Legendary" : activeStreak >= 200 ? "Gold III" : activeStreak >= 100 ? "Gold II" : activeStreak >= 60 ? "Gold I" : activeStreak >= 30 ? "Silver III" : activeStreak >= 15 ? "Silver II" : activeStreak >= 7 ? "Silver I" : activeStreak >= 4 ? "Bronze III" : activeStreak >= 2 ? "Bronze II" : "Bronze I";
   const nextMilestone = [7, 30, 100, 200, 365].find((milestone) => milestone > activeStreak) || 365;
+  const startQuestTimer = () => {
+    setRunning(true);
+    window.setTimeout(() => timerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
+  };
   return (
     <div className="study-home">
       <section className="study-hero"><div><span className="kicker">TODAY’S QUEST</span><h2>One focused hour.</h2><p>Build your journey one calm session at a time.</p></div><div className="quest-badge">✦</div></section>
-      <section className="timer-card"><div className="timer-ring" style={{ "--progress": `${progress}%` } as CSSProperties}><strong>{display}</strong><span>focus time</span></div><div className="timer-actions"><button className="primary" type="button" onClick={() => setRunning((value) => !value)}>{running ? "Pause session" : "Start session"}</button><button className="secondary" type="button" onClick={saveSession} disabled={!seconds}>Finish & save</button><button className="secondary" type="button" onClick={() => { setRunning(false); setSeconds(0); }}>Reset</button></div><small className="timer-note">Your session is saved when you finish, not every second.</small></section>
+      <section className={`study-quest-dock ${questDone ? "done" : ""}`}><div><span className="kicker">ONGOING TASK</span><strong>{questDone ? "Today’s quest is complete" : quests[dayNumber % quests.length]}</strong><small>{questDone ? "Nice work — your journey moved forward." : "Start a focused session whenever you’re ready."}</small></div>{questDone ? <span className="quest-done-mark">✓</span> : <button className="secondary compact" type="button" onClick={startQuestTimer}>Set timer</button>}</section>
+      <section className="timer-card" ref={timerRef}><div className="timer-ring" style={{ "--progress": `${progress}%` } as CSSProperties}><strong>{display}</strong><span>{running ? "focus session running" : "focus time"}</span></div><div className="timer-actions"><button className="primary" type="button" onClick={() => setRunning((value) => !value)}>{running ? "Pause session" : "Start session"}</button><button className="secondary" type="button" onClick={saveSession} disabled={!seconds}>Finish & save</button><button className="secondary" type="button" onClick={() => { setRunning(false); setSeconds(0); }}>Reset</button></div><small className="timer-note">Your session is saved when you finish, not every second.</small></section>
       <div className="study-grid"><article><span className="metric-icon">🔥</span><strong>{activeStreak} days</strong><small>active journey</small></article><article><span className="metric-icon">✦</span><strong>{league}</strong><small>current league</small></article><article><span className="metric-icon">⌁</span><strong>{studiedHours} h</strong><small>studied total</small></article></div>
       <section className={`quest-card ${questDone ? "completed" : ""}`}><div><span className="kicker">DAILY QUEST</span><h3>{quests[dayNumber % quests.length]}</h3><p>Small actions compound into a stronger community.</p></div><button className="quest-check" type="button" onClick={completeQuest} aria-label={questDone ? "Mark quest incomplete" : "Complete daily quest"}>{questDone ? "✓" : "○"}</button></section>
       <section className="journey-card"><div className="section-title">YOUR JOURNEY <span>7 → 30 → 365 days</span></div><div className="journey-track"><span className={`journey-dot ${activeStreak >= 7 ? "done" : "active"}`}>{activeStreak >= 7 ? "✓" : "I"}</span><span className={`journey-line ${activeStreak >= 7 ? "done" : ""}`}/><span className={`journey-dot ${activeStreak >= 30 ? "done" : activeStreak >= 7 ? "active" : ""}`}>{activeStreak >= 30 ? "✓" : "II"}</span><span className={`journey-line ${activeStreak >= 30 ? "done" : ""}`}/><span className={`journey-dot ${activeStreak >= 365 ? "done" : activeStreak >= 30 ? "active" : ""}`}>{activeStreak >= 365 ? "✓" : "G"}</span></div><p>Keep showing up. Your next milestone is {nextMilestone} active day{nextMilestone === 1 ? "" : "s"}.</p></section>
@@ -2038,6 +2045,11 @@ export default function App() {
               <Avatar name={profileName || liveUser.email || "U"} photoURL={liveUser.photoURL || undefined} className="avatar large" />
               <h2>{profileName || "Co Chat member"}</h2>
               <p>{liveUser.email}</p>
+              <div className="profile-details" aria-label="Profile details">
+                <span><b>@</b>{profileUsername || "choose a username"}</span>
+                <span><b>✦</b>{liveUser.emailVerified ? "Verified account" : "Email verification pending"}</span>
+                <span><b>◌</b>{activeStatus ? "Available to friends" : "Activity hidden"}</span>
+              </div>
               <label className="field-label">
                 Display name
                 <input
@@ -2601,6 +2613,7 @@ function GroupCreator({
             ×
           </button>
         </header>
+        <div className="group-stepper" aria-label={`Step ${step} of 2`}><span className={step >= 1 ? "active" : ""}>1</span><i className={step === 2 ? "active" : ""}/><span className={step === 2 ? "active" : ""}>2</span></div>
         {step === 1 ? (
           <>
             <p className="modal-hint">
@@ -2649,6 +2662,7 @@ function GroupCreator({
                   <span>＋</span>
                 </button>
               ))}
+              {!results.length && <div className="group-picker-empty"><strong>{term ? "No friend found" : "Your available friends will appear here"}</strong><span>{term ? "Try a different name or username." : "Accept a friend request first, then add them to a group."}</span></div>}
             </div>
             <button
               className="primary"
