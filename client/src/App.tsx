@@ -312,7 +312,12 @@ function Nav({
 }
 
 function StudyHome() {
+  const studyKey = `cochat-study-${auth?.currentUser?.uid || "preview"}`;
+  const quests = ["Answer one student’s doubt", "Solve five focused problems", "Study for 60 minutes", "Help two people in your community"];
+  const dayNumber = Math.floor(Date.now() / 86_400_000);
   const [seconds, setSeconds] = useState(0);
+  const [totalSeconds, setTotalSeconds] = useState(() => { try { return Number(JSON.parse(localStorage.getItem(studyKey) || "{}").totalSeconds || 0); } catch { return 0; } });
+  const [questDone, setQuestDone] = useState(() => { try { return JSON.parse(localStorage.getItem(studyKey) || "{}").questDay === dayNumber; } catch { return false; } });
   const [running, setRunning] = useState(false);
   useEffect(() => {
     if (!running) return;
@@ -322,12 +327,26 @@ function StudyHome() {
   const minutes = Math.floor(seconds / 60);
   const display = `${String(minutes).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
   const progress = Math.min(100, Math.round((seconds / 3600) * 100));
+  const saveSession = () => {
+    if (seconds <= 0) return;
+    const nextTotal = totalSeconds + seconds;
+    setTotalSeconds(nextTotal);
+    setSeconds(0);
+    setRunning(false);
+    try { localStorage.setItem(studyKey, JSON.stringify({ totalSeconds: nextTotal, questDay: questDone ? dayNumber : null })); } catch { /* storage is optional */ }
+  };
+  const completeQuest = () => {
+    const next = !questDone;
+    setQuestDone(next);
+    try { localStorage.setItem(studyKey, JSON.stringify({ totalSeconds, questDay: next ? dayNumber : null })); } catch { /* storage is optional */ }
+  };
+  const studiedHours = Math.floor(totalSeconds / 3600);
   return (
     <div className="study-home">
       <section className="study-hero"><div><span className="kicker">TODAY’S QUEST</span><h2>One focused hour.</h2><p>Build your journey one calm session at a time.</p></div><div className="quest-badge">✦</div></section>
-      <section className="timer-card"><div className="timer-ring" style={{ "--progress": `${progress}%` } as CSSProperties}><strong>{display}</strong><span>focus time</span></div><div className="timer-actions"><button className="primary" type="button" onClick={() => setRunning((value) => !value)}>{running ? "Pause session" : "Start session"}</button><button className="secondary" type="button" onClick={() => { setRunning(false); setSeconds(0); }}>Reset</button></div><small className="timer-note">Your session is saved when you finish, not every second.</small></section>
-      <div className="study-grid"><article><span className="metric-icon">🔥</span><strong>43 days</strong><small>active journey</small></article><article><span className="metric-icon">✦</span><strong>Silver II</strong><small>current league</small></article><article><span className="metric-icon">⌁</span><strong>126 h</strong><small>studied total</small></article></div>
-      <section className="quest-card"><div><span className="kicker">DAILY QUEST</span><h3>Answer one student’s doubt</h3><p>Small actions compound into a stronger community.</p></div><span className="quest-check">○</span></section>
+      <section className="timer-card"><div className="timer-ring" style={{ "--progress": `${progress}%` } as CSSProperties}><strong>{display}</strong><span>focus time</span></div><div className="timer-actions"><button className="primary" type="button" onClick={() => setRunning((value) => !value)}>{running ? "Pause session" : "Start session"}</button><button className="secondary" type="button" onClick={saveSession} disabled={!seconds}>Finish & save</button><button className="secondary" type="button" onClick={() => { setRunning(false); setSeconds(0); }}>Reset</button></div><small className="timer-note">Your session is saved when you finish, not every second.</small></section>
+      <div className="study-grid"><article><span className="metric-icon">🔥</span><strong>43 days</strong><small>active journey</small></article><article><span className="metric-icon">✦</span><strong>Silver II</strong><small>current league</small></article><article><span className="metric-icon">⌁</span><strong>{studiedHours} h</strong><small>studied total</small></article></div>
+      <section className={`quest-card ${questDone ? "completed" : ""}`}><div><span className="kicker">DAILY QUEST</span><h3>{quests[dayNumber % quests.length]}</h3><p>Small actions compound into a stronger community.</p></div><button className="quest-check" type="button" onClick={completeQuest} aria-label={questDone ? "Mark quest incomplete" : "Complete daily quest"}>{questDone ? "✓" : "○"}</button></section>
       <section className="journey-card"><div className="section-title">YOUR JOURNEY <span>7 → 30 → 365 days</span></div><div className="journey-track"><span className="journey-dot done">✓</span><span className="journey-line done"/><span className="journey-dot active">II</span><span className="journey-line"/><span className="journey-dot">G</span></div><p>Keep showing up. Your next milestone is 30 active days.</p></section>
     </div>
   );
