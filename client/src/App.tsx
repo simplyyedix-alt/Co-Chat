@@ -372,7 +372,8 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
   const [posts, setPosts] = useState(starterTwitts);
   const [visible, setVisible] = useState(3);
   const [community, setCommunity] = useState<"all" | "jee" | "neet" | "study" | "public" | "following">(initialCommunity);
-  const [following, setFollowing] = useState<string[]>(["jee"]);
+  const followKey = `cochat-following-${auth?.currentUser?.uid || "preview"}`;
+  const [following, setFollowing] = useState<string[]>(() => { try { const value = JSON.parse(localStorage.getItem(followKey) || "null"); return Array.isArray(value) ? value.filter((id): id is string => ["jee", "neet", "study", "public"].includes(id)) : ["jee"]; } catch { return ["jee"]; } });
   const [composerOpen, setComposerOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [draftCommunity, setDraftCommunity] = useState<"jee" | "neet" | "study" | "public">("jee");
@@ -388,6 +389,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
   const [commentMore, setCommentMore] = useState<Record<string, boolean>>({});
   const [commentLoading, setCommentLoading] = useState<string | null>(null);
   useEffect(() => { setCommunity(initialCommunity); setVisible(3); }, [initialCommunity]);
+  useEffect(() => { try { localStorage.setItem(followKey, JSON.stringify(following)); } catch { /* preferences are optional */ } }, [followKey, following]);
   useEffect(() => {
     const viewerUid = auth?.currentUser?.uid;
     if (!viewerUid || !firebaseReady) return undefined;
