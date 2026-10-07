@@ -261,11 +261,16 @@ export async function sendMessage(conversationId: string, senderId: string, text
   if (attachment) messageData.attachment = attachment
   if (replyTo) messageData.replyTo = { id: replyTo.id, text: replyTo.text, senderId: replyTo.senderId }
   await addDoc(collection(conversationRef, 'messages'), { ...messageData, seenBy: [senderId] })
-  const overflow = await getDocs(query(collection(conversationRef, 'messages'), orderBy('createdAt', 'desc'), limit(31)))
-  if (overflow.size > 30) await deleteDoc(overflow.docs[overflow.docs.length - 1].ref)
   const recipients = (conversationData.memberIds || []).filter((id: string) => id !== senderId)
   const unreadUpdates = Object.fromEntries(recipients.map((id: string) => [`unreadCounts.${id}`, increment(1)]))
-  await updateDoc(conversationRef, { lastMessage: attachment ? `📎 ${attachment.name}` : text, lastSenderId: senderId, lastMessageAt: serverTimestamp(), hiddenFor: [], ...unreadUpdates })
+  // Keep the send acknowledgement fast: message metadata and the bounded
+  // 30-message cleanup can complete independently after the write succeeds.
+  await Promise.all([
+    updateDoc(conversationRef, { lastMessage: attachment ? `📎 ${attachment.name}` : text, lastSenderId: senderId, lastMessageAt: serverTimestamp(), hiddenFor: [], ...unreadUpdates }),
+    getDocs(query(collection(conversationRef, 'messages'), orderBy('createdAt', 'desc'), limit(31))).then(async (overflow) => {
+      if (overflow.size > 30) await deleteDoc(overflow.docs[overflow.docs.length - 1].ref)
+    }),
+  ])
 }
 
 export async function unsendMessage(conversationId: string, messageId: string) {

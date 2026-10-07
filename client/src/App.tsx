@@ -20,6 +20,7 @@ import {
   cancelFriendRequest,
   createCall,
   createConversation,
+  isSupabaseChatEnabled,
   createGroup,
   createStory,
   declineCall,
@@ -2481,9 +2482,14 @@ function FriendZone({
                 <button
                   className="secondary compact"
                   type="button"
-                  onClick={() =>
-                    respondToFriendRequest(item.fromUid, uid, true)
-                  }
+                  onClick={() => void (async () => {
+                    await respondToFriendRequest(item.fromUid, uid, true)
+                    // The friend request store is shared with Firebase, while
+                    // Supabase chat keeps conversations in its own database.
+                    // Create the direct chat immediately after acceptance so
+                    // both users see it in their conversation list.
+                    if (profile && isSupabaseChatEnabled()) await createConversation(uid, profile)
+                  })().catch(() => undefined)}
                 >
                   Accept
                 </button>
