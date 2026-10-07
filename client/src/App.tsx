@@ -625,6 +625,9 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
   const [remoteLoading, setRemoteLoading] = useState(false);
   const [remoteError, setRemoteError] = useState("");
   const viewedPosts = useRef(new Set<string>());
+  const reactionKey = `cochat-discovery-reactions-${auth?.currentUser?.uid || "preview"}`;
+  const [likedPostIds, setLikedPostIds] = useState<string[]>(() => { try { const value = JSON.parse(localStorage.getItem(reactionKey) || "{}"); return Array.isArray(value.posts) ? value.posts.filter((id: unknown): id is string => typeof id === "string") : []; } catch { return []; } });
+  const [likedCommentIds, setLikedCommentIds] = useState<string[]>(() => { try { const value = JSON.parse(localStorage.getItem(reactionKey) || "{}"); return Array.isArray(value.comments) ? value.comments.filter((id: unknown): id is string => typeof id === "string") : []; } catch { return []; } });
   const [commentsByPost, setCommentsByPost] = useState<Record<string, Awaited<ReturnType<typeof loadTwittComments>>["items"]>>({});
   const [commentCursors, setCommentCursors] = useState<Record<string, Awaited<ReturnType<typeof loadTwittComments>>["cursor"]>>({});
   const [commentMore, setCommentMore] = useState<Record<string, boolean>>({});
@@ -632,6 +635,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
   const [commentNames, setCommentNames] = useState<Record<string, string>>({});
   const hiddenKey = `cochat-hidden-twitts-${auth?.currentUser?.uid || "preview"}`;
   const [hiddenPosts, setHiddenPosts] = useState<string[]>(() => { try { const saved = JSON.parse(localStorage.getItem(hiddenKey) || "[]"); return Array.isArray(saved) ? saved : []; } catch { return []; } });
+  useEffect(() => { try { localStorage.setItem(reactionKey, JSON.stringify({ posts: likedPostIds, comments: likedCommentIds })); } catch { /* reaction cache is optional */ } }, [reactionKey, likedPostIds, likedCommentIds]);
   useEffect(() => { setCommunity(initialCommunity); setVisible(3); }, [initialCommunity]);
   useEffect(() => { try { localStorage.setItem(followKey, JSON.stringify(following)); } catch { /* preferences are optional */ } }, [followKey, following]);
   useEffect(() => { try { localStorage.setItem(hiddenKey, JSON.stringify(hiddenPosts)); } catch { /* preferences are optional */ } }, [hiddenKey, hiddenPosts]);
@@ -645,7 +649,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
       if (!active) return;
       {
         const now = Date.now();
-        setPosts(page.items.map((item) => ({ id: item.id, authorUid: item.uid, author: item.uid === viewerUid ? "You" : "Co-Chat member", handle: item.uid, avatar: item.uid === viewerUid ? "YO" : "CM", body: item.body, likes: item.likes, liked: item.liked, comments: item.comments, views: String(item.views), attachment: item.attachment, age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community })));
+        setPosts(page.items.map((item) => ({ id: item.id, authorUid: item.uid, author: item.uid === viewerUid ? "You" : "Co-Chat member", handle: item.uid, avatar: item.uid === viewerUid ? "YO" : "CM", body: item.body, likes: item.likes, liked: likedPostIds.includes(item.id) || item.liked, comments: item.comments, views: String(item.views), attachment: item.attachment, age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community })));
         setVisible(20);
       }
       setRemoteCursor(page.cursor);
@@ -706,7 +710,9 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
     });
   }, [filtered, visible]);
   const handleLike = (post: TwittPreview) => {
-    setPosts((current) => current.map((item) => item.id === post.id ? { ...item, likes: item.likes + (item.liked ? -1 : 1), liked: !item.liked } : item));
+    const nextLiked = !post.liked;
+    setPosts((current) => current.map((item) => item.id === post.id ? { ...item, likes: Math.max(0, item.likes + (nextLiked ? 1 : -1)), liked: nextLiked } : item));
+    setLikedPostIds((current) => nextLiked ? [...new Set([...current, post.id])] : current.filter((id) => id !== post.id));
     const uid = auth?.currentUser?.uid;
     if (uid && firebaseReady && !post.id.startsWith("local-")) void toggleTwittLike(post.id, uid).catch(() => undefined);
   };
@@ -818,6 +824,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
   };
   const likeComment = async (postId: string, comment: TwittComment) => {
     const nextLiked = !comment.liked;
+    setLikedCommentIds((current) => nextLiked ? [...new Set([...current, comment.id])] : current.filter((id) => id !== comment.id));
     setCommentsByPost((current) => ({ ...current, [postId]: (current[postId] || []).map((item) => item.id === comment.id ? { ...item, liked: nextLiked, likes: Math.max(0, (item.likes || 0) + (nextLiked ? 1 : -1)) } : item) }));
     try {
       const uid = auth?.currentUser?.uid;
