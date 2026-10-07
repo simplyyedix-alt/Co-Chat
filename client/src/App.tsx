@@ -331,6 +331,32 @@ function StudyHome() {
   );
 }
 
+type TwittPreview = { id: string; author: string; handle: string; avatar: string; body: string; likes: number; comments: number; views: string; age: string; liked?: boolean };
+const starterTwitts: TwittPreview[] = [
+  { id: "t1", author: "Aarav Mehta", handle: "aarav.study", avatar: "AM", body: "Solved five rotation problems today. The trick was finally seeing the diagram before touching the formula.", likes: 84, comments: 12, views: "1.2k", age: "42 min" },
+  { id: "t2", author: "Mira Shah", handle: "mirashah", avatar: "MS", body: "A small reminder for every student: a slow, honest hour still counts. Keep going.", likes: 126, comments: 18, views: "2.8k", age: "2 hr" },
+  { id: "t3", author: "Co-Chat Community", handle: "cochat", avatar: "C", body: "What are you studying this evening? Drop one topic and find someone learning the same thing.", likes: 204, comments: 31, views: "4.6k", age: "5 hr" },
+];
+
+function TwittFeed() {
+  const [tab, setTab] = useState<"recent" | "trending">("recent");
+  const [posts, setPosts] = useState(starterTwitts);
+  const [visible, setVisible] = useState(3);
+  const list = useMemo(() => [...posts].sort((a, b) => tab === "recent" ? a.id.localeCompare(b.id) : b.likes - a.likes), [posts, tab]);
+  const loadMore = () => {
+    const next = Array.from({ length: 20 }, (_, index) => ({ id: `t${posts.length + index + 1}`, author: "Co-Chat learner", handle: `learner${posts.length + index + 1}`, avatar: "CL", body: "Sharing a little progress from today’s study session. What helped you focus?", likes: Math.max(4, 48 - index), comments: index % 8, views: `${120 + index * 7}`, age: `${index + 1} hr` }));
+    setPosts((current) => [...current, ...next]);
+    setVisible((current) => current + 20);
+  };
+  return <div className="twitt-feed">
+    <section className="discover-intro"><div><span className="kicker">CO-CHAT DISCOVER</span><h2>Ideas worth sharing.</h2><p>Find useful thoughts, study wins, and people learning beside you.</p></div><button className="primary compact" type="button">＋ Write a Twitt</button></section>
+    <div className="feed-tabs"><button className={tab === "recent" ? "active" : ""} onClick={() => setTab("recent")}>Recent <small>last 24h</small></button><button className={tab === "trending" ? "active" : ""} onClick={() => setTab("trending")}>Trending <small>top today</small></button></div>
+    <div className="twitt-list">{list.slice(0, visible).map((post) => <article className="twitt-card" key={post.id}><div className="twitt-head"><span className="avatar">{post.avatar}</span><div><strong>{post.author}</strong><small>@{post.handle} · {post.age}</small></div><button className="icon" aria-label="More options">•••</button></div><p>{post.body}</p><div className="twitt-meta"><button className={post.liked ? "liked" : ""} onClick={() => setPosts((current) => current.map((item) => item.id === post.id ? { ...item, likes: item.likes + (item.liked ? -1 : 1), liked: !item.liked } : item))}>♡ {post.likes}</button><button>◌ {post.comments}</button><span>◉ {post.views}</span></div></article>)}</div>
+    {visible < list.length && <button className="load-more" type="button" onClick={loadMore}>Load 20 more Twitts</button>}
+    <p className="feed-note">Recent shows the newest posts. Trending is refreshed periodically from eligible posts.</p>
+  </div>;
+}
+
 function UsernameSetup({
   user,
   onComplete,
@@ -1621,9 +1647,8 @@ export default function App() {
           </>
         )}
         {page === "study" && <StudyHome />}
-        {(page === "search" || page === "discover") && (
-          <SearchPanel uid={liveUser.uid} onSelect={startConversation} />
-        )}
+        {page === "discover" && <TwittFeed />}
+        {page === "search" && <SearchPanel uid={liveUser.uid} onSelect={startConversation} />}
         {page === "status" && (
           <div className="hero-card coming-soon">
             <span>◉</span>
