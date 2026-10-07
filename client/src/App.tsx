@@ -370,6 +370,16 @@ type StudyTask = { id: string; title: string; kind: "daily" | "personal"; action
 const studyRecommendations = ["Solve five focused problems", "Revise one difficult chapter", "Study for 60 minutes", "Answer one student’s doubt", "Make short revision notes", "Complete a timed practice set"];
 const currentStudyWeekKey = () => { const date = new Date(); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() - ((date.getDay() + 6) % 7)); return date.toISOString().slice(0, 10); };
 const studyTaskAction = (title: string): StudyTask["action"] => /answer.*doubt|help.*student/i.test(title) ? "discover" : "timer";
+const dailyStudyTasks = (dayNumber: number): StudyTask[] => {
+  let seed = Math.abs(dayNumber * 9301 + 49297) % 233280;
+  const choices = studyRecommendations.map((title, index) => ({ title, index }));
+  for (let index = choices.length - 1; index > 0; index -= 1) {
+    seed = (seed * 9301 + 49297) % 233280;
+    const swap = Math.floor((seed / 233280) * (index + 1));
+    [choices[index], choices[swap]] = [choices[swap], choices[index]];
+  }
+  return choices.slice(0, 2).map(({ title }, offset) => ({ id: `daily-${dayNumber}-${offset}`, title, kind: "daily" as const, action: studyTaskAction(title) }));
+};
 
 function StudyTaskSheet({ tasks, onClose, onStart, onComplete, onAdd, onRemove }: { tasks: StudyTask[]; onClose: () => void; onStart: (task: StudyTask) => void; onComplete: (id: string) => void; onAdd: (title: string) => void; onRemove: (id: string) => void }) {
   const [draft, setDraft] = useState("");
@@ -436,7 +446,7 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
 
   const [studyDays, setStudyDays] = useState<string[]>(() => { try { const value = JSON.parse(localStorage.getItem(studyKey) || "{}").studyDays; return Array.isArray(value) ? value.filter((day): day is string => typeof day === "string") : []; } catch { return []; } });
   const [completedTasks, setCompletedTasks] = useState(() => { try { return Number(JSON.parse(localStorage.getItem(studyKey) || "{}").completedTasks || 0); } catch { return 0; } });
-  const [tasks, setTasks] = useState<StudyTask[]>(() => { try { const saved = JSON.parse(localStorage.getItem(studyKey) || "{}"); if (saved.dailyDay === dayNumber && Array.isArray(saved.tasks)) return saved.tasks.map((task: Partial<StudyTask>) => ({ ...task, action: task.action || studyTaskAction(task.title || "") })) as StudyTask[]; } catch { /* local data is optional */ } return [0, 1].map((offset) => { const title = studyRecommendations[(dayNumber + offset) % studyRecommendations.length]; return { id: `daily-${dayNumber}-${offset}`, title, kind: "daily" as const, action: studyTaskAction(title) }; }); });
+  const [tasks, setTasks] = useState<StudyTask[]>(() => { try { const saved = JSON.parse(localStorage.getItem(studyKey) || "{}"); if (saved.dailyDay === dayNumber && Array.isArray(saved.tasks)) return saved.tasks.map((task: Partial<StudyTask>) => ({ ...task, action: task.action || studyTaskAction(task.title || "") })) as StudyTask[]; } catch { /* local data is optional */ } return dailyStudyTasks(dayNumber); });
   const [taskSheetOpen, setTaskSheetOpen] = useState(false);
   const [timerSetupOpen, setTimerSetupOpen] = useState(false);
   const [timerTaskId, setTimerTaskId] = useState<string | null>(null);
@@ -452,6 +462,16 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   const [timerStartedAt, setTimerStartedAt] = useState<number | null>(() => { try { return Number(JSON.parse(localStorage.getItem(studyKey) || "{}").timerStartedAt) || null; } catch { return null; } });
   const [running, setRunning] = useState(() => { try { const saved = JSON.parse(localStorage.getItem(studyKey) || "{}"); return Boolean(saved.timerRunning && saved.timerStartedAt && saved.targetSeconds); } catch { return false; } });
   const timerRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const refreshDailyTasks = () => {
+      const currentDay = Math.floor(Date.now() / 86_400_000);
+      if (currentDay === dayNumber) return;
+      setTasks((current) => [...current.filter((task) => task.kind === "personal"), ...dailyStudyTasks(currentDay)]);
+      setCompletedTasks(0);
+    };
+    const interval = window.setInterval(refreshDailyTasks, 60_000);
+    return () => window.clearInterval(interval);
+  }, [dayNumber]);
   useEffect(() => {
     listFriends(uid).then((friends) => setStudyFriendIds(friends.map((friend) => friend.uid))).catch(() => setStudyFriendIds([]));
   }, [uid]);
