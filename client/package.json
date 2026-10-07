@@ -15,6 +15,7 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.0.0",
     "@capacitor-firebase/authentication": "6.3.1",
     "@capacitor/android": "^6.2.1",
     "@capacitor/core": "^6.2.1",
