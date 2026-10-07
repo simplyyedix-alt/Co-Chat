@@ -63,7 +63,7 @@ import {
 } from "./services/chat";
 import { attachTwittCommentMedia, attachTwittMedia, createTwitt as createRemoteTwitt, createTwittComment, deleteTwitt, deleteTwittComment, hideTwitt, loadTwittComments, loadTwittPage, recordTwittView, toggleTwittCommentLike, toggleTwittLike, type TwittAttachment, type TwittComment } from "./services/twitts";
 import { StorageManager } from "./services/storageManager";
-import { notifyIncomingMessage, registerFcmNotifications } from "./services/notifications";
+import { clearStudyTimerNotification, listenNotificationActions, notifyIncomingCall, notifyIncomingMessage, notifyStudyTimer, registerFcmNotifications } from "./services/notifications";
 import "./index.css";
 import "./group-friend.css";
 import "./community-feed.css";
@@ -601,6 +601,23 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
     if (seconds >= targetSeconds) { setSeconds(0); setTimerStartedAt(Date.now()); } else setTimerStartedAt(Date.now() - seconds * 1000);
     setRunning(true);
   };
+  useEffect(() => {
+    if (!targetSeconds || seconds >= targetSeconds) {
+      clearStudyTimerNotification();
+      return;
+    }
+    const publish = () => notifyStudyTimer(Math.max(0, targetSeconds - seconds), running);
+    publish();
+    if (!running) return;
+    const interval = window.setInterval(publish, 60_000);
+    return () => window.clearInterval(interval);
+  }, [running, targetSeconds, seconds]);
+  useEffect(() => listenNotificationActions((event) => {
+    if (event.tag !== "cochat-study-timer") return;
+    if (event.action === "pause-timer" && running) { setRunning(false); setTimerStartedAt(null); }
+    if (event.action === "resume-timer" && targetSeconds) { setTimerStartedAt(Date.now() - seconds * 1000); setRunning(true); }
+    if (event.action === "finish-timer" && seconds > 0) saveSession();
+  }), [running, targetSeconds, seconds]);
   return (
     <div className="study-home">
       <section className="study-hero"><div><span className="kicker">YOUR STUDY SPACE</span><h2>Lock in, one session at a time.</h2><p>Small wins stack into a study rhythm that actually lasts.</p></div><div className="quest-badge">✦</div></section>
@@ -1644,6 +1661,16 @@ export default function App() {
     setVoiceRole("callee");
     setShowVoiceCall(true);
   };
+  useEffect(() => {
+    if (!incomingCall) return;
+    void notifyIncomingCall(incomingCall.groupId ? (incomingCall.groupName || "Group call") : incomingCallerName, incomingCall.id, Boolean(incomingCall.groupId));
+  }, [incomingCall?.id, incomingCallerName]);
+  useEffect(() => listenNotificationActions((event) => {
+    if (event.tag?.startsWith("cochat-call-") || event.data?.type === "call") {
+      if (event.action === "answer-call") void acceptIncomingCall();
+      if (event.action === "decline-call") void declineIncomingCall();
+    }
+  }), [incomingCall, liveUser, incomingCallerName]);
   const activeGroupCount = selected?.type === "group"
     ? Math.min(selected.memberIds.length, groupMembers.filter((member) => member.activeStatus !== false && Boolean(member.lastSeen) && presenceNow - (member.lastSeen?.toMillis() || 0) < 90000).length)
     : 0;
