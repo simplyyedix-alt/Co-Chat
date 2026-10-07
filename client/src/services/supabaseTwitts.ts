@@ -42,10 +42,10 @@ export async function createSupabaseTwitt(uid: string, body: string, community: 
   return String(result.id || '')
 }
 
-export async function toggleSupabaseTwittLike(twittId: string, uid: string) {
+export async function toggleSupabaseTwittLike(twittId: string, uid: string, liked: boolean) {
   if (!supabase) throw new Error('Supabase is not configured.')
   void uid
-  const result = await invokeSocialApi(await firebaseToken(), { action: 'like', twittId })
+  const result = await invokeSocialApi(await firebaseToken(), { action: 'like', twittId, liked })
   return Boolean(result.liked)
 }
 
@@ -89,10 +89,10 @@ export async function hideSupabaseTwitt(twittId: string, uid: string) {
   return true
 }
 
-export async function toggleSupabaseTwittCommentLike(twittId: string, commentId: string, uid: string) {
+export async function toggleSupabaseTwittCommentLike(twittId: string, commentId: string, uid: string, liked: boolean) {
   if (!supabase) throw new Error('Supabase is not configured.')
   void uid
-  const result = await invokeSocialApi(await firebaseToken(), { action: 'comment-like', twittId, commentId })
+  const result = await invokeSocialApi(await firebaseToken(), { action: 'comment-like', twittId, commentId, liked })
   return Boolean(result.liked)
 }
 

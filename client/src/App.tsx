@@ -714,7 +714,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
     setPosts((current) => current.map((item) => item.id === post.id ? { ...item, likes: Math.max(0, item.likes + (nextLiked ? 1 : -1)), liked: nextLiked } : item));
     setLikedPostIds((current) => nextLiked ? [...new Set([...current, post.id])] : current.filter((id) => id !== post.id));
     const uid = auth?.currentUser?.uid;
-    if (uid && firebaseReady && !post.id.startsWith("local-")) void toggleTwittLike(post.id, uid).catch(() => undefined);
+    if (uid && firebaseReady && !post.id.startsWith("local-")) void toggleTwittLike(post.id, uid, nextLiked).catch(() => undefined);
   };
   const openComments = async (postId: string) => {
     setCommenting(postId);
@@ -829,7 +829,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
     try {
       const uid = auth?.currentUser?.uid;
       if (!uid || !firebaseReady || comment.id.startsWith('local-comment-')) throw new Error('Sign in again to like a comment.');
-      await toggleTwittCommentLike(postId, comment.id, uid);
+      await toggleTwittCommentLike(postId, comment.id, uid, nextLiked);
     } catch (error) {
       setCommentsByPost((current) => ({ ...current, [postId]: (current[postId] || []).map((item) => item.id === comment.id ? { ...item, liked: comment.liked, likes: comment.likes || 0 } : item) }));
       setRemoteError(error instanceof Error ? error.message : 'Could not update the comment like.');

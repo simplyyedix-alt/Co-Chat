@@ -88,8 +88,8 @@ export async function createTwitt(uid: string, body: string, community: TwittCom
   return ref.id
 }
 
-export async function toggleTwittLike(twittId: string, uid: string) {
-  if (socialBackend === 'supabase' && supabaseReady) return toggleSupabaseTwittLike(twittId, uid)
+export async function toggleTwittLike(twittId: string, uid: string, liked: boolean) {
+  if (socialBackend === 'supabase' && supabaseReady) return toggleSupabaseTwittLike(twittId, uid, liked)
   if (!db) throw new Error('Firebase is not configured.')
   const twittRef = doc(db, 'twitts', twittId)
   const likeRef = doc(twittRef, 'likes', uid)
@@ -175,8 +175,8 @@ export async function hideTwitt(twittId: string, uid: string) {
   return true
 }
 
-export async function toggleTwittCommentLike(twittId: string, commentId: string, uid: string) {
-  if (socialBackend === 'supabase' && supabaseReady) return toggleSupabaseTwittCommentLike(twittId, commentId, uid)
+export async function toggleTwittCommentLike(twittId: string, commentId: string, uid: string, liked: boolean) {
+  if (socialBackend === 'supabase' && supabaseReady) return toggleSupabaseTwittCommentLike(twittId, commentId, uid, liked)
   if (!db) throw new Error('Firebase is not configured.')
   const commentRef = doc(db, 'twitts', twittId, 'comments', commentId)
   const likeRef = doc(commentRef, 'likes', uid)

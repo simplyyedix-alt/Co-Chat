@@ -129,7 +129,7 @@ Deno.serve(async (request) => {
       return response({ recorded: Boolean(await callRpc('record_twitt_view', { p_twitt_id: body.twittId, p_user_id: uid })) })
     }
     if (body.action === 'like') {
-      return response({ liked: Boolean(await callRpc('toggle_twitt_like', { p_twitt_id: body.twittId, p_user_id: uid })) })
+      return response({ liked: Boolean(await callRpc('set_twitt_like', { p_twitt_id: body.twittId, p_user_id: uid, p_liked: body.liked === true })) })
     }
     if (body.action === 'comment') {
       const comment = body.text?.trim() || ''
@@ -158,7 +158,7 @@ Deno.serve(async (request) => {
     }
     if (body.action === 'comment-like') {
       if (!body.commentId) return response({ error: 'commentId is required' }, 400)
-      return response({ liked: Boolean(await callRpc('toggle_twitt_comment_like', { p_comment_id: body.commentId, p_user_id: uid })) })
+      return response({ liked: Boolean(await callRpc('set_twitt_comment_like', { p_comment_id: body.commentId, p_user_id: uid, p_liked: body.liked === true })) })
     }
     if (body.action === 'delete-comment') {
       if (!body.commentId) return response({ error: 'commentId is required' }, 400)
