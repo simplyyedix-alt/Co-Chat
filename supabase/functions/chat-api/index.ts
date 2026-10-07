@@ -63,13 +63,27 @@ Deno.serve(async (request) => {
     }
     if (action === 'conversations') {
       const rows = await rest(`conversation_members?uid=eq.${encodeURIComponent(user.uid)}&select=conversation_id,hidden_at,unread_count,read_at,conversations(id,type,name,admin_id,created_by,last_message,last_sender_id,last_message_at,created_at)&order=joined_at.desc`)
-      const items = await Promise.all((rows || []).map(async (item: Record<string, unknown>) => ({ ...item, member_ids: await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(String(item.conversation_id))}&select=uid`) })))
+      const items = await Promise.all((rows || []).map(async (item: Record<string, unknown>) => {
+        const memberIds = await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(String(item.conversation_id))}&select=uid`)
+        const otherUid = (memberIds || []).map((member: Record<string, unknown>) => String(member.uid || '')).find((uid: string) => uid && uid !== user.uid)
+        const profiles = otherUid ? await rest(`profiles?uid=eq.${encodeURIComponent(otherUid)}&select=uid,display_name,email,username,photo_url,bio,notifications_enabled,discoverable,active_status,last_seen&limit=1`) : []
+        return { ...item, member_ids: memberIds, other_profile: profiles?.[0] || null }
+      }))
       return response({ items })
     }
     if (action === 'create-direct') {
       const otherUid = String(body?.otherUid || '')
       const name = String(body?.name || 'Conversation').slice(0, 100)
       if (!otherUid || otherUid === user.uid) return response({ error: 'A different user is required' }, 400)
+      const memberships = await rest(`conversation_members?uid=eq.${encodeURIComponent(user.uid)}&select=conversation_id`)
+      for (const membership of memberships || []) {
+        const conversationId = String(membership.conversation_id || '')
+        if (!conversationId) continue
+        const conversation = await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}&type=eq.direct&select=id&limit=1`)
+        if (!conversation?.[0]) continue
+        const members = await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&select=uid`)
+        if ((members || []).some((member: Record<string, unknown>) => String(member.uid || '') === otherUid)) return response({ id: conversationId })
+      }
       const created = await rest('conversations', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ type: 'direct', name, created_by: user.uid }) })
       const conversationId = created?.[0]?.id
       if (!conversationId) throw new Error('Conversation could not be created')
@@ -93,6 +107,12 @@ Deno.serve(async (request) => {
       for (const item of members || []) if (item.uid !== user.uid) await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(item.uid)}`, { method: 'PATCH', body: JSON.stringify({ unread_count: Number(item.unread_count || 0) + 1 }) })
       await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: 'PATCH', body: JSON.stringify({ last_message: text || '📎 Attachment', last_sender_id: user.uid, last_message_at: new Date().toISOString() }) })
       return response({ message: rows?.[0] || null })
+    }
+    if (action === 'delete-conversation') {
+      const conversationId = String(body?.conversationId || '')
+      if (!conversationId || !(await member(conversationId, user.uid))) return response({ error: 'You cannot delete this conversation.' }, 403)
+      await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: 'DELETE' })
+      return response({ deleted: true })
     }
     return response({ error: 'Unsupported action' }, 400)
   } catch (error) {

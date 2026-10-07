@@ -23,7 +23,7 @@ import {
 } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { StorageManager } from './storageManager'
-import { createDirect, isSupabaseChatEnabled, sendMessage as sendSupabaseMessage, watchConversations as watchSupabaseConversations, watchMessages as watchSupabaseMessages } from './supabaseChat'
+import { createDirect, deleteConversation as deleteSupabaseConversation, getProfile as getSupabaseProfile, isSupabaseChatEnabled, sendMessage as sendSupabaseMessage, upsertProfile as upsertSupabaseProfile, watchConversations as watchSupabaseConversations, watchMessages as watchSupabaseMessages } from './supabaseChat'
 
 export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; bio?: string; notificationsEnabled?: boolean; discoverable?: boolean; activeStatus?: boolean; theme?: 'light' | 'dark'; lastSeen?: Timestamp | null; profileComplete?: boolean }
 export type Conversation = {
@@ -105,6 +105,11 @@ async function reserveUsername(uid: string, requested: string, fallback: string)
 }
 
 export async function ensureUserProfile(uid: string, profile: Partial<UserProfile>) {
+  if (isSupabaseChatEnabled()) {
+    const existing = await getSupabaseProfile(uid)
+    if (!existing) await upsertSupabaseProfile(uid, { ...profile, username: normalizeUsername(profile.username || profile.displayName || profile.email?.split('@')[0] || `user${uid.slice(0, 8)}`) })
+    return !existing?.username
+  }
   if (!db) return false
   const ref = doc(db, 'users', uid)
   const current = await getDoc(ref)
@@ -122,6 +127,7 @@ export async function ensureUserProfile(uid: string, profile: Partial<UserProfil
 }
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
+  if (isSupabaseChatEnabled()) return getSupabaseProfile(uid)
   if (!db) return null
   const viewerUid = auth?.currentUser?.uid
   if (viewerUid && viewerUid !== uid && await isBlockedBetween(viewerUid, uid)) return null
@@ -224,6 +230,10 @@ export async function deleteMessageForMe(conversationId: string, messageId: stri
 }
 
 export async function deleteConversation(conversationId: string, uid: string) {
+  if (isSupabaseChatEnabled()) {
+    await deleteSupabaseConversation(conversationId)
+    return
+  }
   if (!db) return
   const ref = doc(db, 'conversations', conversationId); const snapshot = await getDoc(ref)
   if (!snapshot.exists() || !(snapshot.data().memberIds || []).includes(uid)) throw new Error('You cannot delete this conversation.')
