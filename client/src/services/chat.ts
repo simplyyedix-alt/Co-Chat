@@ -224,7 +224,7 @@ export async function deleteConversation(conversationId: string, uid: string) {
 export async function markConversationRead(conversationId: string, uid: string) {
   if (!db) return
   const conversationRef = doc(db, 'conversations', conversationId)
-  const snapshot = await getDocs(collection(conversationRef, 'messages'))
+  const snapshot = await getDocs(query(collection(conversationRef, 'messages'), orderBy('createdAt', 'desc'), limit(30)))
   const unread = snapshot.docs.filter(item => !(item.data().seenBy || []).includes(uid))
   for (let start = 0; start < unread.length; start += 450) {
     const batch = writeBatch(db)
