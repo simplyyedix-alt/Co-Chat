@@ -7,3 +7,5 @@ Schedule `refresh_twitt_trending()` once per day with a Supabase scheduled funct
 Row-level security is intentionally enabled with no public policies yet. The app currently authenticates with Firebase, so a small server/Edge Function auth bridge must verify the Firebase ID token before allowing writes. Never solve that by exposing the Supabase `service_role` key in the browser or GitHub Pages.
 
 The identity bridge is in `functions/auth-bridge/index.ts`. Deploy it as a Supabase Edge Function and add the function secret `FIREBASE_WEB_API_KEY` (the Firebase web API key) plus `APP_ORIGIN` set to the deployed website origin. The browser calls the bridge with the Firebase ID token; only the verified Firebase UID is returned.
+
+The privileged engagement proxy is in `functions/social-api/index.ts`. Deploy it after `auth-bridge`; it uses the built-in `SUPABASE_SERVICE_ROLE_KEY` only inside the Edge Function and accepts verified view, like, and comment operations. Never put that key in the browser or GitHub Actions. Add `FIREBASE_WEB_API_KEY` and `APP_ORIGIN` to the function secrets before testing it.

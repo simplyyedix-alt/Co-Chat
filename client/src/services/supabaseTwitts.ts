@@ -1,7 +1,14 @@
-import { supabase } from '../supabase'
+import { invokeSocialApi, supabase } from '../supabase'
+import { auth } from '../firebase'
 import type { TwittCommunity, TwittComment, TwittRecord } from './twitts'
 
 const PAGE_SIZE = 20
+
+async function firebaseToken() {
+  const token = await auth?.currentUser?.getIdToken()
+  if (!token) throw new Error('Sign in again to continue.')
+  return token
+}
 
 type SupabaseRow = {
   id: string
@@ -40,23 +47,23 @@ export async function createSupabaseTwitt(uid: string, body: string, community: 
 
 export async function toggleSupabaseTwittLike(twittId: string, uid: string) {
   if (!supabase) throw new Error('Supabase is not configured.')
-  const { data, error } = await supabase.rpc('toggle_twitt_like', { p_twitt_id: twittId, p_user_id: uid })
-  if (error) throw error
-  return Boolean(data)
+  void uid
+  const result = await invokeSocialApi(await firebaseToken(), { action: 'like', twittId })
+  return Boolean(result.liked)
 }
 
 export async function recordSupabaseTwittView(twittId: string, uid: string) {
   if (!supabase) return false
-  const { data, error } = await supabase.rpc('record_twitt_view', { p_twitt_id: twittId, p_user_id: uid })
-  if (error) throw error
-  return Boolean(data)
+  void uid
+  const result = await invokeSocialApi(await firebaseToken(), { action: 'view', twittId })
+  return Boolean(result.recorded)
 }
 
 export async function createSupabaseTwittComment(twittId: string, uid: string, body: string) {
   if (!supabase) throw new Error('Supabase is not configured.')
-  const { data, error } = await supabase.rpc('create_twitt_comment', { p_twitt_id: twittId, p_user_id: uid, p_body: body })
-  if (error) throw error
-  return String(data)
+  void uid
+  const result = await invokeSocialApi(await firebaseToken(), { action: 'comment', twittId, text: body })
+  return String(result.id || '')
 }
 
 export async function loadSupabaseTwittComments(twittId: string, cursor?: string | null): Promise<{ items: TwittComment[]; cursor: string | null; hasMore: boolean }> {
