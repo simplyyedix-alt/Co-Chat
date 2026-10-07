@@ -22,7 +22,10 @@ async function showActionNotification(title: string, options: NotificationOption
 }
 
 export function listenNotificationActions(listener: (event: NotificationAction) => void) {
-  const handler = (event: MessageEvent<NotificationAction>) => listener(event.data)
+  const handler = (event: MessageEvent<NotificationAction | undefined>) => {
+    if (!event.data || typeof event.data !== 'object') return
+    listener(event.data)
+  }
   navigator.serviceWorker?.addEventListener('message', handler)
   return () => navigator.serviceWorker?.removeEventListener('message', handler)
 }
