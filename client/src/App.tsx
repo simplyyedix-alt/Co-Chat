@@ -411,6 +411,7 @@ type TwittPreview = { id: string; author: string; handle: string; avatar: string
 function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "jee" | "neet" | "study" | "public" | "following" }) {
   const [tab, setTab] = useState<"recent" | "trending">("recent");
   const [posts, setPosts] = useState<TwittPreview[]>([]);
+  const [authorNames, setAuthorNames] = useState<Record<string, string>>({});
   const [visible, setVisible] = useState(20);
   const [community, setCommunity] = useState<"all" | "jee" | "neet" | "study" | "public" | "following">(initialCommunity);
   const followKey = `cochat-following-${auth?.currentUser?.uid || "preview"}`;
@@ -443,7 +444,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
       if (!active) return;
       {
         const now = Date.now();
-        setPosts(page.items.map((item) => ({ id: item.id, author: item.uid === viewerUid ? "You" : "Co-Chat member", handle: item.uid.slice(0, 10), avatar: item.uid === viewerUid ? "YO" : "CM", body: item.body, likes: item.likes, comments: item.comments, views: String(item.views), age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community })));
+        setPosts(page.items.map((item) => ({ id: item.id, author: item.uid === viewerUid ? "You" : "Co-Chat member", handle: item.uid, avatar: item.uid === viewerUid ? "YO" : "CM", body: item.body, likes: item.likes, comments: item.comments, views: String(item.views), age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community })));
         setVisible(20);
       }
       setRemoteCursor(page.cursor);
@@ -462,7 +463,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
       try {
         const page = await loadTwittPage("all", remoteCursor);
         const now = Date.now();
-        setPosts((current) => [...current, ...page.items.map((item) => ({ id: item.id, author: item.uid === auth?.currentUser?.uid ? "You" : "Co-Chat member", handle: item.uid.slice(0, 10), avatar: item.uid === auth?.currentUser?.uid ? "YO" : "CM", body: item.body, likes: item.likes, comments: item.comments, views: String(item.views), age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community }))]);
+        setPosts((current) => [...current, ...page.items.map((item) => ({ id: item.id, author: item.uid === auth?.currentUser?.uid ? "You" : "Co-Chat member", handle: item.uid, avatar: item.uid === auth?.currentUser?.uid ? "YO" : "CM", body: item.body, likes: item.likes, comments: item.comments, views: String(item.views), age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community }))]);
         setRemoteCursor(page.cursor);
         setRemoteHasMore(page.hasMore);
         setVisible((current) => current + page.items.length);
@@ -472,6 +473,21 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
     setRemoteError("There are no more real Twitts to load.");
   };
   const filtered = list.filter((post) => community === "all" || (community === "following" ? following.includes(post.community) : post.community === community));
+  useEffect(() => {
+    const ids = [...new Set(posts.map((post) => post.handle).filter((uid) => uid && !authorNames[uid]))];
+    if (!ids.length) return;
+    Promise.all(ids.map(async (uid) => [uid, await getUserProfile(uid)] as const)).then((items) => {
+      setAuthorNames((current) => {
+        const next = { ...current };
+        items.forEach(([uid, profile]) => { if (profile?.username) { next[uid] = profile.username; next[profile.username] = profile.username; } });
+        return next;
+      });
+      setPosts((current) => current.map((post) => {
+        const profile = items.find(([uid]) => uid === post.handle)?.[1];
+        return profile?.username ? { ...post, handle: profile.username, author: post.author === "You" ? "You" : (profile.displayName || post.author) } : post;
+      }));
+    });
+  }, [posts, authorNames]);
   useEffect(() => {
     const uid = auth?.currentUser?.uid;
     if (!uid || !firebaseReady) return;
@@ -547,7 +563,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
     if (uid && firebaseReady) {
       try { id = await createRemoteTwitt(uid, body, draftCommunity); } catch (error) { setPublishError(error instanceof Error ? error.message : "Could not publish this Twitt. Please try again."); return; }
     }
-    const post: TwittPreview = { id, author: "You", handle: "your_profile", avatar: "YO", body, likes: 0, comments: 0, views: "0", age: "now", createdAt: Date.now(), community: draftCommunity };
+    const post: TwittPreview = { id, author: "You", handle: uid || "your_profile", avatar: "YO", body, likes: 0, comments: 0, views: "0", age: "now", createdAt: Date.now(), community: draftCommunity };
     setPosts((current) => [post, ...current]);
     setDraft("");
     setComposerOpen(false);
