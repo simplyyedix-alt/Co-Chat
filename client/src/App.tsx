@@ -2413,10 +2413,11 @@ export default function App() {
         {(page === "profile" || page === "settings") && (
           <div className="settings-page">
             <div className="settings-hero">
-              <div><span className="settings-eyebrow">ACCOUNT CENTER</span><h1>{page === "settings" ? "Settings & profile" : "Your profile"}</h1><p>Set your vibe, keep your circle close.</p></div>
-              <div className="settings-hero-mark">✦</div>
+              <div><span className="settings-eyebrow">ACCOUNT CENTER</span><h1>{page === "settings" ? "Settings & profile" : "Your profile"}</h1><p>Set your vibe, keep your circle close.</p><div className="settings-hero-meta"><span>● {activeStatus ? "Available" : "Away"}</span><span>✓ {liveUser.emailVerified ? "Verified" : "Verify email"}</span></div></div>
+              <div className="settings-hero-mark" aria-hidden="true">✦</div>
             </div>
             <form className="profile-card settings-profile-card" onSubmit={save}>
+              <div className="settings-card-kicker">PROFILE & IDENTITY <span>Changes sync across devices</span></div>
               <div className="settings-profile-heading"><div className="settings-avatar-wrap"><Avatar name={profileName || liveUser.email || "U"} photoURL={liveUser.photoURL || undefined} className="avatar large" /><span className={`settings-presence ${activeStatus ? "online" : ""}`} /></div><div><span className="settings-eyebrow">PROFILE</span><h2>{profileName || "Co Chat member"}</h2><p>{liveUser.email}</p></div></div>
               <div className="profile-details" aria-label="Profile details">
                 <span><b>@</b>{profileUsername || "choose a username"}</span>
@@ -2436,7 +2437,7 @@ export default function App() {
               <article><span>◉</span><div><b>Your boundaries</b><small>Control who can discover you and see your active status.</small></div></article>
             </div>
             <div className="settings settings-list">
-              <div className="settings-section-label">YOUR CO-CHAT EXPERIENCE</div>
+              <div className="settings-section-label">YOUR CO-CHAT EXPERIENCE <span>Personalize your space</span></div>
               <button type="button" onClick={() => void shareProfile(profileName, profileUsername)}>
                 <span className="settings-row-icon">↗</span><span className="settings-option-copy"><b>Share your profile</b><small>Send your name and handle to a friend</small></span><span>›</span>
               </button>
