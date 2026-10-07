@@ -8,10 +8,32 @@ type NotificationAction = { action: string; tag?: string; data?: Record<string, 
 type ActionButton = { action: string; title: string }
 
 async function showActionNotification(title: string, options: NotificationOptions & { actions?: ActionButton[]; data?: Record<string, unknown> }) {
-  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return false
+  if (typeof Notification === 'undefined') return false
   try {
-    notificationRegistration ||= await navigator.serviceWorker.ready
-    await notificationRegistration.showNotification(title, options)
+    if (Notification.permission === 'default') {
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') return false
+    }
+    if (Notification.permission !== 'granted') return false
+    if (notificationRegistration) {
+      await notificationRegistration.showNotification(title, options)
+      return true
+    }
+
+    // Do not let a missing/uncontrolled service worker block the notification.
+    // This matters on the first visit and after a fresh GitHub Pages deploy.
+    const registration = await Promise.race<ServiceWorkerRegistration | null>([
+      navigator.serviceWorker?.ready ?? Promise.resolve(null),
+      new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 1500)),
+    ])
+    if (registration) {
+      notificationRegistration = registration
+      await registration.showNotification(title, options)
+      return true
+    }
+
+    const fallback = new Notification(title, { body: options.body, icon: options.icon, tag: options.tag })
+    window.setTimeout(() => fallback.close(), 8000)
     return true
   } catch {
     // Safari and some embedded browsers do not expose action notifications.
@@ -38,7 +60,6 @@ export function notifyIncomingMessage(title: string, body: string) {
 }
 
 export function notifyIncomingCall(name: string, callId: string, group = false) {
-  if (!document.hidden) return
   void showActionNotification(group ? 'Incoming group call' : 'Incoming call', {
     body: `${name} is calling you`, icon: '/icon-192.png', tag: `cochat-call-${callId}`, requireInteraction: true,
     data: { type: 'call', callId }, actions: [{ action: 'answer-call', title: 'Answer' }, { action: 'decline-call', title: 'Decline' }],
