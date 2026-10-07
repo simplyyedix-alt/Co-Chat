@@ -511,7 +511,11 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
     setCommentLoading(postId);
     try {
       const page = await loadTwittComments(postId);
-      setCommentsByPost((current) => ({ ...current, [postId]: page.items }));
+      const items = await Promise.all(page.items.map(async (comment) => {
+        const profile = await getUserProfile(comment.uid);
+        return { ...comment, uid: profile?.username || comment.uid.slice(0, 10) };
+      }));
+      setCommentsByPost((current) => ({ ...current, [postId]: items }));
       setCommentCursors((current) => ({ ...current, [postId]: page.cursor }));
       setCommentMore((current) => ({ ...current, [postId]: page.hasMore }));
     } finally { setCommentLoading(null); }
@@ -522,7 +526,11 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
     setCommentLoading(postId);
     try {
       const page = await loadTwittComments(postId, cursor);
-      setCommentsByPost((current) => ({ ...current, [postId]: [...(current[postId] || []), ...page.items] }));
+      const items = await Promise.all(page.items.map(async (comment) => {
+        const profile = await getUserProfile(comment.uid);
+        return { ...comment, uid: profile?.username || comment.uid.slice(0, 10) };
+      }));
+      setCommentsByPost((current) => ({ ...current, [postId]: [...(current[postId] || []), ...items] }));
       setCommentCursors((current) => ({ ...current, [postId]: page.cursor }));
       setCommentMore((current) => ({ ...current, [postId]: page.hasMore }));
     } finally { setCommentLoading(null); }
@@ -544,11 +552,11 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
     const onCommentCreated = (event: Event) => {
       const detail = (event as CustomEvent<{ twittId?: string; id?: string; uid?: string; body?: string }>).detail;
       if (!detail?.twittId || !detail.id || !detail.uid || !detail.body) return;
-      setCommentsByPost((current) => {
+      void getUserProfile(detail.uid).then((profile) => setCommentsByPost((current) => {
         const comments = current[detail.twittId!] || [];
         if (comments.some((comment) => comment.id === detail.id)) return current;
-        return { ...current, [detail.twittId!]: [...comments, { id: detail.id!, uid: detail.uid!, body: detail.body!, createdAt: { toMillis: () => Date.now() } }] };
-      });
+        return { ...current, [detail.twittId!]: [...comments, { id: detail.id!, uid: profile?.username || detail.uid!.slice(0, 10), body: detail.body!, createdAt: { toMillis: () => Date.now() } }] };
+      }));
     };
     window.addEventListener('cochat-comment-created', onCommentCreated);
     return () => window.removeEventListener('cochat-comment-created', onCommentCreated);
