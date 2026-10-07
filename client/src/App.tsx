@@ -63,7 +63,7 @@ import {
 } from "./services/chat";
 import { attachTwittCommentMedia, attachTwittMedia, createTwitt as createRemoteTwitt, createTwittComment, deleteTwitt, deleteTwittComment, hideTwitt, loadTwittComments, loadTwittPage, recordTwittView, toggleTwittCommentLike, toggleTwittLike, type TwittAttachment, type TwittComment } from "./services/twitts";
 import { StorageManager } from "./services/storageManager";
-import { registerFcmNotifications } from "./services/notifications";
+import { notifyIncomingMessage, registerFcmNotifications } from "./services/notifications";
 import "./index.css";
 import "./group-friend.css";
 import "./community-feed.css";
@@ -1028,6 +1028,7 @@ export default function App() {
   const [discoverCommunity, setDiscoverCommunity] = useState<"all" | "jee" | "neet" | "study" | "public" | "following">("all");
   const [conversations, setConversations] =
     useState<Conversation[]>(starterChats);
+  const notificationConversationSeen = useRef<Record<string, number>>({});
   const [selected, setSelected] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState("");
@@ -1188,8 +1189,19 @@ export default function App() {
   useEffect(() => {
     if (!liveUser || liveUser.uid === "preview") return;
     const uid = liveUser.uid;
-    return watchConversations(uid, (items) => setConversations(items));
-  }, [liveUser?.uid]);
+    return watchConversations(uid, (items) => {
+      setConversations(items);
+      if (!notificationsEnabled) return;
+      const seen = notificationConversationSeen.current;
+      for (const item of items) {
+        const messageAt = item.lastMessageAt?.toMillis() || 0;
+        const previous = seen[item.id];
+        seen[item.id] = messageAt;
+        if (!previous || messageAt <= previous || item.lastSenderId === uid || !item.lastMessage) continue;
+        notifyIncomingMessage(item.name || "New Co-Chat message", item.lastMessage);
+      }
+    });
+  }, [liveUser?.uid, notificationsEnabled]);
   useEffect(() => {
     if (!liveUser || liveUser.uid === "preview") return;
     return watchFriendRequests(liveUser.uid, (items) => {

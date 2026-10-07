@@ -2,6 +2,14 @@ import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messagi
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { app, auth, db } from '../firebase'
 
+// Immediate browser fallback while a server-side FCM sender is unavailable.
+// It uses the existing bounded conversation listener and never exposes keys.
+export function notifyIncomingMessage(title: string, body: string) {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted' || !document.hidden) return
+  const notification = new Notification(title, { body, icon: '/icon-192.png', tag: 'cochat-message' })
+  window.setTimeout(() => notification.close(), 8000)
+}
+
 export async function registerFcmNotifications(enabled = true) {
   const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY || ''
   if (!enabled || !app || !auth?.currentUser || !db || !vapidKey || typeof Notification === 'undefined') return false
