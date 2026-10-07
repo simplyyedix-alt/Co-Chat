@@ -11,6 +11,34 @@ function assetUrl(name: string) {
   return new URL(name, document.baseURI).toString()
 }
 
+function messagingConfig() {
+  return new URLSearchParams({
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+    appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
+  })
+}
+
+async function getNotificationServiceWorker() {
+  if (!('serviceWorker' in navigator)) return null
+  if (notificationRegistration) return notificationRegistration
+  const scriptUrl = new URL('firebase-messaging-sw.js', document.baseURI)
+  try {
+    const existing = await navigator.serviceWorker.getRegistration(scriptUrl.pathname)
+    if (existing) {
+      notificationRegistration = existing
+      return existing
+    }
+    scriptUrl.search = messagingConfig().toString()
+    notificationRegistration = await navigator.serviceWorker.register(scriptUrl.toString())
+    return notificationRegistration
+  } catch {
+    return null
+  }
+}
+
 async function showActionNotification(title: string, options: NotificationOptions & { actions?: ActionButton[]; data?: Record<string, unknown> }) {
   if (typeof Notification === 'undefined') return false
   try {
@@ -19,15 +47,16 @@ async function showActionNotification(title: string, options: NotificationOption
       if (permission !== 'granted') return false
     }
     if (Notification.permission !== 'granted') return false
-    if (notificationRegistration) {
-      await notificationRegistration.showNotification(title, options)
+    const serviceWorker = await getNotificationServiceWorker()
+    if (serviceWorker) {
+      await serviceWorker.showNotification(title, options)
       return true
     }
 
     // Do not let a missing/uncontrolled service worker block the notification.
     // This matters on the first visit and after a fresh GitHub Pages deploy.
     const registration = await Promise.race<ServiceWorkerRegistration | null>([
-      navigator.serviceWorker?.ready ?? Promise.resolve(null),
+      serviceWorker ? Promise.resolve(serviceWorker) : Promise.resolve(null),
       new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 1500)),
     ])
     if (registration) {
@@ -90,11 +119,8 @@ export async function registerFcmNotifications(enabled = true) {
   const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission()
   if (permission !== 'granted') return false
   const messaging = getMessaging(app)
-  const config = new URLSearchParams({ apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '', authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '', projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '', messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '', appId: import.meta.env.VITE_FIREBASE_APP_ID || '' })
-  const serviceWorkerUrl = new URL('firebase-messaging-sw.js', document.baseURI)
-  serviceWorkerUrl.search = config.toString()
-  const registration = await navigator.serviceWorker.register(serviceWorkerUrl.toString())
-  notificationRegistration = registration
+  const registration = await getNotificationServiceWorker()
+  if (!registration) return false
   const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: registration })
   if (!token) return false
   await setDoc(doc(db, 'users', auth.currentUser.uid, 'fcmTokens', token), { token, platform: 'web', updatedAt: serverTimestamp() }, { merge: true })
