@@ -1,5 +1,5 @@
 import { getDownloadURL, ref, uploadBytes, deleteObject, getMetadata as getStorageMetadata } from 'firebase/storage'
-import { storage } from '../firebase'
+import { auth, storage } from '../firebase'
 
 export type UploadMetadata = { ownerId: string; originalName: string; mimeType: string; sizeBytes: number; conversationId?: string }
 export type StorageObject = { provider: string; storageKey: string; url: string; originalName: string; mimeType: string; sizeBytes: number }
@@ -14,6 +14,12 @@ export interface StorageProvider {
 const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/webm', 'application/pdf', 'text/plain'])
 const maxFileSize = 50 * 1024 * 1024
 const mediaApiUrl = (import.meta.env.VITE_MEDIA_API_URL || '').replace(/\/$/, '')
+
+async function mediaHeaders() {
+  const token = await auth?.currentUser?.getIdToken()
+  if (!token) throw new Error('Please sign in before sharing media.')
+  return { Authorization: `Bearer ${token}` }
+}
 
 function validateFile(file: File) {
   if (!allowedTypes.has(file.type)) throw new Error('This file type is not supported.')
@@ -34,29 +40,29 @@ const firebaseProvider: StorageProvider = {
   getMetadata: async storageKey => { if (!storage) throw new Error('Media storage is not configured.'); const value = await getStorageMetadata(ref(storage, storageKey)); return { sizeBytes: value.size, mimeType: value.contentType || 'application/octet-stream' } },
 }
 
-// B2 is primary and IDrive e2 is the fallback behind this server endpoint.
+// Backblaze B2 is used behind this server endpoint. Provider keys never ship here.
 // The browser receives a short-lived result only; provider keys never ship here.
 const managedProvider: StorageProvider = {
   async upload(file, metadata) {
     const body = new FormData()
     body.append('file', file)
     body.append('metadata', JSON.stringify(metadata))
-    const response = await fetch(`${mediaApiUrl}/upload`, { method: 'POST', body })
-    if (!response.ok) throw new Error('Media upload failed.')
+    const response = await fetch(`${mediaApiUrl}/upload`, { method: 'POST', headers: await mediaHeaders(), body })
+    if (!response.ok) { const error = await response.json().catch(() => null); throw new Error(error?.error || 'Media upload failed.') }
     return response.json() as Promise<StorageObject>
   },
   async download(storageKey) {
-    const response = await fetch(`${mediaApiUrl}/download?key=${encodeURIComponent(storageKey)}`)
+    const response = await fetch(`${mediaApiUrl}/download?key=${encodeURIComponent(storageKey)}`, { headers: await mediaHeaders() })
     if (!response.ok) throw new Error('Media is unavailable.')
     const value = await response.json() as { url: string }
     return value.url
   },
   async delete(storageKey) {
-    const response = await fetch(`${mediaApiUrl}/delete`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ storageKey }) })
+    const response = await fetch(`${mediaApiUrl}/delete?key=${encodeURIComponent(storageKey)}`, { method: 'POST', headers: await mediaHeaders() })
     if (!response.ok) throw new Error('Media deletion failed.')
   },
   async getMetadata(storageKey) {
-    const response = await fetch(`${mediaApiUrl}/metadata?key=${encodeURIComponent(storageKey)}`)
+    const response = await fetch(`${mediaApiUrl}/metadata?key=${encodeURIComponent(storageKey)}`, { headers: await mediaHeaders() })
     if (!response.ok) throw new Error('Media metadata is unavailable.')
     return response.json()
   },

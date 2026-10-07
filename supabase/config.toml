@@ -3,3 +3,6 @@ verify_jwt = false
 
 [functions.social-api]
 verify_jwt = false
+
+[functions.media-api]
+verify_jwt = false
