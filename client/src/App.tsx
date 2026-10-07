@@ -52,7 +52,7 @@ import {
   type Story,
   type UserProfile,
 } from "./services/chat";
-import { createTwitt as createRemoteTwitt, loadTwittPage } from "./services/twitts";
+import { createTwitt as createRemoteTwitt, createTwittComment, loadTwittPage, recordTwittView, toggleTwittLike } from "./services/twitts";
 import "./index.css";
 import "./group-friend.css";
 import "./community-feed.css";
@@ -355,15 +355,17 @@ function TwittFeed() {
   const [remoteCursor, setRemoteCursor] = useState<Awaited<ReturnType<typeof loadTwittPage>>["cursor"]>(null);
   const [remoteHasMore, setRemoteHasMore] = useState(false);
   const [remoteLoading, setRemoteLoading] = useState(false);
+  const viewedPosts = useRef(new Set<string>());
   useEffect(() => {
-    if (!auth?.currentUser?.uid || !firebaseReady) return undefined;
+    const viewerUid = auth?.currentUser?.uid;
+    if (!viewerUid || !firebaseReady) return undefined;
     let active = true;
     setRemoteLoading(true);
     loadTwittPage("all").then((page) => {
       if (!active) return;
       if (page.items.length) {
         const now = Date.now();
-        setPosts(page.items.map((item) => ({ id: item.id, author: item.uid === auth.currentUser?.uid ? "You" : "Co-Chat learner", handle: item.uid.slice(0, 10), avatar: item.uid === auth.currentUser?.uid ? "YO" : "CL", body: item.body, likes: item.likes, comments: item.comments, views: String(item.views), age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community })));
+        setPosts(page.items.map((item) => ({ id: item.id, author: item.uid === viewerUid ? "You" : "Co-Chat learner", handle: item.uid.slice(0, 10), avatar: item.uid === viewerUid ? "YO" : "CL", body: item.body, likes: item.likes, comments: item.comments, views: String(item.views), age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community })));
         setVisible(3);
       }
       setRemoteCursor(page.cursor);
@@ -394,6 +396,22 @@ function TwittFeed() {
     setVisible((current) => current + 20);
   };
   const filtered = list.filter((post) => community === "all" || (community === "following" ? following.includes(post.community) : post.community === community));
+  useEffect(() => {
+    const uid = auth?.currentUser?.uid;
+    if (!uid || !firebaseReady) return;
+    filtered.slice(0, visible).forEach((post) => {
+      if (post.id.startsWith("local-") || viewedPosts.current.has(post.id)) return;
+      viewedPosts.current.add(post.id);
+      void recordTwittView(post.id, uid).then((counted) => {
+        if (counted) setPosts((current) => current.map((item) => item.id === post.id ? { ...item, views: String(Number(item.views || 0) + 1) } : item));
+      }).catch(() => viewedPosts.current.delete(post.id));
+    });
+  }, [filtered, visible]);
+  const handleLike = (post: TwittPreview) => {
+    setPosts((current) => current.map((item) => item.id === post.id ? { ...item, likes: item.likes + (item.liked ? -1 : 1), liked: !item.liked } : item));
+    const uid = auth?.currentUser?.uid;
+    if (uid && firebaseReady && !post.id.startsWith("local-")) void toggleTwittLike(post.id, uid).catch(() => undefined);
+  };
   const communityLabel = { all: "All public", jee: "JEE Prep", neet: "NEET Prep", study: "Study circles", public: "Public Co-Chat", following: "Following" }[community];
   const createTwitt = () => {
     if (!draft.trim()) return;
@@ -414,7 +432,7 @@ function TwittFeed() {
     <div className="community-filter" aria-label="Twitt community filter">{([["all", "All"], ["following", "Following"], ["jee", "JEE"], ["neet", "NEET"], ["study", "Study"], ["public", "Public"]] as const).map(([id, label]) => <button key={id} className={community === id ? "active" : ""} onClick={() => { setCommunity(id); setVisible(3); }}>{label}</button>)}</div>
     <div className="feed-tabs"><button className={tab === "recent" ? "active" : ""} onClick={() => setTab("recent")}>Recent <small>{communityLabel} · 24h</small></button><button className={tab === "trending" ? "active" : ""} onClick={() => setTab("trending")}>Trending <small>{communityLabel} · daily</small></button></div>
     <div className="follow-strip"><span>Following: {following.length ? following.map((id) => id.toUpperCase()).join(" · ") : "none"}</span><button onClick={() => setCommunity("following")}>View following</button></div>
-    <div className="twitt-list">{filtered.slice(0, visible).map((post) => <article className="twitt-card" key={post.id}><div className="twitt-head"><span className="avatar">{post.avatar}</span><div><strong>{post.author}</strong><small>@{post.handle} · {post.age} · {post.community.toUpperCase()}</small></div><div className="twitt-actions"><button className="icon" aria-label="Twitt options" aria-expanded={postMenu === post.id} onClick={() => setPostMenu(postMenu === post.id ? null : post.id)}>•••</button>{postMenu === post.id && <div className="twitt-menu"><button type="button" onClick={() => { setPosts((current) => current.filter((item) => item.id !== post.id)); setPostMenu(null); }}>Hide this Twitt</button><button type="button" onClick={() => setPostMenu(null)}>Cancel</button></div>}</div></div><p>{post.body}</p><div className="twitt-meta"><button className={post.liked ? "liked" : ""} onClick={() => setPosts((current) => current.map((item) => item.id === post.id ? { ...item, likes: item.likes + (item.liked ? -1 : 1), liked: !item.liked } : item))}>♡ {post.likes}</button><button onClick={() => { setCommenting(commenting === post.id ? null : post.id); setCommentDraft(""); }}>◌ {post.comments}</button><span>◉ {post.views}</span><button className={following.includes(post.community) ? "followed" : ""} onClick={() => setFollowing((current) => current.includes(post.community) ? current.filter((id) => id !== post.community) : [...current, post.community])}>{following.includes(post.community) ? "Following" : `Follow ${post.community.toUpperCase()}`}</button></div>{commenting === post.id && <form className="twitt-comment" onSubmit={(event) => { event.preventDefault(); if (!commentDraft.trim()) return; setPosts((current) => current.map((item) => item.id === post.id ? { ...item, comments: item.comments + 1 } : item)); setCommentDraft(""); }}><input value={commentDraft} onChange={(event) => setCommentDraft(event.target.value.slice(0, 240))} placeholder="Add a thoughtful comment" autoFocus /><button className="primary compact" type="submit">Send</button></form>}</article>)}</div>
+    <div className="twitt-list">{filtered.slice(0, visible).map((post) => <article className="twitt-card" key={post.id}><div className="twitt-head"><span className="avatar">{post.avatar}</span><div><strong>{post.author}</strong><small>@{post.handle} · {post.age} · {post.community.toUpperCase()}</small></div><div className="twitt-actions"><button className="icon" aria-label="Twitt options" aria-expanded={postMenu === post.id} onClick={() => setPostMenu(postMenu === post.id ? null : post.id)}>•••</button>{postMenu === post.id && <div className="twitt-menu"><button type="button" onClick={() => { setPosts((current) => current.filter((item) => item.id !== post.id)); setPostMenu(null); }}>Hide this Twitt</button><button type="button" onClick={() => setPostMenu(null)}>Cancel</button></div>}</div></div><p>{post.body}</p><div className="twitt-meta"><button className={post.liked ? "liked" : ""} onClick={() => handleLike(post)}>♡ {post.likes}</button><button onClick={() => { setCommenting(commenting === post.id ? null : post.id); setCommentDraft(""); }}>◌ {post.comments}</button><span>◉ {post.views}</span><button className={following.includes(post.community) ? "followed" : ""} onClick={() => setFollowing((current) => current.includes(post.community) ? current.filter((id) => id !== post.community) : [...current, post.community])}>{following.includes(post.community) ? "Following" : `Follow ${post.community.toUpperCase()}`}</button></div>{commenting === post.id && <form className="twitt-comment" onSubmit={(event) => { event.preventDefault(); const body = commentDraft.trim(); if (!body) return; setPosts((current) => current.map((item) => item.id === post.id ? { ...item, comments: item.comments + 1 } : item)); const uid = auth?.currentUser?.uid; if (uid && firebaseReady && !post.id.startsWith("local-")) void createTwittComment(post.id, uid, body).catch(() => undefined); setCommentDraft(""); }}><input value={commentDraft} onChange={(event) => setCommentDraft(event.target.value.slice(0, 240))} placeholder="Add a thoughtful comment" autoFocus /><button className="primary compact" type="submit">Send</button></form>}</article>)}</div>
     {!filtered.length && <div className="empty-state">No Twitts in {communityLabel} yet.</div>}
     {(visible < filtered.length || remoteHasMore) && <button className="load-more" type="button" onClick={() => void loadMore()} disabled={remoteLoading}>{remoteLoading ? "Loading Twitts…" : "Load 20 more Twitts"}</button>}
     <p className="feed-note">Recent shows the newest posts in this community. Trending is refreshed periodically from eligible posts.</p>
