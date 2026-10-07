@@ -6,6 +6,7 @@ import {
   signInWithPopup,
   signInWithCredential,
   GoogleAuthProvider,
+  sendPasswordResetEmail,
   signOut,
   updateProfile,
   type User,
@@ -153,6 +154,7 @@ const relativeMessageTime = (value?: { toMillis?: () => number } | null) => {
 function AuthScreen({ onPreview }: { onPreview: () => void }) {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const friendlyAuthError = (value: unknown, fallback: string) => {
     const code = typeof value === "object" && value !== null && "code" in value ? String((value as { code?: string }).code) : "";
@@ -170,6 +172,7 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
     event.preventDefault();
     if (!auth || busy) return;
     setError("");
+    setNotice("");
     setBusy(true);
     const data = new FormData(event.currentTarget);
     try {
@@ -197,6 +200,7 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
   const google = async () => {
     if (!auth || busy) return;
     setError("");
+    setNotice("");
     setBusy(true);
     try {
       const isAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
@@ -210,6 +214,22 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
       }
     } catch (e) {
       setError(friendlyAuthError(e, "Google sign-in failed."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const resetPassword = async () => {
+    if (!auth || busy) return;
+    const email = window.prompt("Enter the email for your Co-Chat account:")?.trim();
+    if (!email) return;
+    setError("");
+    setNotice("");
+    setBusy(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setNotice("Password reset instructions sent. Check your email.");
+    } catch (e) {
+      setError(friendlyAuthError(e, "Could not send password reset instructions."));
     } finally {
       setBusy(false);
     }
@@ -285,6 +305,7 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
                 />
               </label>
               {error && <p className="error-text">{error}</p>}
+              {notice && <p className="notice">{notice}</p>}
               <button className="primary" disabled={busy}>
                 {busy ? "Connecting…" : mode === "signin" ? "Sign in" : "Create account"}
               </button>
@@ -292,6 +313,11 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
             <button className="google-button" onClick={google} disabled={busy}>
               {busy ? "Connecting…" : "Continue with Google"}
             </button>
+            {mode === "signin" && (
+              <button className="secondary compact" type="button" onClick={() => void resetPassword()} disabled={busy}>
+                Forgot password?
+              </button>
+            )}
             <small>Your account syncs securely across devices.</small>
           </>
         )}
