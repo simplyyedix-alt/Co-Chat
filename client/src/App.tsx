@@ -52,6 +52,7 @@ import {
   type Story,
   type UserProfile,
 } from "./services/chat";
+import { createTwitt as createRemoteTwitt } from "./services/twitts";
 import "./index.css";
 import "./group-friend.css";
 import "./community-feed.css";
@@ -365,7 +366,10 @@ function TwittFeed() {
   const communityLabel = { all: "All public", jee: "JEE Prep", neet: "NEET Prep", study: "Study circles", public: "Public Co-Chat", following: "Following" }[community];
   const createTwitt = () => {
     if (!draft.trim()) return;
-    const post: TwittPreview = { id: `local-${Date.now()}`, author: "You", handle: "your_profile", avatar: "YO", body: draft.trim(), likes: 0, comments: 0, views: "0", age: "now", createdAt: Date.now(), community: draftCommunity };
+    const body = draft.trim();
+    const post: TwittPreview = { id: `local-${Date.now()}`, author: "You", handle: "your_profile", avatar: "YO", body, likes: 0, comments: 0, views: "0", age: "now", createdAt: Date.now(), community: draftCommunity };
+    const uid = auth?.currentUser?.uid;
+    if (uid && firebaseReady) void createRemoteTwitt(uid, body, draftCommunity).catch(() => undefined);
     setPosts((current) => [post, ...current]);
     setDraft("");
     setComposerOpen(false);
