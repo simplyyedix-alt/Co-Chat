@@ -29,6 +29,7 @@ export type UserProfile = { uid: string; displayName: string; email: string; use
 export type Conversation = {
   id: string
   name: string
+  username?: string
   memberIds: string[]
   lastMessage: string
   lastSenderId?: string
@@ -127,7 +128,17 @@ export async function ensureUserProfile(uid: string, profile: Partial<UserProfil
 }
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
-  if (isSupabaseChatEnabled()) return getSupabaseProfile(uid)
+  if (isSupabaseChatEnabled()) {
+    const supabaseProfile = await getSupabaseProfile(uid)
+    const firestoreProfile = await getFirestoreUserProfile(uid)
+    if (!supabaseProfile) return firestoreProfile
+    return { ...supabaseProfile, displayName: firestoreProfile?.displayName || supabaseProfile.displayName, username: firestoreProfile?.username || supabaseProfile.username, photoURL: firestoreProfile?.photoURL || supabaseProfile.photoURL, bio: firestoreProfile?.bio || supabaseProfile.bio }
+  }
+  if (!db) return null
+  return getFirestoreUserProfile(uid)
+}
+
+async function getFirestoreUserProfile(uid: string): Promise<UserProfile | null> {
   if (!db) return null
   const viewerUid = auth?.currentUser?.uid
   if (viewerUid && viewerUid !== uid && await isBlockedBetween(viewerUid, uid)) return null
@@ -136,7 +147,14 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 }
 
 export function watchConversations(uid: string, callback: (items: Conversation[]) => void): Unsubscribe | undefined {
-  if (isSupabaseChatEnabled()) return watchSupabaseConversations(uid, callback)
+  if (isSupabaseChatEnabled()) return watchSupabaseConversations(uid, (items) => {
+    void Promise.all(items.map(async (item) => {
+      if (item.type !== 'direct') return item
+      const otherUid = item.memberIds.find(memberId => memberId !== uid)
+      const profile = otherUid ? await getFirestoreUserProfile(otherUid) : null
+      return profile ? { ...item, name: profile.displayName || item.name, username: profile.username || item.username, photoURL: profile.photoURL || item.photoURL, lastSeen: profile.lastSeen || item.lastSeen, active: profile.activeStatus !== false } : item
+    })).then(callback)
+  })
   if (!db) return undefined
   const q = query(collection(db, 'conversations'), where('memberIds', 'array-contains', uid), limit(50))
   return onSnapshot(q, snapshot => {
@@ -417,6 +435,13 @@ export async function createStory(uid: string, displayName: string, text: string
 }
 
 export async function saveProfile(uid: string, values: Pick<UserProfile, 'displayName' | 'username' | 'bio' | 'notificationsEnabled' | 'discoverable'> & { activeStatus?: boolean }) {
+  if (isSupabaseChatEnabled()) {
+    const current = await getSupabaseProfile(uid)
+    const username = normalizeUsername(values.username)
+    if (username.length < 3) throw new Error('Username must be at least 3 characters.')
+    await upsertSupabaseProfile(uid, { ...values, username, email: current?.email || auth?.currentUser?.email || '', photoURL: current?.photoURL || auth?.currentUser?.photoURL || '' })
+    return
+  }
   if (!db) throw new Error('Profile service is unavailable. Check your connection and try again.')
   const userRef = doc(db, 'users', uid)
   const current = await getDoc(userRef)

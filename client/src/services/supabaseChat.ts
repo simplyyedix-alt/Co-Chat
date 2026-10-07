@@ -40,7 +40,7 @@ const profileFromRow = (row: Record<string, unknown> | null | undefined): UserPr
 }
 
 export async function upsertProfile(uid: string, profile: Partial<UserProfile>) {
-  await request({ action: 'profile-upsert', displayName: profile.displayName || '', email: profile.email || '', photoURL: profile.photoURL || '', username: profile.username || '', bio: profile.bio || '' })
+  await request({ action: 'profile-upsert', displayName: profile.displayName || '', email: profile.email || '', photoURL: profile.photoURL || '', username: profile.username || '', bio: profile.bio || '', notificationsEnabled: profile.notificationsEnabled, discoverable: profile.discoverable, activeStatus: profile.activeStatus })
   return true
 }
 
@@ -60,7 +60,7 @@ export async function listConversations(uid: string): Promise<Conversation[]> {
       id: String(nested.id || item.conversation_id || ''), name, memberIds: members,
       type: nested.type === 'group' ? ('group' as const) : ('direct' as const), adminId: nested.admin_id ? String(nested.admin_id) : undefined,
       lastMessage: String(nested.last_message || ''), lastSenderId: nested.last_sender_id ? String(nested.last_sender_id) : undefined,
-      lastMessageAt: timestamp(nested.last_message_at), createdAt: timestamp(nested.created_at),
+      lastMessageAt: timestamp(nested.last_message_at), createdAt: timestamp(nested.created_at), username: profile?.username || '',
       avatar: name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'U',
       active: profile?.activeStatus !== false, lastSeen: profile?.lastSeen || null, photoURL: profile?.photoURL || '', unreadCount: Number(item.unread_count || 0), hiddenFor: item.hidden_at ? [uid] : [],
     }
