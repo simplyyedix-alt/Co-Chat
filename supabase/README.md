@@ -1,6 +1,6 @@
 # Supabase backend
 
-Run the SQL migrations in order from the Supabase SQL Editor. `001_social_feed.sql` creates the bounded social-feed tables and indexes; `002_social_feed_functions.sql` adds atomic counters and the daily trending calculation.
+Run the SQL migrations in order from the Supabase SQL Editor. `001_social_feed.sql` creates the bounded social-feed tables and indexes; `002_social_feed_functions.sql` adds atomic counters and the daily trending calculation; `003_harden_social_functions.sql` removes direct browser execution grants from those privileged functions.
 
 Schedule `refresh_twitt_trending()` once per day with a Supabase scheduled function. Feed reads should query `twitt_trending_daily` instead of recalculating scores for every visitor.
 
