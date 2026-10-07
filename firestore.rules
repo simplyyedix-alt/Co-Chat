@@ -89,6 +89,21 @@ service cloud.firestore {
         && request.resource.data.text.size() <= 500;
       allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
+    match /twitts/{twittId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.body is string
+        && request.resource.data.body.size() > 0
+        && request.resource.data.body.size() <= 280
+        && request.resource.data.community in ['jee', 'neet', 'study', 'public']
+        && request.resource.data.likes == 0
+        && request.resource.data.comments == 0
+        && request.resource.data.views == 0;
+      allow update: if signedIn() && resource.data.uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['body', 'community']);
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
     match /calls/{callId} {
       allow read: if signedIn();
       allow create: if signedIn() && request.resource.data.callerId == request.auth.uid
