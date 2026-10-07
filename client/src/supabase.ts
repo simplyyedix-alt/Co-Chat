@@ -21,7 +21,7 @@ export async function verifyFirebaseIdentity(idToken: string) {
   return data as { uid: string; email: string; displayName: string; photoURL: string }
 }
 
-export async function invokeSocialApi(idToken: string, payload: { action: 'feed' | 'comments' | 'create' | 'view' | 'like' | 'comment'; twittId?: string; text?: string; community?: string; cursor?: string | null }) {
+export async function invokeSocialApi(idToken: string, payload: { action: 'feed' | 'comments' | 'create' | 'view' | 'like' | 'comment' | 'delete-twitt' | 'hide' | 'comment-like' | 'delete-comment'; twittId?: string; commentId?: string; text?: string; community?: string; cursor?: string | null }) {
   if (!supabaseReady) throw new Error('Supabase is not configured.')
   const result = await fetch(`${supabaseUrl}/functions/v1/social-api`, {
     method: 'POST',

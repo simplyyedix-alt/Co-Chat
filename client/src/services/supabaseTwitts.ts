@@ -61,8 +61,36 @@ export async function createSupabaseTwittComment(twittId: string, uid: string, b
   return String(result.id || '')
 }
 
+export async function deleteSupabaseTwitt(twittId: string, uid: string) {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  void uid
+  await invokeSocialApi(await firebaseToken(), { action: 'delete-twitt', twittId })
+  return true
+}
+
+export async function hideSupabaseTwitt(twittId: string, uid: string) {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  void uid
+  await invokeSocialApi(await firebaseToken(), { action: 'hide', twittId })
+  return true
+}
+
+export async function toggleSupabaseTwittCommentLike(twittId: string, commentId: string, uid: string) {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  void uid
+  const result = await invokeSocialApi(await firebaseToken(), { action: 'comment-like', twittId, commentId })
+  return Boolean(result.liked)
+}
+
+export async function deleteSupabaseTwittComment(twittId: string, commentId: string, uid: string) {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  void uid
+  await invokeSocialApi(await firebaseToken(), { action: 'delete-comment', twittId, commentId })
+  return true
+}
+
 export async function loadSupabaseTwittComments(twittId: string, cursor?: string | null): Promise<{ items: TwittComment[]; cursor: string | null; hasMore: boolean }> {
   if (!supabase) return { items: [], cursor: null, hasMore: false }
-  const rows = (await invokeSocialApi(await firebaseToken(), { action: 'comments', twittId, cursor })).items as Array<{ id: string; author_id: string; body: string; created_at: string }>
-  return { items: rows.map((row) => ({ id: row.id, uid: row.author_id, body: row.body, createdAt: { toMillis: () => new Date(row.created_at).getTime() } })), cursor: rows.length ? rows[rows.length - 1].created_at : null, hasMore: rows.length === PAGE_SIZE }
+  const rows = (await invokeSocialApi(await firebaseToken(), { action: 'comments', twittId, cursor })).items as Array<{ id: string; author_id: string; body: string; likes_count: number; liked?: boolean; created_at: string }>
+  return { items: rows.map((row) => ({ id: row.id, uid: row.author_id, body: row.body, likes: row.likes_count, liked: row.liked, createdAt: { toMillis: () => new Date(row.created_at).getTime() } })), cursor: rows.length ? rows[rows.length - 1].created_at : null, hasMore: rows.length === PAGE_SIZE }
 }

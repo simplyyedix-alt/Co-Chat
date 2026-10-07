@@ -17,7 +17,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import { socialBackend, supabaseReady } from '../supabase'
-import { createSupabaseTwitt, createSupabaseTwittComment, loadSupabaseTwittComments, loadSupabaseTwittPage, recordSupabaseTwittView, toggleSupabaseTwittLike } from './supabaseTwitts'
+import { createSupabaseTwitt, createSupabaseTwittComment, deleteSupabaseTwitt, deleteSupabaseTwittComment, hideSupabaseTwitt, loadSupabaseTwittComments, loadSupabaseTwittPage, recordSupabaseTwittView, toggleSupabaseTwittCommentLike, toggleSupabaseTwittLike } from './supabaseTwitts'
 
 export type TwittCommunity = 'jee' | 'neet' | 'study' | 'public'
 
@@ -38,7 +38,7 @@ export type TwittPage = {
   hasMore: boolean
 }
 
-export type TwittComment = { id: string; uid: string; body: string; createdAt: DocumentData['createdAt'] | null }
+export type TwittComment = { id: string; uid: string; body: string; createdAt: DocumentData['createdAt'] | null; likes?: number; liked?: boolean }
 
 const PAGE_SIZE = 20
 
@@ -133,13 +133,60 @@ export async function createTwittComment(twittId: string, uid: string, body: str
   return commentRef.id
 }
 
+export async function deleteTwitt(twittId: string, uid: string) {
+  if (socialBackend === 'supabase' && supabaseReady) return deleteSupabaseTwitt(twittId, uid)
+  if (!db) throw new Error('Firebase is not configured.')
+  const twittRef = doc(db, 'twitts', twittId)
+  return runTransaction(db, async (transaction) => {
+    const twitt = await transaction.get(twittRef)
+    if (!twitt.exists() || String(twitt.data().uid || '') !== uid) throw new Error('Only the author can delete this Twitt.')
+    transaction.delete(twittRef)
+    return true
+  })
+}
+
+export async function hideTwitt(twittId: string, uid: string) {
+  if (socialBackend === 'supabase' && supabaseReady) return hideSupabaseTwitt(twittId, uid)
+  void twittId; void uid
+  return true
+}
+
+export async function toggleTwittCommentLike(twittId: string, commentId: string, uid: string) {
+  if (socialBackend === 'supabase' && supabaseReady) return toggleSupabaseTwittCommentLike(twittId, commentId, uid)
+  if (!db) throw new Error('Firebase is not configured.')
+  const commentRef = doc(db, 'twitts', twittId, 'comments', commentId)
+  const likeRef = doc(commentRef, 'likes', uid)
+  return runTransaction(db, async (transaction) => {
+    const comment = await transaction.get(commentRef)
+    const like = await transaction.get(likeRef)
+    if (!comment.exists()) throw new Error('Comment no longer exists.')
+    const likes = Math.max(0, Number(comment.data().likes || 0))
+    if (like.exists()) { transaction.delete(likeRef); transaction.update(commentRef, { likes: Math.max(0, likes - 1) }); return false }
+    transaction.set(likeRef, { uid, createdAt: serverTimestamp() }); transaction.update(commentRef, { likes: likes + 1 }); return true
+  })
+}
+
+export async function deleteTwittComment(twittId: string, commentId: string, uid: string) {
+  if (socialBackend === 'supabase' && supabaseReady) return deleteSupabaseTwittComment(twittId, commentId, uid)
+  if (!db) throw new Error('Firebase is not configured.')
+  const twittRef = doc(db, 'twitts', twittId)
+  const commentRef = doc(twittRef, 'comments', commentId)
+  return runTransaction(db, async (transaction) => {
+    const [twitt, comment] = await Promise.all([transaction.get(twittRef), transaction.get(commentRef)])
+    if (!twitt.exists() || !comment.exists() || String(comment.data().uid || '') !== uid) throw new Error('Only the author can delete this comment.')
+    transaction.delete(commentRef)
+    transaction.update(twittRef, { comments: Math.max(0, Number(twitt.data().comments || 0) - 1) })
+    return true
+  })
+}
+
 export async function loadTwittComments(twittId: string, cursor?: string | null) {
   if (socialBackend === 'supabase' && supabaseReady) return loadSupabaseTwittComments(twittId, cursor)
   if (!db) return { items: [] as TwittComment[], cursor: null, hasMore: false }
   const constraints: QueryConstraint[] = [orderBy('createdAt', 'desc'), ...(cursor ? [where('createdAt', '<', Timestamp.fromDate(new Date(cursor)))] : []), limit(PAGE_SIZE)]
   const snapshot = await getDocs(query(collection(db, 'twitts', twittId, 'comments'), ...constraints))
   return {
-    items: snapshot.docs.map((item) => ({ id: item.id, uid: String(item.data().uid || ''), body: String(item.data().body || ''), createdAt: item.data().createdAt || null })),
+    items: snapshot.docs.map((item) => ({ id: item.id, uid: String(item.data().uid || ''), body: String(item.data().body || ''), likes: Number(item.data().likes || 0), createdAt: item.data().createdAt || null })),
     cursor: snapshot.docs[snapshot.docs.length - 1]?.data().createdAt?.toDate?.()?.toISOString?.() || null,
     hasMore: snapshot.size === PAGE_SIZE,
   }
