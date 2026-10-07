@@ -408,16 +408,10 @@ function StudyHome() {
 }
 
 type TwittPreview = { id: string; author: string; handle: string; avatar: string; body: string; likes: number; comments: number; views: string; age: string; createdAt: number; community: "jee" | "neet" | "study" | "public"; liked?: boolean };
-const starterTwitts: TwittPreview[] = [
-  { id: "t1", author: "Aarav Mehta", handle: "aarav.study", avatar: "AM", body: "Solved five rotation problems today. The trick was finally seeing the diagram before touching the formula.", likes: 84, comments: 12, views: "1.2k", age: "42 min", createdAt: Date.now() - 42 * 60_000, community: "jee" },
-  { id: "t2", author: "Mira Shah", handle: "mirashah", avatar: "MS", body: "A small reminder for every student: a slow, honest hour still counts. Keep going.", likes: 126, comments: 18, views: "2.8k", age: "2 hr", createdAt: Date.now() - 2 * 3_600_000, community: "neet" },
-  { id: "t3", author: "Co-Chat Community", handle: "cochat", avatar: "C", body: "What are you studying this evening? Drop one topic and find someone learning the same thing.", likes: 204, comments: 31, views: "4.6k", age: "5 hr", createdAt: Date.now() - 5 * 3_600_000, community: "public" },
-];
-
 function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "jee" | "neet" | "study" | "public" | "following" }) {
   const [tab, setTab] = useState<"recent" | "trending">("recent");
-  const [posts, setPosts] = useState(starterTwitts);
-  const [visible, setVisible] = useState(3);
+  const [posts, setPosts] = useState<TwittPreview[]>([]);
+  const [visible, setVisible] = useState(20);
   const [community, setCommunity] = useState<"all" | "jee" | "neet" | "study" | "public" | "following">(initialCommunity);
   const followKey = `cochat-following-${auth?.currentUser?.uid || "preview"}`;
   const [following, setFollowing] = useState<string[]>(() => { try { const value = JSON.parse(localStorage.getItem(followKey) || "null"); return Array.isArray(value) ? value.filter((id): id is string => ["jee", "neet", "study", "public"].includes(id)) : ["jee"]; } catch { return ["jee"]; } });
@@ -431,6 +425,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
   const [remoteCursor, setRemoteCursor] = useState<Awaited<ReturnType<typeof loadTwittPage>>["cursor"]>(null);
   const [remoteHasMore, setRemoteHasMore] = useState(false);
   const [remoteLoading, setRemoteLoading] = useState(false);
+  const [remoteError, setRemoteError] = useState("");
   const viewedPosts = useRef(new Set<string>());
   const [commentsByPost, setCommentsByPost] = useState<Record<string, Awaited<ReturnType<typeof loadTwittComments>>["items"]>>({});
   const [commentCursors, setCommentCursors] = useState<Record<string, Awaited<ReturnType<typeof loadTwittComments>>["cursor"]>>({});
@@ -443,16 +438,17 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
     if (!viewerUid || !firebaseReady) return undefined;
     let active = true;
     setRemoteLoading(true);
+    setRemoteError("");
     loadTwittPage("all").then((page) => {
       if (!active) return;
-      if (page.items.length) {
+      {
         const now = Date.now();
-        setPosts(page.items.map((item) => ({ id: item.id, author: item.uid === viewerUid ? "You" : "Co-Chat learner", handle: item.uid.slice(0, 10), avatar: item.uid === viewerUid ? "YO" : "CL", body: item.body, likes: item.likes, comments: item.comments, views: String(item.views), age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community })));
-        setVisible(3);
+        setPosts(page.items.map((item) => ({ id: item.id, author: item.uid === viewerUid ? "You" : "Co-Chat member", handle: item.uid.slice(0, 10), avatar: item.uid === viewerUid ? "YO" : "CM", body: item.body, likes: item.likes, comments: item.comments, views: String(item.views), age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community })));
+        setVisible(20);
       }
       setRemoteCursor(page.cursor);
       setRemoteHasMore(page.hasMore);
-    }).catch(() => undefined).finally(() => { if (active) setRemoteLoading(false); });
+    }).catch((error) => { if (active) setRemoteError(error instanceof Error ? error.message : "Could not load real Twitts."); }).finally(() => { if (active) setRemoteLoading(false); });
     return () => { active = false; };
   }, []);
   const list = useMemo(() => {
@@ -466,16 +462,14 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
       try {
         const page = await loadTwittPage("all", remoteCursor);
         const now = Date.now();
-        setPosts((current) => [...current, ...page.items.map((item) => ({ id: item.id, author: item.uid === auth?.currentUser?.uid ? "You" : "Co-Chat learner", handle: item.uid.slice(0, 10), avatar: item.uid === auth?.currentUser?.uid ? "YO" : "CL", body: item.body, likes: item.likes, comments: item.comments, views: String(item.views), age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community }))]);
+        setPosts((current) => [...current, ...page.items.map((item) => ({ id: item.id, author: item.uid === auth?.currentUser?.uid ? "You" : "Co-Chat member", handle: item.uid.slice(0, 10), avatar: item.uid === auth?.currentUser?.uid ? "YO" : "CM", body: item.body, likes: item.likes, comments: item.comments, views: String(item.views), age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community }))]);
         setRemoteCursor(page.cursor);
         setRemoteHasMore(page.hasMore);
         setVisible((current) => current + page.items.length);
       } finally { setRemoteLoading(false); }
       return;
     }
-    const next = Array.from({ length: 20 }, (_, index) => ({ id: `t${posts.length + index + 1}`, author: "Co-Chat learner", handle: `learner${posts.length + index + 1}`, avatar: "CL", body: "Sharing a little progress from today’s study session. What helped you focus?", likes: Math.max(4, 48 - index), comments: index % 8, views: `${120 + index * 7}`, age: `${index + 1} hr`, createdAt: Date.now() - (index + 1) * 3_600_000, community: (["jee", "neet", "study", "public"] as const)[index % 4] }));
-    setPosts((current) => [...current, ...next]);
-    setVisible((current) => current + 20);
+    setRemoteError("There are no more real Twitts to load.");
   };
   const filtered = list.filter((post) => community === "all" || (community === "following" ? following.includes(post.community) : post.community === community));
   useEffect(() => {
@@ -548,17 +542,18 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
     if (!draft.trim()) return;
     const body = draft.trim();
     setPublishError("");
-    const post: TwittPreview = { id: `local-${Date.now()}`, author: "You", handle: "your_profile", avatar: "YO", body, likes: 0, comments: 0, views: "0", age: "now", createdAt: Date.now(), community: draftCommunity };
     const uid = auth?.currentUser?.uid;
+    let id = `local-${Date.now()}`;
     if (uid && firebaseReady) {
-      try { await createRemoteTwitt(uid, body, draftCommunity); } catch { setPublishError("Shown here, but it could not sync online. Please try posting again."); }
+      try { id = await createRemoteTwitt(uid, body, draftCommunity); } catch (error) { setPublishError(error instanceof Error ? error.message : "Could not publish this Twitt. Please try again."); return; }
     }
+    const post: TwittPreview = { id, author: "You", handle: "your_profile", avatar: "YO", body, likes: 0, comments: 0, views: "0", age: "now", createdAt: Date.now(), community: draftCommunity };
     setPosts((current) => [post, ...current]);
     setDraft("");
     setComposerOpen(false);
     setCommunity(draftCommunity);
     setTab("recent");
-    setVisible(3);
+    setVisible(20);
   };
   return <div className="twitt-feed">
     <section className="discover-intro"><div><span className="kicker">CO-CHAT DISCOVER</span><h2>Ideas worth sharing.</h2><p>Find useful thoughts, study wins, and people learning beside you.</p></div><button className="primary compact" type="button" onClick={() => setComposerOpen(true)}>＋ Write a Twitt</button></section>
@@ -566,8 +561,10 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: "all" | "j
     <div className="community-filter" aria-label="Twitt community filter">{([["all", "All"], ["following", "Following"], ["jee", "JEE"], ["neet", "NEET"], ["study", "Study"], ["public", "Public"]] as const).map(([id, label]) => <button key={id} className={community === id ? "active" : ""} onClick={() => { setCommunity(id); setVisible(3); }}>{label}</button>)}</div>
     <div className="feed-tabs"><button className={tab === "recent" ? "active" : ""} onClick={() => setTab("recent")}>Recent <small>{communityLabel} · 24h</small></button><button className={tab === "trending" ? "active" : ""} onClick={() => setTab("trending")}>Trending <small>{communityLabel} · daily</small></button></div>
     <div className="follow-strip"><span>Following: {following.length ? following.map((id) => id.toUpperCase()).join(" · ") : "none"}</span><button onClick={() => setCommunity("following")}>View following</button></div>
+    {remoteError && <div className="notice twitt-sync-error">{remoteError}<button className="secondary compact" type="button" onClick={() => window.location.reload()}>Retry</button></div>}
+    {remoteLoading && !posts.length && <div className="empty-state">Loading real Twitts…</div>}
     <div className="twitt-list">{filtered.slice(0, visible).map((post) => <article className="twitt-card" key={post.id}><div className="twitt-head"><span className="avatar">{post.avatar}</span><div><strong>{post.author}</strong><small>@{post.handle} · {post.age} · {post.community.toUpperCase()}</small></div><div className="twitt-actions"><button className="icon" aria-label="Twitt options" aria-expanded={postMenu === post.id} onClick={() => setPostMenu(postMenu === post.id ? null : post.id)}>•••</button>{postMenu === post.id && <div className="twitt-menu"><button type="button" onClick={() => { setPosts((current) => current.filter((item) => item.id !== post.id)); setPostMenu(null); }}>Hide this Twitt</button><button type="button" onClick={() => setPostMenu(null)}>Cancel</button></div>}</div></div><p>{post.body}</p><div className="twitt-meta"><button className={post.liked ? "liked" : ""} onClick={() => handleLike(post)}>♡ {post.likes}</button><button onClick={() => void openComments(post.id)}>◌ {post.comments}</button><span>◉ {post.views}</span><button className={following.includes(post.community) ? "followed" : ""} onClick={() => setFollowing((current) => current.includes(post.community) ? current.filter((id) => id !== post.community) : [...current, post.community])}>{following.includes(post.community) ? "Following" : `Follow ${post.community.toUpperCase()}`}</button></div>{commenting === post.id && <>{commentsByPost[post.id]?.length ? <div className="twitt-comments">{commentsByPost[post.id].map((comment) => <div className="twitt-comment-item" key={comment.id}><strong>@{comment.uid.slice(0, 10)}</strong><span>{comment.body}</span></div>)}{commentMore[post.id] && <button className="load-comments" type="button" disabled={commentLoading === post.id} onClick={() => void loadMoreComments(post.id)}>{commentLoading === post.id ? "Loading…" : "Load more comments"}</button>}</div> : commentLoading === post.id ? <small className="comment-loading">Loading comments…</small> : null}<form className="twitt-comment" onSubmit={(event) => { event.preventDefault(); const body = commentDraft.trim(); if (!body) return; setPosts((current) => current.map((item) => item.id === post.id ? { ...item, comments: item.comments + 1 } : item)); const uid = auth?.currentUser?.uid; if (uid && firebaseReady && !post.id.startsWith("local-")) void createTwittComment(post.id, uid, body).catch(() => undefined); setCommentDraft(""); }}><input value={commentDraft} onChange={(event) => setCommentDraft(event.target.value.slice(0, 240))} placeholder="Add a thoughtful comment" autoFocus /><button className="primary compact" type="submit">Send</button></form></>}</article>)}</div>
-    {!filtered.length && <div className="empty-state">No Twitts in {communityLabel} yet.</div>}
+    {!remoteLoading && !remoteError && !filtered.length && <div className="empty-state">No Twitts in {communityLabel} yet. Be the first to share something useful.</div>}
     {(visible < filtered.length || remoteHasMore) && <button className="load-more" type="button" onClick={() => void loadMore()} disabled={remoteLoading}>{remoteLoading ? "Loading Twitts…" : "Load 20 more Twitts"}</button>}
     <p className="feed-note">Recent shows the newest posts in this community. Trending is refreshed periodically from eligible posts.</p>
   </div>;
