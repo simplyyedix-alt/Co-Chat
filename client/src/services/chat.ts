@@ -130,7 +130,7 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 
 export function watchConversations(uid: string, callback: (items: Conversation[]) => void): Unsubscribe | undefined {
   if (!db) return undefined
-  const q = query(collection(db, 'conversations'), where('memberIds', 'array-contains', uid))
+  const q = query(collection(db, 'conversations'), where('memberIds', 'array-contains', uid), limit(50))
   return onSnapshot(q, snapshot => {
     Promise.all(snapshot.docs.map(async item => {
       const data = item.data()
@@ -261,7 +261,7 @@ export async function getFriendship(uid: string, otherUid: string): Promise<'fri
 
 export async function listFriends(uid: string): Promise<UserProfile[]> {
   if (!db) return []
-  const snapshot = await getDocs(query(collection(db, 'friendships'), where('memberIds', 'array-contains', uid)))
+  const snapshot = await getDocs(query(collection(db, 'friendships'), where('memberIds', 'array-contains', uid), limit(100)))
   const ids = snapshot.docs.filter(item => item.data().status === 'accepted').flatMap(item => (item.data().memberIds || []).map(String)).filter(id => id !== uid)
   const profiles = await Promise.all([...new Set(ids)].map(id => getUserProfile(id)))
   return profiles.filter((profile): profile is UserProfile => Boolean(profile))
@@ -303,8 +303,8 @@ export function watchFriendRequests(uid: string, callback: (items: FriendRequest
   if (!db) return undefined
   let incoming: FriendRequest[] = []; let outgoing: FriendRequest[] = []
   const emit = () => callback([...incoming, ...outgoing])
-  const incomingUnsub = onSnapshot(query(collection(db, 'friendRequests'), where('toUid', '==', uid)), snapshot => { incoming = snapshot.docs.filter(item => item.data().status === 'pending').map(item => ({ id: item.id, fromUid: String(item.data().fromUid), toUid: String(item.data().toUid), status: 'pending', createdAt: asTimestamp(item.data().createdAt) })); emit() })
-  const outgoingUnsub = onSnapshot(query(collection(db, 'friendRequests'), where('fromUid', '==', uid)), snapshot => { outgoing = snapshot.docs.filter(item => item.data().status === 'pending').map(item => ({ id: item.id, fromUid: String(item.data().fromUid), toUid: String(item.data().toUid), status: 'pending', createdAt: asTimestamp(item.data().createdAt) })); emit() })
+  const incomingUnsub = onSnapshot(query(collection(db, 'friendRequests'), where('toUid', '==', uid), limit(50)), snapshot => { incoming = snapshot.docs.filter(item => item.data().status === 'pending').map(item => ({ id: item.id, fromUid: String(item.data().fromUid), toUid: String(item.data().toUid), status: 'pending', createdAt: asTimestamp(item.data().createdAt) })); emit() })
+  const outgoingUnsub = onSnapshot(query(collection(db, 'friendRequests'), where('fromUid', '==', uid), limit(50)), snapshot => { outgoing = snapshot.docs.filter(item => item.data().status === 'pending').map(item => ({ id: item.id, fromUid: String(item.data().fromUid), toUid: String(item.data().toUid), status: 'pending', createdAt: asTimestamp(item.data().createdAt) })); emit() })
   return () => { incomingUnsub(); outgoingUnsub() }
 }
 
