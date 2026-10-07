@@ -1,5 +1,6 @@
 import { getDownloadURL, ref, uploadBytes, deleteObject, getMetadata as getStorageMetadata } from 'firebase/storage'
 import { auth, storage } from '../firebase'
+import { supabaseAnonKey } from '../supabase'
 
 export type UploadMetadata = { ownerId: string; originalName: string; mimeType: string; sizeBytes: number; conversationId?: string }
 export type StorageObject = { provider: string; storageKey: string; url: string; originalName: string; mimeType: string; sizeBytes: number }
@@ -18,7 +19,7 @@ const mediaApiUrl = (import.meta.env.VITE_MEDIA_API_URL || '').replace(/\/$/, ''
 async function mediaHeaders() {
   const token = await auth?.currentUser?.getIdToken()
   if (!token) throw new Error('Please sign in before sharing media.')
-  return { Authorization: `Bearer ${token}` }
+  return { Authorization: `Bearer ${token}`, ...(supabaseAnonKey ? { apikey: supabaseAnonKey } : {}) }
 }
 
 function validateFile(file: File) {

@@ -5,6 +5,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
 
 export const supabaseReady = Boolean(supabaseUrl && supabaseAnonKey)
 export const supabaseProjectUrl = supabaseUrl
+export { supabaseAnonKey }
 export const socialBackend: 'firebase' | 'supabase' = import.meta.env.VITE_SOCIAL_BACKEND === 'supabase' && supabaseReady ? 'supabase' : 'firebase'
 export const supabase = supabaseReady
   ? createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } })
