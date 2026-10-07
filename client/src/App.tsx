@@ -1130,6 +1130,8 @@ export default function App() {
   const [incomingCallerPhoto, setIncomingCallerPhoto] = useState<string | undefined>();
   const [activeStatus, setActiveStatus] = useState(true);
   const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
+  const [blockedProfiles, setBlockedProfiles] = useState<UserProfile[]>([]);
+  const [showBlocklist, setShowBlocklist] = useState(false);
   const [presenceNow, setPresenceNow] = useState(() => Date.now());
   const liveUser = preview
     ? ({
@@ -1138,6 +1140,19 @@ export default function App() {
         email: "preview@cochat.local",
       } as User)
     : user;
+  useEffect(() => {
+    if (!blockedUsers.length) { setBlockedProfiles([]); return; }
+    Promise.all(blockedUsers.map((id) => getUserProfile(id))).then((items) => setBlockedProfiles(items.filter((item): item is UserProfile => Boolean(item))));
+  }, [blockedUsers]);
+  const unblockFromSettings = async (profile: UserProfile) => {
+    if (!liveUser || liveUser.uid === "preview") return;
+    try {
+      await unblockUser(liveUser.uid, profile.uid);
+      setBlockedUsers((current) => current.filter((id) => id !== profile.uid));
+    } catch {
+      setError("Could not unblock this person.");
+    }
+  };
   const resendVerification = async () => {
     if (!user || verificationCooldown > 0) return;
     try {
@@ -2459,6 +2474,10 @@ export default function App() {
               >
                 <span className={`settings-row-icon ${activeStatus ? "online" : ""}`}>●</span><span className="settings-option-copy"><b>Active status</b><small>Let friends see when you are available</small></span><span className={`settings-toggle ${activeStatus ? "on" : ""}`} aria-label={activeStatus ? "Active status on" : "Active status off"}><span /></span>
               </button>
+              <button type="button" onClick={() => setShowBlocklist((value) => !value)}>
+                <span className="settings-row-icon">⊘</span><span className="settings-option-copy"><b>Blocklist</b><small>Manage people you’ve blocked</small></span><span className="settings-value">{blockedUsers.length} blocked <span className="chevron">›</span></span>
+              </button>
+              {showBlocklist && <div className="settings-blocklist" role="region" aria-label="Blocked people">{blockedProfiles.length ? blockedProfiles.map((profile) => <div className="settings-blocked-person" key={profile.uid}><Avatar profile={profile} /><span><b>{profile.displayName}</b><small>@{profile.username}</small></span><button type="button" className="secondary compact" onClick={() => void unblockFromSettings(profile)}>Unblock</button></div>) : <p>No blocked people yet.</p>}</div>}
               <button type="button" className="settings-danger" onClick={logout}>
                 <span className="settings-row-icon">↪</span><span className="settings-option-copy"><b>Log out</b><small>Sign out of this device</small></span><span>›</span>
               </button>
@@ -2559,6 +2578,12 @@ function FriendZone({
     } catch {
       // Keep the profile open so the user can retry.
     }
+  };
+  const blockProfile = async (profile: UserProfile) => {
+    if (!window.confirm(`Block ${profile.displayName}? They will disappear from your people and friend lists.`)) return;
+    await blockUser(uid, profile.uid).catch(() => undefined);
+    setBlocked((current) => [...new Set([...current, profile.uid])]);
+    setFocused(null);
   };
   const shareProfile = async (profile: UserProfile) => {
     const message = `${profile.displayName} is on Co-Chat — @${profile.username}`;
@@ -2702,6 +2727,7 @@ function FriendZone({
               Share
             </button>
             {friends.some((item) => (item.fromUid === uid ? item.toUid : item.fromUid) === focused.uid) && <button className="secondary danger-outline" type="button" onClick={() => void unfriend(focused)}>Unfriend</button>}
+            <button className="secondary danger-outline" type="button" onClick={() => void blockProfile(focused)}>Block</button>
             <button
               className="secondary"
               type="button"
@@ -2807,6 +2833,17 @@ function SearchPanel({
       setFocused(null);
     } catch {
       setActionError("Could not remove this friend.");
+    }
+  };
+  const blockProfile = async (profile: UserProfile) => {
+    if (!window.confirm(`Block ${profile.displayName}? They will no longer appear in your people lists.`)) return;
+    try {
+      await blockUser(uid, profile.uid);
+      setRelationships((old) => ({ ...old, [profile.uid]: "blocked" }));
+      setResults((current) => current.filter((item) => item.uid !== profile.uid));
+      setFocused(null);
+    } catch {
+      setActionError("Could not block this person.");
     }
   };
   const shareProfile = async (profile: UserProfile) => {
@@ -2972,6 +3009,7 @@ function SearchPanel({
             )}
             <button className="secondary" type="button" onClick={() => void shareProfile(focused)}>Share</button>
             {relationships[focused.uid] === "friends" && <button className="secondary danger-outline" type="button" onClick={() => void unfriend(focused)}>Unfriend</button>}
+            <button className="secondary danger-outline" type="button" onClick={() => void blockProfile(focused)}>Block</button>
           </div>
         </div>
       )}
