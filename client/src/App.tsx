@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -450,7 +450,7 @@ function JourneySheet({ streak, league, weeklySeconds, totalSeconds, nextStreakM
   const milestones = [7, 30, 100, 365];
   const [showLeagueInfo, setShowLeagueInfo] = useState(false);
   const divisions = [["Bronze I", 0], ["Bronze II", 10], ["Bronze III", 20], ["Silver I", 35], ["Silver II", 50], ["Silver III", 70], ["Gold I", 90], ["Gold II", 120], ["Gold III", 160], ["Platinum I", 220], ["Platinum II", 300], ["Platinum III", 400], ["Legendary", 550]] as const;
-  const toggleInfo = (event: MouseEvent<HTMLButtonElement>) => {
+  const toggleInfo = (event: ReactMouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     setShowLeagueInfo((value) => !value);
   };
@@ -1358,7 +1358,7 @@ export default function App() {
   }, [liveUser?.uid, activeStatus]);
   useEffect(() => {
     if (!messageMenu && !forwardingMessage) return;
-    const closeMenus = (event: MouseEvent) => {
+    const closeMenus = (event: globalThis.MouseEvent) => {
       const target = event.target as HTMLElement;
       if (!target.closest(".message-menu,.forward-panel")) {
         setMessageMenu(null);
@@ -1402,7 +1402,7 @@ export default function App() {
   }, [selected?.id]);
   useEffect(() => {
     if (!conversationMenu) return;
-    const closeMenu = (event: MouseEvent) => {
+    const closeMenu = (event: globalThis.MouseEvent) => {
       const target = event.target as HTMLElement;
       if (!target.closest(".conversation-menu,.chat-row"))
         setConversationMenu(null);
@@ -1411,7 +1411,7 @@ export default function App() {
     return () => document.removeEventListener("click", closeMenu);
   }, [conversationMenu]);
   useEffect(() => {
-    const handleBlock = (event: MouseEvent) => {
+    const handleBlock = (event: globalThis.MouseEvent) => {
       const target = event.target as HTMLElement;
       if (
         !target.closest(".chat-profile-menu .danger-text") ||
@@ -1439,7 +1439,7 @@ export default function App() {
     return () => document.removeEventListener("click", handleBlock, true);
   }, [selected, liveUser?.uid]);
   useEffect(() => {
-    const handleViewProfile = (event: MouseEvent) => {
+    const handleViewProfile = (event: globalThis.MouseEvent) => {
       const target = event.target as HTMLElement;
       if (
         target.textContent?.trim() !== "View profile" ||
