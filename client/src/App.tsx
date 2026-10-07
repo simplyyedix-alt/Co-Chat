@@ -332,11 +332,11 @@ function StudyHome() {
   );
 }
 
-type TwittPreview = { id: string; author: string; handle: string; avatar: string; body: string; likes: number; comments: number; views: string; age: string; community: "jee" | "neet" | "study" | "public"; liked?: boolean };
+type TwittPreview = { id: string; author: string; handle: string; avatar: string; body: string; likes: number; comments: number; views: string; age: string; createdAt: number; community: "jee" | "neet" | "study" | "public"; liked?: boolean };
 const starterTwitts: TwittPreview[] = [
-  { id: "t1", author: "Aarav Mehta", handle: "aarav.study", avatar: "AM", body: "Solved five rotation problems today. The trick was finally seeing the diagram before touching the formula.", likes: 84, comments: 12, views: "1.2k", age: "42 min", community: "jee" },
-  { id: "t2", author: "Mira Shah", handle: "mirashah", avatar: "MS", body: "A small reminder for every student: a slow, honest hour still counts. Keep going.", likes: 126, comments: 18, views: "2.8k", age: "2 hr", community: "neet" },
-  { id: "t3", author: "Co-Chat Community", handle: "cochat", avatar: "C", body: "What are you studying this evening? Drop one topic and find someone learning the same thing.", likes: 204, comments: 31, views: "4.6k", age: "5 hr", community: "public" },
+  { id: "t1", author: "Aarav Mehta", handle: "aarav.study", avatar: "AM", body: "Solved five rotation problems today. The trick was finally seeing the diagram before touching the formula.", likes: 84, comments: 12, views: "1.2k", age: "42 min", createdAt: Date.now() - 42 * 60_000, community: "jee" },
+  { id: "t2", author: "Mira Shah", handle: "mirashah", avatar: "MS", body: "A small reminder for every student: a slow, honest hour still counts. Keep going.", likes: 126, comments: 18, views: "2.8k", age: "2 hr", createdAt: Date.now() - 2 * 3_600_000, community: "neet" },
+  { id: "t3", author: "Co-Chat Community", handle: "cochat", avatar: "C", body: "What are you studying this evening? Drop one topic and find someone learning the same thing.", likes: 204, comments: 31, views: "4.6k", age: "5 hr", createdAt: Date.now() - 5 * 3_600_000, community: "public" },
 ];
 
 function TwittFeed() {
@@ -351,9 +351,13 @@ function TwittFeed() {
   const [commenting, setCommenting] = useState<string | null>(null);
   const [commentDraft, setCommentDraft] = useState("");
   const [postMenu, setPostMenu] = useState<string | null>(null);
-  const list = useMemo(() => [...posts].sort((a, b) => tab === "recent" ? a.id.localeCompare(b.id) : b.likes - a.likes), [posts, tab]);
+  const list = useMemo(() => {
+    const now = Date.now();
+    const eligible = posts.filter((post) => now - post.createdAt <= (tab === "recent" ? 24 : 24 * 7) * 3_600_000);
+    return (tab === "recent" ? eligible.sort((a, b) => b.createdAt - a.createdAt) : eligible.sort((a, b) => b.likes - a.likes || b.comments - a.comments || b.createdAt - a.createdAt).slice(0, 10));
+  }, [posts, tab]);
   const loadMore = () => {
-    const next = Array.from({ length: 20 }, (_, index) => ({ id: `t${posts.length + index + 1}`, author: "Co-Chat learner", handle: `learner${posts.length + index + 1}`, avatar: "CL", body: "Sharing a little progress from today’s study session. What helped you focus?", likes: Math.max(4, 48 - index), comments: index % 8, views: `${120 + index * 7}`, age: `${index + 1} hr`, community: (["jee", "neet", "study", "public"] as const)[index % 4] }));
+    const next = Array.from({ length: 20 }, (_, index) => ({ id: `t${posts.length + index + 1}`, author: "Co-Chat learner", handle: `learner${posts.length + index + 1}`, avatar: "CL", body: "Sharing a little progress from today’s study session. What helped you focus?", likes: Math.max(4, 48 - index), comments: index % 8, views: `${120 + index * 7}`, age: `${index + 1} hr`, createdAt: Date.now() - (index + 1) * 3_600_000, community: (["jee", "neet", "study", "public"] as const)[index % 4] }));
     setPosts((current) => [...current, ...next]);
     setVisible((current) => current + 20);
   };
@@ -361,7 +365,7 @@ function TwittFeed() {
   const communityLabel = { all: "All public", jee: "JEE Prep", neet: "NEET Prep", study: "Study circles", public: "Public Co-Chat", following: "Following" }[community];
   const createTwitt = () => {
     if (!draft.trim()) return;
-    const post: TwittPreview = { id: `local-${Date.now()}`, author: "You", handle: "your_profile", avatar: "YO", body: draft.trim(), likes: 0, comments: 0, views: "0", age: "now", community: draftCommunity };
+    const post: TwittPreview = { id: `local-${Date.now()}`, author: "You", handle: "your_profile", avatar: "YO", body: draft.trim(), likes: 0, comments: 0, views: "0", age: "now", createdAt: Date.now(), community: draftCommunity };
     setPosts((current) => [post, ...current]);
     setDraft("");
     setComposerOpen(false);
