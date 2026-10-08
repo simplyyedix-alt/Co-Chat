@@ -6,7 +6,7 @@ import Avatar from './Avatar'
 type Props = { uid: string; otherUid: string; otherName: string; otherPhotoURL?: string; role?: 'caller' | 'callee'; onClose: () => void }
 
 export default function VoiceCall({ uid, otherUid, otherName, otherPhotoURL, role, onClose }: Props) {
-  const [status, setStatus] = useState('Connecting…'); const [muted, setMuted] = useState(false); const [error, setError] = useState(''); const [elapsed, setElapsed] = useState(0)
+  const [status, setStatus] = useState('Connecting…'); const [muted, setMuted] = useState(false); const [error, setError] = useState(''); const [elapsed, setElapsed] = useState(0); const [quality, setQuality] = useState('Checking audio…')
   const peerRef = useRef<RTCPeerConnection | null>(null); const streamRef = useRef<MediaStream | null>(null); const callRef = useRef<string | null>(null); const remoteAudio = useRef<HTMLAudioElement>(null)
   useEffect(() => {
     if (!db || !uid || !otherUid) { setError('Voice calling is unavailable.'); return }
@@ -47,6 +47,27 @@ export default function VoiceCall({ uid, otherUid, otherName, otherPhotoURL, rol
     start(); return () => { stopped = true; if (ringTimeout) window.clearTimeout(ringTimeout); if (disconnectTimer) window.clearTimeout(disconnectTimer); unsub?.(); streamRef.current?.getTracks().forEach(track => track.stop()); peerRef.current?.close() }
   }, [uid, otherUid, role])
   useEffect(() => { if (status !== 'Connected') return; const timer = window.setInterval(() => setElapsed(value => value + 1), 1000); return () => window.clearInterval(timer) }, [status])
+  useEffect(() => {
+    if (status !== 'Connected' || !peerRef.current) return
+    let stopped = false
+    const checkQuality = async () => {
+      const peer = peerRef.current
+      if (!peer || stopped) return
+      try {
+        const stats = await peer.getStats()
+        let received = 0; let lost = 0; let rtt = 0
+        stats.forEach((report) => {
+          if (report.type === 'inbound-rtp' && report.kind === 'audio') { received += Number(report.packetsReceived || 0); lost += Number(report.packetsLost || 0) }
+          if (report.type === 'candidate-pair' && report.state === 'succeeded') rtt = Math.max(rtt, Number(report.currentRoundTripTime || 0))
+        })
+        const loss = received + lost > 0 ? lost / (received + lost) : 0
+        setQuality(loss > 0.08 || rtt > 0.6 ? 'Weak connection' : loss > 0.03 || rtt > 0.25 ? 'Good connection' : 'Excellent connection')
+      } catch { setQuality('Connection active') }
+    }
+    void checkQuality()
+    const timer = window.setInterval(() => void checkQuality(), 4000)
+    return () => { stopped = true; window.clearInterval(timer) }
+  }, [status])
   const hangUp = async () => { if (db && callRef.current) await updateDoc(doc(db, 'calls', callRef.current), { status: 'ended', endedAt: serverTimestamp() }).catch(() => undefined); streamRef.current?.getTracks().forEach(track => track.stop()); peerRef.current?.close(); onClose() }
-  return <div className="call-backdrop"><section className="call-card"><Avatar name={otherName} photoURL={otherPhotoURL} className="avatar large" /><p className="eyebrow">VOICE CALL</p><h2>{otherName}</h2><p>{error || status}</p>{status === 'Connected' && <strong className="call-duration">{String(Math.floor(elapsed / 60)).padStart(2, '0')}:{String(elapsed % 60).padStart(2, '0')}</strong>}<audio ref={remoteAudio} autoPlay /><div className="call-actions"><button className="secondary" onClick={() => { streamRef.current?.getAudioTracks().forEach(track => { track.enabled = muted }); setMuted(value => !value) }}>{muted ? 'Unmute' : 'Mute'}</button><button className="danger" onClick={hangUp}>End call</button></div></section></div>
+  return <div className="call-backdrop"><section className="call-card"><Avatar name={otherName} photoURL={otherPhotoURL} className="avatar large" /><p className="eyebrow">VOICE CALL</p><h2>{otherName}</h2><p>{error || status}</p>{status === 'Connected' && <><strong className="call-duration">{String(Math.floor(elapsed / 60)).padStart(2, '0')}:{String(elapsed % 60).padStart(2, '0')}</strong><small className="call-quality" aria-live="polite">{quality}</small></>}<audio ref={remoteAudio} autoPlay /><div className="call-actions"><button className="secondary" onClick={() => { streamRef.current?.getAudioTracks().forEach(track => { track.enabled = muted }); setMuted(value => !value) }}>{muted ? 'Unmute' : 'Mute'}</button><button className="danger" onClick={hangUp}>End call</button></div></section></div>
 }
