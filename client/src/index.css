@@ -336,3 +336,8 @@ button:disabled{cursor:not-allowed;opacity:.55;transform:none!important}
 .settings-page .settings-option-copy small{font-size:9px}
 @media(max-width:560px){.settings-page{max-width:none}.settings-page .settings-profile-card{padding:13px!important}.settings-page .settings-profile-heading .avatar{width:48px;height:48px}.settings-page .settings-form-grid{grid-template-columns:1fr 1fr}.settings-page .settings-save-row{align-items:flex-start}.settings-page .settings-save-row .primary{width:auto}}
 @media(max-width:400px){.settings-page .settings-form-grid{grid-template-columns:1fr}}
+
+/* Keep the compact profile spacing, but let the settings page use the full
+   conversation canvas. The compact pass should reduce vertical height, not
+   squeeze the profile card horizontally. */
+.settings-page{width:100%;max-width:760px}
