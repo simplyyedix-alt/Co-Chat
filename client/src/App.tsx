@@ -1029,7 +1029,6 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
     setPublishing(false);
   };
   return <div className={`twitt-feed feed-type-${feedType}`}>
-    <p className="discovery-security-note" role="note"><span aria-hidden="true">🔒</span> Secure connection · your chats and study space stay private to your account.</p>
     <div className="discovery-mode-tabs" role="tablist" aria-label="Discovery mode"><button type="button" role="tab" aria-selected={feedType === "study"} className={feedType === "study" ? "active" : ""} onClick={() => { setFeedType("study"); setTab("recent"); setCommunity("all"); setVisible(20); }}>Study <small>Questions & answers</small></button><button type="button" role="tab" aria-selected={feedType === "social"} className={feedType === "social" ? "active" : ""} onClick={() => { setFeedType("social"); setTab("recent"); setCommunity("all"); setVisible(20); }}>Social <small>24-hour moments</small></button></div>
     <section className="discover-intro"><div><span className="kicker">CO-CHAT {feedType === "study" ? "STUDY" : "SOCIAL"}</span><h2>{feedType === "study" ? "Ask it. Solve it together." : "Share the moment."}</h2><p>{feedType === "study" ? "Post a doubt as text, photo, or PDF and get clear answers from your circle." : "Friends appear first. Once you see a post, it moves down so your feed stays fresh."}</p></div><button className="primary compact" type="button" onClick={() => setComposerOpen(true)}>＋ {feedType === "study" ? "Ask a doubt" : "Share a moment"}</button></section>
     {composerOpen && <section className="twitt-composer"><div className="composer-heading"><strong>{feedType === "study" ? "Ask your study community" : "Share with friends"}</strong><button className="icon" type="button" disabled={publishing} onClick={() => setComposerOpen(false)}>×</button></div><textarea disabled={publishing} value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 280))} placeholder={feedType === "study" ? "Describe your doubt or study win…" : "What is happening today? (expires in 24 hours)"} autoFocus /><label className="twitt-media-picker">📎 Add photo/PDF (max 5 MB)<input disabled={publishing} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => setDraftFile(event.target.files?.[0] || null)} /></label>{draftFile && <small className="twitt-file-name">{draftFile.name}</small>}{publishError && <p className="twitt-sync-error">{publishError}</p>}<div className="composer-footer">{feedType === "study" ? <div className="tag-input"><span>#</span><input disabled={publishing} list="twitt-tag-suggestions" value={draftCommunity} onChange={(event) => setDraftCommunity(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} placeholder="Add a study tag (required)" /><datalist id="twitt-tag-suggestions">{tagSuggestions.map((tag) => <option value={tag} key={tag} />)}</datalist></div> : <span className="social-expiry-note">Visible for 24 hours</span>}<span>{draft.length}/280</span><button className="primary compact" type="button" disabled={!draft.trim() || (feedType === "study" && !draftCommunity) || publishing} onClick={() => void createTwitt()}>{publishing ? "◌ Uploading…" : "Post"}</button></div></section>}
@@ -1133,6 +1132,8 @@ export default function App() {
   const notificationConversationSeen = useRef<Record<string, number>>({});
   const [selected, setSelected] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [conversationOpening, setConversationOpening] = useState(false);
+  const conversationOpeningAt = useRef(0);
   const [text, setText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<ChatAttachment | null>(null);
@@ -1363,9 +1364,24 @@ export default function App() {
               []
           : [],
       );
-      return;
+      const readyTimer = window.setTimeout(
+        () => setConversationOpening(false),
+        Math.max(0, 650 - (Date.now() - conversationOpeningAt.current)),
+      );
+      return () => window.clearTimeout(readyTimer);
     }
-    return watchMessages(selected.id, liveUser.uid, setMessages);
+    const fallbackTimer = window.setTimeout(() => setConversationOpening(false), 3000);
+    const stopWatching = watchMessages(selected.id, liveUser.uid, (items) => {
+      setMessages(items);
+      window.setTimeout(
+        () => setConversationOpening(false),
+        Math.max(0, 650 - (Date.now() - conversationOpeningAt.current)),
+      );
+    });
+    return () => {
+      window.clearTimeout(fallbackTimer);
+      stopWatching?.();
+    };
   }, [selected?.id, liveUser?.uid]);
   useEffect(() => {
     if (!liveUser || !messages.length) return;
@@ -1676,6 +1692,12 @@ export default function App() {
       );
     }
   };
+  const openConversation = (conversation: Conversation) => {
+    conversationOpeningAt.current = Date.now();
+    setConversationOpening(true);
+    setMessages([]);
+    setSelected(conversation);
+  };
   const startConversation = async (profile: UserProfile) => {
     try {
       const id = await createConversation(liveUser.uid, profile);
@@ -1683,7 +1705,7 @@ export default function App() {
       setShowNew(false);
       setSearch("");
       setPage("chats");
-      setSelected({
+      openConversation({
         id,
         name: profile.displayName,
         avatar: initials(profile.displayName),
@@ -1996,7 +2018,18 @@ export default function App() {
             onClose={() => { setShowVoiceCall(false); setVoiceTarget(null); }}
           />
         )}
-        <section className="messages">
+        <div className="conversation-security" role="status">
+          <span aria-hidden="true">🔒</span>
+          <span><strong>End-to-end encryption</strong> is being set up for Co-Chat conversations.</span>
+        </div>
+        {conversationOpening ? (
+          <section className="conversation-opening" aria-live="polite" aria-label={`Opening conversation with ${selected.name}`}>
+            <span className="conversation-opening-lock" aria-hidden="true">🔒</span>
+            <div className="conversation-opening-spinner" aria-hidden="true" />
+            <strong>Opening your private conversation</strong>
+            <small>Securing the connection and loading messages…</small>
+          </section>
+        ) : <section className="messages">
           {messages.map((item) => {
             const mine =
               item.senderId === liveUser.uid || item.senderId === "me";
@@ -2067,7 +2100,7 @@ export default function App() {
               </div>
             );
           })}
-        </section>
+        </section>}
         {messageMenu && (
           <div className="message-menu">
             <button
@@ -2317,7 +2350,7 @@ export default function App() {
                       type="button"
                       className="online-person"
                       key={item.id}
-                      onClick={() => profile ? void startConversation(profile) : setSelected(item)}
+                      onClick={() => profile ? void startConversation(profile) : openConversation(item)}
                     >
                       <Avatar name={name} profile={profile} active />
                       <span>{name.split(" ")[0]}</span>
@@ -2352,7 +2385,7 @@ export default function App() {
                       suppressConversationClick.current = false;
                       return;
                     }
-                    setSelected(item);
+                    openConversation(item);
                   }}
                   onContextMenu={(event) => {
                     event.preventDefault();
@@ -2412,7 +2445,7 @@ export default function App() {
                   className="secondary"
                   type="button"
                   onClick={() => {
-                    setSelected(conversationMenu);
+                    openConversation(conversationMenu);
                     setConversationMenu(null);
                   }}
                 >
@@ -2472,7 +2505,7 @@ export default function App() {
                 onCreated={(conversation) => {
                   setShowGroup(false);
                   setConversations((current) => [conversation, ...current.filter((item) => item.id !== conversation.id)]);
-                  setSelected(conversation);
+                  openConversation(conversation);
                 }}
                 onClose={() => setShowGroup(false)}
               />
