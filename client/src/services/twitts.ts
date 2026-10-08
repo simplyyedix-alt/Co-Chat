@@ -49,6 +49,19 @@ export type TwittComment = { id: string; uid: string; body: string; createdAt: D
 
 const PAGE_SIZE = 20
 
+// Keep the Firebase fallback aligned with the server-side social safety gate.
+// This is a text/name check only; image moderation needs a dedicated vision
+// moderation service before attachments can be considered fully screened.
+function containsRestrictedContent(value: string) {
+  return /\b(?:porn|pornography|xxx|nsfw|nude|nudity|naked|onlyfans|blowjob|handjob|deepfake|genitals|sexual|sexually|erotic|boobs|breasts|pussy|dickpic|cumshot|fetish|escort)\b/i.test(value)
+}
+
+function assertSafeTwittContent(text: string, attachment?: TwittAttachment | null) {
+  if (containsRestrictedContent(`${text} ${attachment?.name || ''} ${attachment?.url || ''}`)) {
+    throw new Error('Adult or explicit content is not allowed.')
+  }
+}
+
 function fromDoc(item: QueryDocumentSnapshot<DocumentData>): TwittRecord {
   const data = item.data()
   return {
@@ -91,6 +104,7 @@ export async function createTwitt(uid: string, body: string, community: TwittCom
   if (!db) throw new Error('Firebase is not configured.')
   const text = body.trim()
   if (!text || text.length > 280) throw new Error('Twitt must be between 1 and 280 characters.')
+  assertSafeTwittContent(text, attachment)
   const ref = await addDoc(collection(db, 'twitts'), { uid, body: text, community, feedType, ...(feedType === 'social' ? { expiresAt: new Date(Date.now() + 24 * 3_600_000) } : {}), likes: 0, comments: 0, views: 0, ...(attachment ? { attachment } : {}), createdAt: serverTimestamp() })
   return ref.id
 }
@@ -140,6 +154,7 @@ export async function createTwittComment(twittId: string, uid: string, body: str
   if (!db) throw new Error('Firebase is not configured.')
   const text = body.trim()
   if (!text || text.length > 240) throw new Error('Comment must be between 1 and 240 characters.')
+  assertSafeTwittContent(text, attachment)
   const twittRef = doc(db, 'twitts', twittId)
   const commentRef = doc(collection(twittRef, 'comments'))
   await runTransaction(db, async (transaction) => {
@@ -153,12 +168,14 @@ export async function createTwittComment(twittId: string, uid: string, body: str
 }
 
 export async function attachTwittMedia(twittId: string, uid: string, attachment: TwittAttachment) {
+  assertSafeTwittContent('', attachment)
   if (socialBackend === 'supabase' && supabaseReady) return attachSupabaseTwittMedia(twittId, uid, attachment)
   if (!db) throw new Error('Firebase is not configured.')
   await updateDoc(doc(db, 'twitts', twittId), { attachment })
 }
 
 export async function attachTwittCommentMedia(twittId: string, commentId: string, uid: string, attachment: TwittAttachment) {
+  assertSafeTwittContent('', attachment)
   if (socialBackend === 'supabase' && supabaseReady) return attachSupabaseTwittCommentMedia(twittId, commentId, uid, attachment)
   if (!db) throw new Error('Firebase is not configured.')
   await updateDoc(doc(db, 'twitts', twittId, 'comments', commentId), { attachment })

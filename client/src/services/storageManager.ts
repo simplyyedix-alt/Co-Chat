@@ -35,6 +35,27 @@ function validateFile(file: File, metadata?: UploadMetadata) {
   if (file.size > maxFileSize) throw new Error('Files must be smaller than 50 MB.')
 }
 
+async function optimizeTwittImage(file: File): Promise<File> {
+  if (!file.type.startsWith('image/') || file.type === 'image/gif' || typeof createImageBitmap !== 'function') return file
+  try {
+    const bitmap = await createImageBitmap(file)
+    const maxDimension = 1920
+    const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+    const context = canvas.getContext('2d')
+    if (!context) { bitmap.close(); return file }
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    bitmap.close()
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.82))
+    if (!blob || blob.size >= file.size) return file
+    return new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg', lastModified: file.lastModified })
+  } catch {
+    return file
+  }
+}
+
 const firebaseProvider: StorageProvider = {
   async upload(file, metadata) {
     if (!storage) throw new Error('Media storage is not configured.')
@@ -82,7 +103,11 @@ const managedProvider: StorageProvider = {
 // The provider is intentionally selected in one place. A secure B2 provider can replace this
 // without changing chat, Twitt, or profile code; B2 credentials must never ship to the browser.
 export const StorageManager = {
-  async upload(file: File, metadata: UploadMetadata) { validateFile(file, metadata); return mediaApiUrl ? managedProvider.upload(file, metadata) : firebaseProvider.upload(file, metadata) },
+  async upload(file: File, metadata: UploadMetadata) {
+    validateFile(file, metadata)
+    const prepared = metadata.scope === 'twitt' ? await optimizeTwittImage(file) : file
+    return mediaApiUrl ? managedProvider.upload(prepared, { ...metadata, mimeType: prepared.type, sizeBytes: prepared.size }) : firebaseProvider.upload(prepared, { ...metadata, mimeType: prepared.type, sizeBytes: prepared.size })
+  },
   download: (storageKey: string) => mediaApiUrl ? managedProvider.download(storageKey) : firebaseProvider.download(storageKey),
   delete: (storageKey: string) => mediaApiUrl ? managedProvider.delete(storageKey) : firebaseProvider.delete(storageKey),
   getMetadata: (storageKey: string) => mediaApiUrl ? managedProvider.getMetadata(storageKey) : firebaseProvider.getMetadata(storageKey),
