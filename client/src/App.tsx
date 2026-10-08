@@ -3013,6 +3013,7 @@ function GroupCreator({
   const [members, setMembers] = useState<UserProfile[]>([]);
   const [step, setStep] = useState<1 | 2>(1);
   const [error, setError] = useState("");
+  const [creating, setCreating] = useState(false);
   useEffect(() => {
     listFriends(uid)
       .then(setFriendPool)
@@ -3035,6 +3036,9 @@ function GroupCreator({
       setError("Choose at least two friends first.");
       return;
     }
+    if (creating) return;
+    setCreating(true);
+    setError("");
     try {
       const id = await createGroup(uid, name, members);
       onCreated({
@@ -3047,7 +3051,12 @@ function GroupCreator({
         lastMessage: "",
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not create group.");
+      const message = e instanceof Error ? e.message : "Could not create group.";
+      setError(message.toLowerCase().includes("unsupported action")
+        ? "The chat service needs its latest deployment. Deploy the updated chat-api function, then try again."
+        : message);
+    } finally {
+      setCreating(false);
     }
   };
   return (
@@ -3129,11 +3138,8 @@ function GroupCreator({
         ) : (
           <>
             <div className="group-preview">
-              <div className="avatar large">{initials(name || "Group")}</div>
-              <strong>{members.length + 1} members</strong>
-              <small>
-                {members.map((member) => member.displayName).join(", ")}
-              </small>
+              <div className="group-avatar-stack"><div className="avatar large">{initials(name || "Group")}</div>{members.slice(0, 3).map((member, index) => <Avatar key={member.uid} profile={member} className={`group-stack-avatar stack-${index}`} />)}</div>
+              <div><strong>{name.trim() || "New group"}</strong><small>{members.length + 1} members · You are the admin</small><span>{members.map((member) => member.displayName).join(" · ")}</span></div>
             </div>
             <label className="field-label">
               Group name
@@ -3158,8 +3164,9 @@ function GroupCreator({
                 className="primary"
                 type="button"
                 onClick={() => void create()}
+                disabled={creating}
               >
-                Create group
+                {creating ? "Creating…" : "Create group"}
               </button>
             </div>
           </>
