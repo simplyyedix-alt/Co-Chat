@@ -10,6 +10,7 @@ let nativeListenersReady = false
 let nativeActionsReady = false
 let localNotificationId = 10_000
 let nativeRegistrationPromise: Promise<boolean> | null = null
+const recentNotificationKeys = new Map<string, number>()
 type NotificationAction = { action: string; tag?: string; data?: Record<string, unknown> }
 type ActionButton = { action: string; title: string }
 type NativeNotificationData = Record<string, unknown>
@@ -46,6 +47,35 @@ async function ensureNativeListeners() {
   await PushNotifications.addListener('pushNotificationActionPerformed', ({ actionId, notification }) => {
     emitAction({ action: actionId === 'tap' ? 'open' : actionId, tag: notification.tag, data: asData(notification.data) })
   })
+  await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+    // Capacitor does not display remote FCM notifications while the WebView
+    // is in the foreground. Bridge that event to the same local notification
+    // path used by messages and calls so foreground and background behavior
+    // match.
+    const data = asData(notification.data)
+    const type = typeof data.type === 'string' ? data.type : ''
+    const title = notification.title || (type === 'message' ? 'New Co-Chat message' : 'Co-Chat')
+    const body = notification.body || ''
+    if (!body) return
+    if (type === 'message') {
+      const key = typeof data.messageId === 'string' && data.messageId
+        ? `${data.conversationId || title}:${data.messageAt || data.messageId}`
+        : `${data.conversationId || title}:${body}`
+      notifyIncomingMessage(title, body, key)
+      return
+    }
+    const tag = typeof data.messageId === 'string'
+      ? `cochat-message-${data.messageId}`
+      : typeof data.callId === 'string'
+        ? `cochat-call-${data.callId}`
+        : `cochat-push-${Date.now()}`
+    if (!displayOnce(`${type}:${tag}:${body}`)) return
+    if (type === 'call') {
+      void showNativeNotification(title, body, { tag, data, actionTypeId: 'cochat-call-actions', ongoing: true })
+    } else {
+      void showNativeNotification(title, body, { tag, data })
+    }
+  })
   await LocalNotifications.addListener('localNotificationActionPerformed', ({ actionId, notification }) => {
     const data = asData(notification.extra)
     emitAction({ action: actionId === 'tap' ? 'open' : actionId, tag: typeof data.tag === 'string' ? data.tag : undefined, data })
@@ -81,8 +111,16 @@ export function listenNotificationActions(listener: (event: NotificationAction) 
   void ensureNativeListeners()
   return () => { actionListeners.delete(listener); navigator.serviceWorker?.removeEventListener('message', webHandler) }
 }
-export function notifyIncomingMessage(title: string, body: string) {
-  if (isNativeAndroid()) { void showNativeNotification(title, body, { tag: 'cochat-message', data: { type: 'message' } }); return }
+function displayOnce(key: string) {
+  const now = Date.now()
+  for (const [existing, at] of recentNotificationKeys) if (now - at > 45_000) recentNotificationKeys.delete(existing)
+  if (recentNotificationKeys.has(key)) return false
+  recentNotificationKeys.set(key, now)
+  return true
+}
+export function notifyIncomingMessage(title: string, body: string, dedupeKey = `${title}:${body}`) {
+  if (!displayOnce(dedupeKey)) return
+  if (isNativeAndroid()) { void showNativeNotification(title, body, { tag: `cochat-message-${dedupeKey}`, data: { type: 'message' } }); return }
   void showWebNotification(title, { body, icon: assetUrl('icon-192.png'), tag: 'cochat-message' })
 }
 export function notifyIncomingCall(name: string, callId: string, group = false) {
@@ -124,7 +162,13 @@ export async function registerFcmNotifications(enabled = true) {
       void PushNotifications.register().catch(() => settle(false))
       window.setTimeout(() => settle(false), 15_000)
     })
-    return nativeRegistrationPromise
+    const registration = nativeRegistrationPromise
+    return registration.then((registered) => {
+      // A transient WebView/plugin failure should be retryable when the user
+      // toggles notifications back on or reopens the app.
+      if (!registered) nativeRegistrationPromise = null
+      return registered
+    })
   }
   const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY || ''
   if (!vapidKey || typeof Notification === 'undefined' || !(await isSupported()) || Notification.permission === 'denied') return false

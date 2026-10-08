@@ -167,6 +167,7 @@ const relativeMessageTime = (value?: { toMillis?: () => number } | null) => {
 
 function AuthScreen() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const isNativeAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -251,7 +252,7 @@ function AuthScreen() {
     }
   };
   return (
-    <main className="auth auth-shell">
+    <main className={`auth auth-shell${isNativeAndroid ? " native-android" : ""}`}>
       <section className="auth-showcase" aria-label="Co-Chat introduction">
         <div className="auth-brand"><span className="brand-mark">C</span><span>Co-Chat</span></div>
         <div className="auth-showcase-copy">
@@ -1338,8 +1339,16 @@ export default function App() {
   }, [liveUser?.uid]);
   useEffect(() => {
     if (!liveUser || liveUser.uid === "preview") return;
-    void registerFcmNotifications(notificationsEnabled).catch(() => undefined);
-  }, [liveUser?.uid, notificationsEnabled]);
+    void registerFcmNotifications(notificationsEnabled)
+      .then((registered) => {
+        if (isNativeAndroid && notificationsEnabled && !registered) {
+          setError("Notifications are off for Co‑Chat. Allow notifications in Android Settings to receive messages and calls.");
+        }
+      })
+      .catch(() => {
+        if (isNativeAndroid && notificationsEnabled) setError("Could not register notifications on this device. Check Android notification permissions.");
+      });
+  }, [liveUser?.uid, notificationsEnabled, isNativeAndroid]);
   useEffect(() => {
     if (!liveUser || liveUser.uid === "preview") return;
     const uid = liveUser.uid;
@@ -1355,7 +1364,7 @@ export default function App() {
         const previous = seen[item.id];
         seen[item.id] = messageAt;
         if (!previous || messageAt <= previous || item.lastSenderId === uid || !item.lastMessage) continue;
-        notifyIncomingMessage(item.name || "New Co-Chat message", item.lastMessage);
+        notifyIncomingMessage(item.name || "New Co-Chat message", item.lastMessage, `${item.id}:${messageAt}`);
       }
     });
     return () => { window.clearTimeout(loadingTimeout); stopWatching?.(); };

@@ -56,7 +56,7 @@ async function member(conversationId: string, uid: string) {
   return Array.isArray(rows) && rows.length > 0
 }
 
-async function notifyMessageRecipients(targetUids: string[], senderName: string, message: string, conversationId: string) {
+async function notifyMessageRecipients(targetUids: string[], senderName: string, message: string, conversationId: string, messageId: string, messageAt: string) {
   const base = Deno.env.get('SUPABASE_URL') || ''
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
   const secret = Deno.env.get('INTERNAL_NOTIFICATIONS_SECRET') || ''
@@ -64,7 +64,7 @@ async function notifyMessageRecipients(targetUids: string[], senderName: string,
   await fetch(`${base}/functions/v1/fcm-notifications`, {
     method: 'POST',
     headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json', 'x-internal-notifications-secret': secret },
-    body: JSON.stringify({ targetUids, title: senderName || 'New Co-Chat message', body: message || '📎 Attachment', data: { type: 'message', conversationId } }),
+    body: JSON.stringify({ targetUids, title: senderName || 'New Co-Chat message', body: message || '📎 Attachment', data: { type: 'message', conversationId, messageId, messageAt } }),
   })
 }
 
@@ -243,7 +243,13 @@ Deno.serve(async (request) => {
       await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: 'PATCH', body: JSON.stringify({ last_message: text || '📎 Attachment', last_sender_id: user.uid, last_message_at: new Date().toISOString() }) })
       void broadcastChatMessage(conversationId, { messageId: rows?.[0]?.id || null }).catch(() => undefined)
       const targets = (members || []).map((item: Record<string, unknown>) => String(item.uid || '')).filter((uid: string) => uid && uid !== user.uid)
-      void notifyMessageRecipients(targets, user.displayName, text || '📎 Attachment', conversationId).catch(() => undefined)
+      // Finish the push attempt before returning. Fire-and-forget fetches can
+      // be cancelled when an Edge Function tears down after its response,
+      // which previously caused intermittent missing message notifications.
+      await Promise.race([
+        notifyMessageRecipients(targets, user.displayName, text || '📎 Attachment', conversationId, String(rows?.[0]?.id || ''), String(rows?.[0]?.created_at || '')).catch(() => undefined),
+        new Promise<void>((resolve) => setTimeout(resolve, 2500)),
+      ])
       return response({ message: rows?.[0] || null })
     }
     if (action === 'delete-conversation') {
