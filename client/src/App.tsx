@@ -1593,12 +1593,17 @@ export default function App() {
   }), [incomingCall, liveUser, incomingCallerName]);
   if (loading)
     return (
-      <main className="auth">
-        <section className="auth-card">
-          <div className="brand-mark">C</div>
-          <h1>Co Chat</h1>
-          <p>Getting your space ready…</p>
-          <div className="loading-stack" aria-label="Loading Co-Chat"><span/><span/><span/></div>
+      <main className="app-loading-screen">
+        <div className="app-loading-glow app-loading-glow-one" />
+        <div className="app-loading-glow app-loading-glow-two" />
+        <section className="app-loading-card" aria-label="Loading Co-Chat">
+          <div className="app-loading-brand"><span className="brand-mark">C</span><strong>Co-Chat</strong></div>
+          <div className="app-loading-orbit"><span className="app-loading-spinner" /><b>✦</b></div>
+          <p className="app-loading-kicker">YOUR SPACE IS SYNCING</p>
+          <h1>Connect to your space</h1>
+          <p className="app-loading-copy">Loading your conversations, study journey, and communities.</p>
+          <div className="app-loading-progress"><span /></div>
+          <small>Securely preparing your Co-Chat experience</small>
         </section>
       </main>
     );
