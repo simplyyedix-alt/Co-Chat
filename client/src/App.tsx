@@ -2757,21 +2757,10 @@ function SearchPanel({
   embedded?: boolean;
 }) {
   const [term, setTerm] = useState("");
+  // Search history is intentionally disabled; searches are session-only.
+  const history: Array<{ uid: string; displayName: string; username: string }> = [];
+  const setHistory = (_value: Array<{ uid: string; displayName: string; username: string }>) => undefined;
   const activeTerm = externalTerm ?? term;
-  const [history, setHistory] = useState<
-    Array<{ uid: string; displayName: string; username: string }>
-  >(() => {
-    try {
-      const stored = JSON.parse(
-        localStorage.getItem(`cochat-search-history-${uid}`) || "[]",
-      );
-      return Array.isArray(stored)
-        ? stored.filter((item) => item && typeof item === "object" && item.uid)
-        : [];
-    } catch {
-      return [];
-    }
-  });
   const [results, setResults] = useState<UserProfile[]>([]);
   const [relationships, setRelationships] = useState<Record<string, string>>(
     {},
@@ -2797,19 +2786,7 @@ function SearchPanel({
       ),
     ).then((items) => setRelationships(Object.fromEntries(items)));
   }, [results, uid]);
-  const remember = (profile: UserProfile) => {
-    const next = [
-      {
-        uid: profile.uid,
-        displayName: profile.displayName,
-        username: profile.username,
-      },
-      ...history.filter((item) => item.uid !== profile.uid),
-    ].slice(0, 8);
-    setHistory(next);
-    localStorage.setItem(`cochat-search-history-${uid}`, JSON.stringify(next));
-    setProfileExpanded(false);
-  };
+  const remember = (_profile?: UserProfile) => setProfileExpanded(false);
   const action = async (profile: UserProfile) => {
     setActionError("");
     const relationship = relationships[profile.uid] || "none";
