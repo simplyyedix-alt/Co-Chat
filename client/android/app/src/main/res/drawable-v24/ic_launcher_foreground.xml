@@ -9,5 +9,4 @@
         android:strokeColor="#FFFFFF"
         android:strokeWidth="8"
         android:strokeLineCap="round" />
-    <path android:fillColor="#FFFFFF" android:pathData="M81,37a4,4 0,1 1,-8,0a4,4 0,1 1,8,0M81,71a4,4 0,1 1,-8,0a4,4 0,1 1,8,0" />
 </vector>

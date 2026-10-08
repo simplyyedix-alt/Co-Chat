@@ -131,7 +131,10 @@ export function watchMessages(conversationId: string, uid: string, callback: (it
     void listMessages(conversationId, uid).then(items => { if (active) callback(items) }).catch(() => undefined).finally(() => { inFlight = false })
   }
   refresh()
-  const timer = window.setInterval(refresh, 15000)
+  // Realtime broadcasts deliver messages immediately. This is only a safety
+  // refresh for a missed broadcast, so keep it slow to avoid burning edge
+  // function/database quota while the chat remains open.
+  const timer = window.setInterval(refresh, 30000)
   const channel = supabase?.channel(`chat-messages:${conversationId}`)
     .on('broadcast', { event: 'message' }, refresh)
     .subscribe()

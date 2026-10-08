@@ -1152,6 +1152,9 @@ export default function App() {
     if (dx > 72 && Math.abs(dx) > Math.abs(dy) * 1.35) setSelected(null);
   };
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const messagesViewportRef = useRef<HTMLElement | null>(null);
+  const stickMessagesToBottom = useRef(true);
+  const previousConversationId = useRef<string | null>(null);
   const [conversationOpening, setConversationOpening] = useState(false);
   const conversationOpeningAt = useRef(0);
   const [encryptionNoticeVisible, setEncryptionNoticeVisible] = useState(true);
@@ -1459,22 +1462,27 @@ export default function App() {
       .catch(() => setIncomingCallerName("Incoming caller"));
   }, [incomingCall?.callerId]);
   useEffect(() => {
+    if (selected?.id !== previousConversationId.current) {
+      previousConversationId.current = selected?.id || null;
+      stickMessagesToBottom.current = true;
+    }
     const frame = window.requestAnimationFrame(() => {
-      const container = document.querySelector(".messages");
+      const container = messagesViewportRef.current;
       if (!container) return;
+      if (!stickMessagesToBottom.current) return;
       container.scrollTop = container.scrollHeight;
       window.setTimeout(() => {
-        container.scrollTop = container.scrollHeight;
+        if (stickMessagesToBottom.current) container.scrollTop = container.scrollHeight;
       }, 50);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [messages, selected?.id]);
+  }, [messages, selected?.id, conversationOpening]);
   useEffect(() => {
     if (!liveUser || liveUser.uid === "preview") return;
     touchPresence(liveUser.uid, activeStatus).catch(() => undefined);
     const timer = window.setInterval(
       () => touchPresence(liveUser.uid, activeStatus).catch(() => undefined),
-      30000,
+      60000,
     );
     return () => window.clearInterval(timer);
   }, [liveUser?.uid, activeStatus]);
@@ -1898,7 +1906,7 @@ export default function App() {
             title={selected.type === "group" ? "Open group settings" : undefined}
             onClick={selected.type === "group" ? () => setShowChatProfile(true) : undefined}
           >
-            <Avatar name={selected.name} photoURL={selected.photoURL} />
+            <Avatar name={selected.name} photoURL={selected.photoURL} active={selectedIsActive} />
           </button>
           <div>
             <strong>{selected.name}</strong>
@@ -1906,7 +1914,8 @@ export default function App() {
               {selected.type === "group"
                 ? (activeGroupCount > 0 && <span className="group-active-summary"><span className="presence-dot" />{activeGroupCount} Active now</span>)
                 : selected.id.startsWith("preview-") ? "Preview conversation" : (
-                <span className={selected.active ? "active-presence" : ""}>
+                <span className={selectedIsActive ? "active-presence" : ""}>
+                  {selectedIsActive && <span className="presence-dot" aria-hidden="true" />}
                   {presenceLabel(selectedIsActive, selectedLastSeen)}
                 </span>
               )}
@@ -2084,7 +2093,10 @@ export default function App() {
             <strong>Opening your private conversation</strong>
             <small>Securing the connection and loading messages…</small>
           </section>
-        ) : <section className="messages">
+        ) : <section className="messages" ref={messagesViewportRef} onScroll={(event) => {
+          const container = event.currentTarget;
+          stickMessagesToBottom.current = container.scrollHeight - container.scrollTop - container.clientHeight < 140;
+        }}>
           {!messages.length && <div className="conversation-empty" role="status"><span className="conversation-empty-icon">✦</span><strong>No messages yet</strong><small>Send a message to start the conversation.</small></div>}
           {messages.map((item) => {
             const mine =

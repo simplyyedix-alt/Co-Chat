@@ -30,7 +30,7 @@
 .profile-actions{display:grid;gap:8px}.profile-actions .secondary{width:100%}.danger-text{color:#c14d62}
 .bell-wrap{position:relative;display:inline-grid}.notification-dot{position:absolute;right:-2px;top:-2px;width:9px;height:9px;border-radius:50%;background:#e54864;border:2px solid currentColor}.group-active-summary{display:inline-flex;align-items:center;gap:6px}.presence-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#31c56a;box-shadow:0 0 0 3px #31c56a22}
 .auth .password-toggle{align-self:flex-end;margin-top:-34px;margin-right:8px;position:relative;z-index:1;border:0;background:transparent;color:#6652d9;font-weight:700;cursor:pointer}
-.chat-row .avatar{position:relative}.active-dot{position:absolute;right:-2px;bottom:-2px;width:13px;height:13px;border-radius:50%;background:#32cf70;border:3px solid #fff}.is-active{outline:1px solid #32cf70}:root.dark .active-dot{border-color:#26283c}
+.chat-row .avatar,.chat-header .avatar{position:relative}.active-dot{position:absolute;right:-2px;bottom:-2px;width:13px;height:13px;border-radius:50%;background:#32cf70;border:3px solid #fff}.is-active{outline:1px solid #32cf70}:root.dark .active-dot{border-color:#26283c}
 .chat-screen .chat-header{flex:0 0 auto}
 .chat-screen .messages{flex:1;min-height:0;overflow-y:auto;padding-bottom:18px}
 .chat-screen .composer{position:sticky;bottom:0;z-index:4;background:#fff;padding-bottom:calc(12px + env(safe-area-inset-bottom));touch-action:manipulation}
@@ -411,6 +411,8 @@ button:disabled{cursor:not-allowed;opacity:.55;transform:none!important}
 }
 
 .chat-header .active-presence { color: #31c875 !important; font-weight: 750; }
+.chat-header .active-presence { display: inline-flex; align-items: center; gap: 6px; }
+.chat-header .active-presence .presence-dot { width: 7px; height: 7px; box-shadow: 0 0 0 2px #31c87522; }
 
 .conversation-security {
   animation: conversation-notice-in 180ms ease-out;
