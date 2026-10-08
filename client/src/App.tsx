@@ -2219,8 +2219,17 @@ export default function App() {
             </button>
           </div>
         )}
-            {(page === "chats" || page === "communities") && (
+        {(page === "chats" || page === "communities") && (
           <>
+            {page === "chats" && (
+              <section className="chat-home-hero" aria-label="Chats home">
+                <div>
+                  <span className="kicker">YOUR SPACE</span>
+                  <h1>Stay in the loop.</h1>
+                  <p>Catch up with your people, share the moment, and keep moving together.</p>
+                </div>
+              </section>
+            )}
             <input
               className="search"
               value={search}
