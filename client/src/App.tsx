@@ -427,8 +427,8 @@ function LeaderboardPodiumCard({ entry, rank, currentUid, mode }: { entry?: Stud
     <span className="leaderboard-medal" aria-label={`Rank ${rank}`}>{medal}</span>
     {entry ? <>
       <Avatar name={entry.displayName} photoURL={entry.photoURL} className="leaderboard-avatar" />
-      <strong>{entry.uid === currentUid ? "You" : entry.displayName}</strong>
-      <small>{entry.username ? `@${entry.username}` : mode === "friends" ? "Friend" : "Student"}</small>
+      <strong>@{entry.username || "user"}</strong>
+      <small>{entry.uid === currentUid ? "You" : mode === "friends" ? "Friend" : "Student"}</small>
       <b>{studyMinutes(entry.weeklySeconds)}</b>
     </> : <>
       <span className="leaderboard-avatar leaderboard-avatar-empty">—</span>
@@ -442,7 +442,7 @@ function LeaderboardSheet({ mode, entries, currentUid, loading, onModeChange, on
   const ranked = entries.slice(0, 10);
   const podium = [ranked[1], ranked[0], ranked[2]] as const;
   const lowerRanks = Array.from({ length: 7 }, (_, index) => ranked[index + 3]);
-  return <div className="task-sheet-backdrop" role="presentation" onMouseDown={onClose}><section className="leaderboard-sheet" role="dialog" aria-modal="true" aria-label="Study leaderboard" onMouseDown={(event) => event.stopPropagation()}><div className="sheet-handle"/><header className="sheet-page-header"><button className="icon" type="button" aria-label="Close leaderboard" onClick={onClose}>×</button><div><strong>{mode === "friends" ? "Friends leaderboard" : "Public leaderboard"}</strong><small>Top 10 · weekly totals reset every Monday</small></div><span>🏆</span></header><div className="leaderboard-sheet-body"><div className="leaderboard-mode-tabs"><button className={mode === "friends" ? "active" : ""} type="button" onClick={() => onModeChange("friends")}>Friends</button><button className={mode === "public" ? "active" : ""} type="button" onClick={() => onModeChange("public")}>Public</button></div>{loading ? <p className="leaderboard-disclaimer">Loading study totals…</p> : !ranked.length ? <p className="leaderboard-disclaimer">No saved study sessions yet.</p> : <><div className="leaderboard-podium">{podium.map((entry, index) => <LeaderboardPodiumCard key={entry?.uid || `empty-${index}`} entry={entry} rank={index === 0 ? 2 : index === 1 ? 1 : 3} currentUid={currentUid} mode={mode} />)}</div><p className="leaderboard-disclaimer">Finished study sessions saved to your account.</p><p className="leaderboard-section-label">Ranks 4–10</p><div className="leaderboard-ranks">{lowerRanks.map((entry, index) => <article className={entry ? "" : "rank-waiting"} key={entry?.uid || `waiting-${index + 4}`}><b>{index + 4}</b><div><strong>{entry ? (entry.uid === currentUid ? "You" : entry.displayName) : "Open rank"}</strong><small>{entry ? (entry.username ? `@${entry.username}` : mode === "friends" ? "Friend" : "Student") : "Waiting"}</small></div><span>{entry ? studyMinutes(entry.weeklySeconds) : "—"}</span></article>)}</div></>}</div></section></div>;
+  return <div className="task-sheet-backdrop" role="presentation" onMouseDown={onClose}><section className="leaderboard-sheet" role="dialog" aria-modal="true" aria-label="Study leaderboard" onMouseDown={(event) => event.stopPropagation()}><div className="sheet-handle"/><header className="sheet-page-header"><button className="icon" type="button" aria-label="Close leaderboard" onClick={onClose}>×</button><div><strong>{mode === "friends" ? "Friends leaderboard" : "Public leaderboard"}</strong><small>Top 10 · weekly totals reset every Monday</small></div><span>🏆</span></header><div className="leaderboard-sheet-body"><div className="leaderboard-mode-tabs"><button className={mode === "friends" ? "active" : ""} type="button" onClick={() => onModeChange("friends")}>Friends</button><button className={mode === "public" ? "active" : ""} type="button" onClick={() => onModeChange("public")}>Public</button></div>{loading ? <p className="leaderboard-disclaimer">Loading study totals…</p> : !ranked.length ? <p className="leaderboard-disclaimer">No saved study sessions yet.</p> : <><div className="leaderboard-podium">{podium.map((entry, index) => <LeaderboardPodiumCard key={entry?.uid || `empty-${index}`} entry={entry} rank={index === 0 ? 2 : index === 1 ? 1 : 3} currentUid={currentUid} mode={mode} />)}</div><p className="leaderboard-disclaimer">Finished study sessions saved to your account.</p><p className="leaderboard-section-label">Ranks 4–10</p><div className="leaderboard-ranks">{lowerRanks.map((entry, index) => <article className={entry ? "" : "rank-waiting"} key={entry?.uid || `waiting-${index + 4}`}><b>{index + 4}</b><div><strong>{entry ? `@${entry.username || "user"}` : "Open rank"}</strong><small>{entry ? (entry.uid === currentUid ? "You" : mode === "friends" ? "Friend" : "Student") : "Waiting"}</small></div><span>{entry ? studyMinutes(entry.weeklySeconds) : "—"}</span></article>)}</div></>}</div></section></div>;
 }
 
 function JourneySheet({ streak, league, weeklySeconds, totalSeconds, nextStreakMilestone, nextLeaguePromotion, onClose }: { streak: number; league: string; weeklySeconds: number; totalSeconds: number; nextStreakMilestone: number; nextLeaguePromotion: number; onClose: () => void }) {
@@ -497,6 +497,7 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const [leaderboardEntries, setLeaderboardEntries] = useState<StudyLeaderboardEntry[]>([]);
   const [studyZoneEntries, setStudyZoneEntries] = useState<StudyLeaderboardEntry[]>([]);
+  const [viewerUsername, setViewerUsername] = useState("");
   const [studyFriendIds, setStudyFriendIds] = useState<string[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardRefreshKey, setLeaderboardRefreshKey] = useState(0);
@@ -519,6 +520,15 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   }, [uid]);
   useEffect(() => {
     let cancelled = false;
+    const cached = localStorage.getItem(`cochat-username-${uid}`) || "";
+    if (cached) setViewerUsername(cached);
+    void getUserProfile(uid).then((profile) => {
+      if (!cancelled && profile?.username) setViewerUsername(profile.username);
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [uid]);
+  useEffect(() => {
+    let cancelled = false;
     const refresh = async () => {
       if (leaderboardOpen) setLeaderboardLoading(true);
       const currentUser = auth?.currentUser;
@@ -526,7 +536,7 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
       const localEntry: StudyLeaderboardEntry = {
         uid,
         displayName: currentUser?.displayName || "You",
-        username: currentUser?.email?.split("@")[0] || "",
+        username: viewerUsername || localStorage.getItem(`cochat-username-${uid}`) || "user",
         photoURL: currentUser?.photoURL || "",
         weeklySeconds: Math.max(0, weeklySeconds + currentSessionSeconds),
         totalSeconds: Math.max(0, totalSeconds + currentSessionSeconds),
@@ -559,7 +569,7 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
     };
     void refresh();
     return () => { cancelled = true; };
-  }, [uid, weekKey, studyFriendIds, leaderboardMode, leaderboardOpen, leaderboardRefreshKey, weeklySeconds, totalSeconds, seconds, running]);
+  }, [uid, weekKey, studyFriendIds, viewerUsername, leaderboardMode, leaderboardOpen, leaderboardRefreshKey, weeklySeconds, totalSeconds, seconds, running]);
   useEffect(() => {
     void updateStudyPresence(running, timerTaskId ? "Working on an active task" : "In a focus session").catch(() => undefined);
     const timer = window.setInterval(() => void updateStudyPresence(running, timerTaskId ? "Working on an active task" : "In a focus session").catch(() => undefined), 30000);
