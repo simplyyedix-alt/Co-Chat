@@ -118,6 +118,11 @@ export async function createDirect(otherUid: string, name: string) {
   return String(data.id || '')
 }
 
+export async function createGroup(name: string, memberIds: string[]) {
+  const data = await request<{ id?: string }>({ action: 'create-group', name, memberIds })
+  return String(data.id || '')
+}
+
 export async function deleteConversation(conversationId: string) {
   await request({ action: 'delete-conversation', conversationId })
 }

@@ -2267,16 +2267,7 @@ export default function App() {
             {page === "communities" && (
               <>
               <section className="community-hero"><div><span className="kicker">YOUR COMMUNITIES</span><h2>Find your people.</h2><p>Find your lane, swap ideas, and stay accountable together.</p></div><span className="community-symbol">♧</span></section>
-              <div className="community-rail"><button type="button" onClick={() => { setDiscoverCommunity("jee"); setPage("discover"); }}><span>JEE</span><strong>JEE Prep</strong><small>Public · 2.4k · View Twitts</small></button><button type="button" onClick={() => { setDiscoverCommunity("study"); setPage("discover"); }}><span>⌂</span><strong>Study circles</strong><small>Private · 8 members · View Twitts</small></button><button type="button" onClick={() => setShowGroup(true)}><span>+</span><strong>Create one</strong><small>Your space · New group</small></button></div>
-              <div className="chat-tools">
-                <button
-                  className="secondary compact"
-                  type="button"
-                  onClick={() => setShowGroup(true)}
-                >
-                  ＋ New group
-                </button>
-              </div>
+              <div className="community-create-card"><div><span className="kicker">YOUR GROUP SPACE</span><strong>Create a private group</strong><small>Choose friends and keep the full Co-Chat experience in one conversation.</small></div><button className="primary" type="button" onClick={() => setShowGroup(true)}>＋ Create group</button></div>
               </>
             )}
             <div className="section-title">
@@ -2416,6 +2407,7 @@ export default function App() {
                 uid={liveUser.uid}
                 onCreated={(conversation) => {
                   setShowGroup(false);
+                  setConversations((current) => [conversation, ...current.filter((item) => item.id !== conversation.id)]);
                   setSelected(conversation);
                 }}
                 onClose={() => setShowGroup(false)}

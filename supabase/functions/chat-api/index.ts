@@ -121,6 +121,20 @@ Deno.serve(async (request) => {
       await rest('conversation_members', { method: 'POST', body: JSON.stringify([{ conversation_id: conversationId, uid: user.uid }, { conversation_id: conversationId, uid: otherUid }]) })
       return response({ id: conversationId })
     }
+    if (action === 'create-group') {
+      const name = String(body?.name || 'New group').trim().slice(0, 80) || 'New group'
+      const requested = Array.isArray(body?.memberIds) ? body.memberIds.map(String).filter(Boolean) : []
+      const memberIds = [...new Set([user.uid, ...requested])]
+      if (memberIds.length < 3) return response({ error: 'Choose at least two friends for a group.' }, 400)
+      const profiles = await rest(`profiles?uid=in.(${memberIds.map((uid: string) => encodeURIComponent(uid)).join(',')})&select=uid`)
+      const knownIds = new Set((profiles || []).map((item: Record<string, unknown>) => String(item.uid || '')))
+      if (memberIds.some((uid: string) => uid !== user.uid && !knownIds.has(uid))) return response({ error: 'One or more selected friends could not be found.' }, 400)
+      const created = await rest('conversations', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ type: 'group', name, admin_id: user.uid, created_by: user.uid }) })
+      const conversationId = String(created?.[0]?.id || '')
+      if (!conversationId) throw new Error('Group could not be created')
+      await rest('conversation_members', { method: 'POST', body: JSON.stringify(memberIds.map((uid: string) => ({ conversation_id: conversationId, uid }))) })
+      return response({ id: conversationId })
+    }
     if (action === 'messages') {
       const conversationId = String(body?.conversationId || '')
       if (!conversationId || !(await member(conversationId, user.uid))) return response({ error: 'Conversation access denied' }, 403)

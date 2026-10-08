@@ -23,7 +23,7 @@ import {
 } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { StorageManager } from './storageManager'
-import { createDirect, deleteConversation as deleteSupabaseConversation, deleteForMe as deleteSupabaseMessageForMe, getProfile as getSupabaseProfile, getStudyLeaderboard as getSupabaseStudyLeaderboard, isSupabaseChatEnabled, markRead as markSupabaseRead, saveStudySession as saveSupabaseStudySession, sendMessage as sendSupabaseMessage, unsend as unsendSupabaseMessage, updateStudyPresence as updateSupabaseStudyPresence, upsertProfile as upsertSupabaseProfile, watchConversations as watchSupabaseConversations, watchMessages as watchSupabaseMessages, type StudyLeaderboardEntry } from './supabaseChat'
+import { createDirect, createGroup as createSupabaseGroup, deleteConversation as deleteSupabaseConversation, deleteForMe as deleteSupabaseMessageForMe, getProfile as getSupabaseProfile, getStudyLeaderboard as getSupabaseStudyLeaderboard, isSupabaseChatEnabled, markRead as markSupabaseRead, saveStudySession as saveSupabaseStudySession, sendMessage as sendSupabaseMessage, unsend as unsendSupabaseMessage, updateStudyPresence as updateSupabaseStudyPresence, upsertProfile as upsertSupabaseProfile, watchConversations as watchSupabaseConversations, watchMessages as watchSupabaseMessages, type StudyLeaderboardEntry } from './supabaseChat'
 export { isSupabaseChatEnabled } from './supabaseChat'
 
 export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; bio?: string; notificationsEnabled?: boolean; discoverable?: boolean; activeStatus?: boolean; theme?: 'light' | 'dark'; lastSeen?: Timestamp | null; profileComplete?: boolean }
@@ -430,6 +430,11 @@ export async function createConversation(uid: string, other: UserProfile) {
 }
 
 export async function createGroup(uid: string, name: string, members: UserProfile[]) {
+  if (isSupabaseChatEnabled()) {
+    const memberIds = [...new Set([uid, ...members.map(member => member.uid)])]
+    if (memberIds.length < 3) throw new Error('Choose at least two friends for a group.')
+    return createSupabaseGroup(name.trim() || 'New group', memberIds)
+  }
   if (!db) return ''
   const memberIds = [...new Set([uid, ...members.map(member => member.uid)])]
   if (memberIds.length < 3) throw new Error('Choose at least two friends for a group.')
