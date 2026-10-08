@@ -133,7 +133,7 @@ export function watchMessages(conversationId: string, uid: string, callback: (it
   refresh()
   const timer = window.setInterval(refresh, 15000)
   const channel = supabase?.channel(`chat-messages:${conversationId}`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, refresh)
+    .on('broadcast', { event: 'message' }, refresh)
     .subscribe()
   const onVisibilityChange = () => { if (document.visibilityState === 'visible') refresh() }
   document.addEventListener('visibilitychange', onVisibilityChange)

@@ -39,6 +39,18 @@ async function rest(path: string, init: RequestInit = {}) {
   return body
 }
 
+async function broadcastChatMessage(conversationId: string, payload: Record<string, unknown>) {
+  const base = Deno.env.get('SUPABASE_URL') || ''
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+  if (!base || !key) return
+  const topic = encodeURIComponent(`chat-messages:${conversationId}`)
+  await fetch(`${base}/realtime/v1/api/broadcast/${topic}/events/message`, {
+    method: 'POST',
+    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
+
 async function member(conversationId: string, uid: string) {
   const rows = await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(uid)}&select=conversation_id,uid,hidden_at,unread_count,read_at`)
   return Array.isArray(rows) && rows.length > 0
@@ -229,6 +241,7 @@ Deno.serve(async (request) => {
       const members = await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&select=uid,unread_count`)
       for (const item of members || []) if (item.uid !== user.uid) await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(item.uid)}`, { method: 'PATCH', body: JSON.stringify({ unread_count: Number(item.unread_count || 0) + 1 }) })
       await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: 'PATCH', body: JSON.stringify({ last_message: text || '📎 Attachment', last_sender_id: user.uid, last_message_at: new Date().toISOString() }) })
+      void broadcastChatMessage(conversationId, { messageId: rows?.[0]?.id || null }).catch(() => undefined)
       const targets = (members || []).map((item: Record<string, unknown>) => String(item.uid || '')).filter((uid: string) => uid && uid !== user.uid)
       void notifyMessageRecipients(targets, user.displayName, text || '📎 Attachment', conversationId).catch(() => undefined)
       return response({ message: rows?.[0] || null })

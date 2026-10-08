@@ -13,6 +13,7 @@ import {
   type User,
 } from "firebase/auth";
 import { auth, firebaseReady, googleProvider } from "./firebase";
+import { Timestamp } from "firebase/firestore";
 import { supabaseReady, verifyFirebaseIdentity } from "./supabase";
 import {
   addGroupMembers,
@@ -1152,6 +1153,9 @@ export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationOpening, setConversationOpening] = useState(false);
   const conversationOpeningAt = useRef(0);
+  const [encryptionNoticeVisible, setEncryptionNoticeVisible] = useState(true);
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const pendingMessages = useRef<Record<string, ChatMessage>>({});
   const [text, setText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<ChatAttachment | null>(null);
@@ -1367,6 +1371,11 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, []);
   useEffect(() => {
+    setEncryptionNoticeVisible(true);
+    const noticeTimer = window.setTimeout(() => setEncryptionNoticeVisible(false), 2400);
+    return () => window.clearTimeout(noticeTimer);
+  }, [selected?.id]);
+  useEffect(() => {
     if (
       !selected ||
       selected.id.startsWith("preview-") ||
@@ -1390,7 +1399,9 @@ export default function App() {
     }
     const fallbackTimer = window.setTimeout(() => setConversationOpening(false), 3000);
     const stopWatching = watchMessages(selected.id, liveUser.uid, (items) => {
-      setMessages(items);
+      const pending = Object.values(pendingMessages.current).filter((item) => !items.some((saved) => saved.senderId === item.senderId && saved.text === item.text));
+      pendingMessages.current = Object.fromEntries(pending.map((item) => [item.id, item]));
+      setMessages([...items, ...pending].sort((a, b) => (a.createdAt?.toMillis() || Date.now()) - (b.createdAt?.toMillis() || Date.now())));
       window.setTimeout(
         () => setConversationOpening(false),
         Math.max(0, 650 - (Date.now() - conversationOpeningAt.current)),
@@ -1654,7 +1665,7 @@ export default function App() {
     );
   const send = async (event: FormEvent) => {
     event.preventDefault();
-    if ((!text.trim() && !selectedFile) || !selected) return;
+    if ((!text.trim() && !selectedFile) || !selected || sendingMessage) return;
     const value = text.trim();
     const file = selectedFile;
     if (value.length > 2000) {
@@ -1694,6 +1705,18 @@ export default function App() {
       });
       return;
     }
+    const pendingId = `pending-${Date.now()}`;
+    const optimistic: ChatMessage = {
+      id: pendingId,
+      senderId: liveUser.uid,
+      text: value || file?.name || "",
+      createdAt: Timestamp.now(),
+      replyTo: target ? { id: target.id, text: target.text, senderId: target.senderId } : null,
+      attachment: file ? { name: file.name, url: URL.createObjectURL(file), type: file.type, size: file.size } : null,
+    };
+    pendingMessages.current[pendingId] = optimistic;
+    setMessages((old) => [...old, optimistic]);
+    setSendingMessage(true);
     try {
       await sendMessage(
         selected.id,
@@ -1703,16 +1726,21 @@ export default function App() {
         target,
       );
     } catch (e) {
+      delete pendingMessages.current[pendingId];
+      setMessages((old) => old.filter((item) => item.id !== pendingId));
       setError(
         e instanceof Error
           ? e.message
           : "Message could not be sent. Check your connection.",
       );
+    } finally {
+      setSendingMessage(false);
     }
   };
   const openConversation = (conversation: Conversation) => {
     conversationOpeningAt.current = Date.now();
     setConversationOpening(true);
+    pendingMessages.current = {};
     setMessages([]);
     setSelected(conversation);
   };
@@ -2036,10 +2064,10 @@ export default function App() {
             onClose={() => { setShowVoiceCall(false); setVoiceTarget(null); }}
           />
         )}
-        <div className="conversation-security" role="status">
+        {encryptionNoticeVisible && <div className="conversation-security" role="status">
           <span aria-hidden="true">🔒</span>
-          <span><strong>End-to-end encryption</strong> is being set up for Co-Chat conversations.</span>
-        </div>
+          <span><strong>Private conversation</strong> · securing your connection…</span>
+        </div>}
         {conversationOpening ? (
           <section className="conversation-opening" aria-live="polite" aria-label={`Opening conversation with ${selected.name}`}>
             <span className="conversation-opening-lock" aria-hidden="true">🔒</span>
@@ -2048,6 +2076,7 @@ export default function App() {
             <small>Securing the connection and loading messages…</small>
           </section>
         ) : <section className="messages">
+          {!messages.length && <div className="conversation-empty" role="status"><span className="conversation-empty-icon">✦</span><strong>No messages yet</strong><small>Send a message to start the conversation.</small></div>}
           {messages.map((item) => {
             const mine =
               item.senderId === liveUser.uid || item.senderId === "me";
@@ -2227,7 +2256,7 @@ export default function App() {
             onChange={(e) => setText(e.target.value)}
             placeholder={selectedFile ? selectedFile.name : "Write a message"}
           />
-          <button className="primary">Send</button>
+          <button className="primary" disabled={sendingMessage}>{sendingMessage ? "Sending…" : "Send"}</button>
         </form>
         {incomingCall && (
           <IncomingCall
