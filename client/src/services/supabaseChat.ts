@@ -35,6 +35,7 @@ const attachment = (value: unknown): ChatAttachment | null => {
 export function isSupabaseChatEnabled() { return enabled }
 
 export type StudyLeaderboardEntry = { uid: string; displayName: string; username: string; photoURL: string; weeklySeconds: number; totalSeconds: number; active: boolean; label: string }
+export type StudyStats = { totalSeconds: number; weeklySeconds: number; weekKey: string; studyDays: string[] }
 
 const profileFromRow = (row: Record<string, unknown> | null | undefined): UserProfile | null => {
   if (!row?.uid) return null
@@ -46,8 +47,13 @@ export async function upsertProfile(uid: string, profile: Partial<UserProfile>) 
   return true
 }
 
-export async function saveStudySession(seconds: number, weekKey: string) {
-  await request({ action: 'study-save', seconds, weekKey })
+export async function saveStudySession(seconds: number, weekKey: string, studyDay?: string) {
+  return request<StudyStats & { ok: boolean }>({ action: 'study-save', seconds, weekKey, studyDay })
+}
+
+export async function getStudyStats(weekKey: string): Promise<StudyStats> {
+  const data = await request<StudyStats>({ action: 'study-stats', weekKey })
+  return { totalSeconds: Number(data.totalSeconds || 0), weeklySeconds: Number(data.weeklySeconds || 0), weekKey: String(data.weekKey || weekKey), studyDays: Array.isArray(data.studyDays) ? data.studyDays.filter((day): day is string => typeof day === 'string') : [] }
 }
 
 export async function updateStudyPresence(active: boolean, label = '') {

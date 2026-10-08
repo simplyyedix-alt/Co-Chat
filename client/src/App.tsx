@@ -29,6 +29,7 @@ import {
   findUsers,
   getFriendship,
   getStudyLeaderboard,
+  getStudyStats,
   getUserProfile,
   listBlockedUsers,
   listFriends,
@@ -385,7 +386,8 @@ function Nav({
 
 type StudyTask = { id: string; title: string; kind: "daily" | "personal"; action: "timer" | "discover"; startedAt?: number; completedAt?: number };
 const studyRecommendations = ["Solve five focused problems", "Revise one difficult chapter", "Study for 60 minutes", "Answer one student’s doubt", "Make short revision notes", "Complete a timed practice set"];
-const currentStudyWeekKey = () => { const date = new Date(); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() - ((date.getDay() + 6) % 7)); return date.toISOString().slice(0, 10); };
+const localStudyDateKey = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+const currentStudyWeekKey = () => { const date = new Date(); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() - ((date.getDay() + 6) % 7)); return localStudyDateKey(date); };
 const studyTaskAction = (title: string): StudyTask["action"] => /answer.*doubt|help.*student/i.test(title) ? "discover" : "timer";
 const dailyStudyTasks = (dayNumber: number): StudyTask[] => {
   let seed = Math.abs(dayNumber * 9301 + 49297) % 233280;
@@ -464,8 +466,8 @@ function JourneySheet({ streak, league, weeklySeconds, totalSeconds, nextStreakM
           <section className="journey-league">
             <div className="league-heading"><span className="sheet-label">WEEKLY LEAGUE</span><button type="button" className="league-info-button" aria-expanded={showLeagueInfo} aria-controls="league-guide" aria-label="Open league guide" title="Open league guide" onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onClick={toggleInfo}><span aria-hidden="true">i</span></button></div>
             <div className="league-current"><i className={`league-crest ${league.split(" ")[0].toLowerCase()}`}>{league === "Legendary" ? "★" : league.split(" ")[1]}</i><div><strong>{league}</strong><p>{Math.floor(weeklySeconds / 3600)}h {Math.floor((weeklySeconds % 3600) / 60)}m this week · {Math.max(0, nextLeaguePromotion - Math.floor(weeklySeconds / 3600))}h to promote</p></div></div>
-            <div className="league-zones"><span className="promotion"><b>Promote</b><small>Top 20%</small></span><span className="safe"><b>Stay</b><small>Middle 60%</small></span><span className="demotion"><b>Demote</b><small>Bottom 20%</small></span></div>
-            {showLeagueInfo && <aside className="league-guide" id="league-guide" role="region" aria-label="Weekly league guide"><div className="league-guide-title"><strong>How the league works</strong><button type="button" className="league-guide-close" aria-label="Close league guide" onClick={() => setShowLeagueInfo(false)}>×</button></div><p>Study time places you in a weekly league. At Monday’s reset, the top 20% promote, the middle 60% stay, and the bottom 20% demote.</p><div className="league-guide-zones"><span className="promotion"><b>Promote</b><small>Top 20%</small></span><span className="safe"><b>Stay</b><small>Middle 60%</small></span><span className="demotion"><b>Demote</b><small>Bottom 20%</small></span></div><strong className="league-guide-subtitle">Divisions</strong><div>{divisions.map(([division, hoursRequired]) => { const tier = division.split(" ")[0].toLowerCase(); const roman = division.split(" ")[1] || "★"; const currentHours = Math.floor(weeklySeconds / 3600); return <span className={league === division ? "current" : currentHours >= hoursRequired ? "unlocked" : ""} key={division}><i className={`league-crest ${tier}`}>{roman}</i><b>{division}</b><small>{hoursRequired === 0 ? "Starting rank" : `${hoursRequired}h / week`}</small></span>; })}</div></aside>}
+            <div className="league-zones"><span className="promotion"><b>Next division</b><small>Reach the next hour target</small></span><span className="safe"><b>Current</b><small>Your saved weekly time</small></span><span className="demotion"><b>New week</b><small>Weekly total resets Monday</small></span></div>
+            {showLeagueInfo && <aside className="league-guide" id="league-guide" role="region" aria-label="Weekly league guide"><div className="league-guide-title"><strong>How the league works</strong><button type="button" className="league-guide-close" aria-label="Close league guide" onClick={() => setShowLeagueInfo(false)}>×</button></div><p>Your division is based on saved study time. Weekly totals reset on Monday, while your all-time total and streak history stay saved.</p><strong className="league-guide-subtitle">Divisions</strong><div>{divisions.map(([division, hoursRequired]) => { const tier = division.split(" ")[0].toLowerCase(); const roman = division.split(" ")[1] || "★"; const currentHours = Math.floor(weeklySeconds / 3600); return <span className={league === division ? "current" : currentHours >= hoursRequired ? "unlocked" : ""} key={division}><i className={`league-crest ${tier}`}>{roman}</i><b>{division}</b><small>{hoursRequired === 0 ? "Starting rank" : `${hoursRequired}h / week`}</small></span>; })}</div></aside>}
           </section>
           <section><p className="sheet-label">STREAK MILESTONES</p><div className="journey-milestones">{milestones.map((milestone) => <article className={streak >= milestone ? "reached" : ""} key={milestone}><span>{streak >= milestone ? "✓" : milestone}</span><div><strong>{milestone} days</strong><small>Keep your daily study streak alive</small></div></article>)}</div></section>
           <section className="journey-stats"><article><small>STUDIED TOTAL</small><strong>{hours}h {minutes}m</strong></article><article><small>THIS WEEK</small><strong>{Math.floor(weeklySeconds / 3600)}h {Math.floor((weeklySeconds % 3600) / 60)}m</strong></article></section>
@@ -482,6 +484,7 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   const [seconds, setSeconds] = useState(() => { try { return Number(JSON.parse(localStorage.getItem(studyKey) || "{}").elapsedSeconds || 0); } catch { return 0; } });
   const [totalSeconds, setTotalSeconds] = useState(() => { try { return Number(JSON.parse(localStorage.getItem(studyKey) || "{}").totalSeconds || 0); } catch { return 0; } });
   const [weeklySeconds, setWeeklySeconds] = useState(() => { try { const saved = JSON.parse(localStorage.getItem(studyKey) || "{}"); return saved.weekKey === weekKey ? Number(saved.weeklySeconds || 0) : 0; } catch { return 0; } });
+  const [statsLoaded, setStatsLoaded] = useState(false);
 
   const [studyDays, setStudyDays] = useState<string[]>(() => { try { const value = JSON.parse(localStorage.getItem(studyKey) || "{}").studyDays; return Array.isArray(value) ? value.filter((day): day is string => typeof day === "string") : []; } catch { return []; } });
   const [completedTasks, setCompletedTasks] = useState(() => { try { return Number(JSON.parse(localStorage.getItem(studyKey) || "{}").completedTasks || 0); } catch { return 0; } });
@@ -548,11 +551,15 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   }, [uid, running, timerTaskId]);
   useEffect(() => () => { void updateStudyPresence(false).catch(() => undefined); }, [uid]);
   useEffect(() => {
-    if (!weeklySeconds) return;
-    const syncKey = `${studyKey}-remote-${weekKey}`;
-    try { if (localStorage.getItem(syncKey)) return; } catch { return; }
-    void saveStudySession(weeklySeconds, weekKey).then(() => { try { localStorage.setItem(syncKey, "1"); } catch { /* storage is optional */ } }).catch(() => undefined);
-  }, [studyKey, weeklySeconds, weekKey]);
+    let cancelled = false;
+    void getStudyStats(weekKey).then((stats) => {
+      if (cancelled || !stats) return;
+      setTotalSeconds(Math.max(0, stats.totalSeconds));
+      setWeeklySeconds(Math.max(0, stats.weeklySeconds));
+      setStudyDays([...new Set(stats.studyDays)].sort().slice(-730));
+    }).catch(() => undefined).finally(() => { if (!cancelled) setStatsLoaded(true); });
+    return () => { cancelled = true; };
+  }, [weekKey, uid]);
   useEffect(() => {
     if (!running) return;
     const updateElapsed = () => {
@@ -571,11 +578,11 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   const progress = targetSeconds ? Math.min(100, Math.round((seconds / targetSeconds) * 100)) : Math.min(100, Math.round((seconds / 3600) * 100));
   const saveSession = () => {
     if (seconds <= 0) return;
-    void saveStudySession(seconds, weekKey).then(() => setLeaderboardRefreshKey((value) => value + 1)).catch(() => undefined);
+    const today = localStudyDateKey();
+    void saveStudySession(seconds, weekKey, today).then((saved) => { if (isSupabaseChatEnabled()) { setTotalSeconds(saved.totalSeconds); setWeeklySeconds(saved.weeklySeconds); setStudyDays(saved.studyDays); } setLeaderboardRefreshKey((value) => value + 1); }).catch(() => undefined);
     const nextTotal = totalSeconds + seconds;
     const nextWeekly = weeklySeconds + seconds;
-    const today = new Date().toISOString().slice(0, 10);
-    const nextDays = studyDays.includes(today) ? studyDays : [...studyDays, today].slice(-365);
+    const nextDays = studyDays.includes(today) ? studyDays : [...studyDays, today].slice(-730);
     setTotalSeconds(nextTotal);
     setWeeklySeconds(nextWeekly);
     setStudyDays(nextDays);
@@ -584,14 +591,14 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
     setRunning(false); setTimerStartedAt(null); setTimerTaskId(null);
     try { localStorage.setItem(studyKey, JSON.stringify({ totalSeconds: nextTotal, weeklySeconds: nextWeekly, weekKey, studyDays: nextDays, completedTasks, tasks, dailyDay: dayNumber, targetSeconds: 0, elapsedSeconds: 0, timerStartedAt: null, timerRunning: false })); } catch { /* storage is optional */ }
   };
-  useEffect(() => { try { const saved = JSON.parse(localStorage.getItem(studyKey) || "{}"); if (saved.weekKey !== weekKey) setWeeklySeconds(0); } catch { /* local data is optional */ } }, [studyKey, weekKey]);
+  useEffect(() => { /* weekly values come from the server stats hydration */ }, [studyKey, weekKey]);
   // The timestamp carries a running timer across reloads; avoid writing local state every second.
-  useEffect(() => { try { localStorage.setItem(studyKey, JSON.stringify({ totalSeconds, weeklySeconds, weekKey, studyDays, completedTasks, tasks, dailyDay: dayNumber, targetSeconds, elapsedSeconds: seconds, timerStartedAt, timerRunning: running })); } catch { /* local data is optional */ } }, [studyKey, totalSeconds, weeklySeconds, weekKey, studyDays, completedTasks, tasks, dayNumber, targetSeconds, timerStartedAt, running]);
+  useEffect(() => { if (!statsLoaded) return; try { localStorage.setItem(studyKey, JSON.stringify({ totalSeconds, weeklySeconds, weekKey, studyDays, completedTasks, tasks, dailyDay: dayNumber, targetSeconds, elapsedSeconds: seconds, timerStartedAt, timerRunning: running })); } catch { /* local data is optional */ } }, [studyKey, totalSeconds, weeklySeconds, weekKey, studyDays, completedTasks, tasks, dayNumber, targetSeconds, timerStartedAt, running, statsLoaded]);
   const studiedHours = Math.floor(totalSeconds / 3600);
   const studiedMinutes = Math.floor((totalSeconds % 3600) / 60);
   const studiedLabel = `${studiedHours}h ${studiedMinutes}m`;
   const today = new Date();
-  const activeStreak = (() => { let streak = 0; for (let index = 0; index < 365; index += 1) { const date = new Date(today); date.setDate(today.getDate() - index); if (!studyDays.includes(date.toISOString().slice(0, 10))) break; streak += 1; } return streak; })();
+  const activeStreak = (() => { let streak = 0; for (let index = 0; index < 730; index += 1) { const date = new Date(today); date.setDate(today.getDate() - index); if (!studyDays.includes(localStudyDateKey(date))) break; streak += 1; } return streak; })();
   const weeklyHours = Math.floor(weeklySeconds / 3600);
   const league = weeklyHours >= 40 ? "Legendary" : weeklyHours >= 30 ? "Platinum III" : weeklyHours >= 24 ? "Platinum II" : weeklyHours >= 18 ? "Platinum I" : weeklyHours >= 14 ? "Gold III" : weeklyHours >= 11 ? "Gold II" : weeklyHours >= 8 ? "Gold I" : weeklyHours >= 6 ? "Silver III" : weeklyHours >= 4 ? "Silver II" : weeklyHours >= 2 ? "Silver I" : weeklyHours >= 1 ? "Bronze III" : "Bronze I";
   const nextStreakMilestone = [7, 30, 100, 365].find((milestone) => milestone > activeStreak) || 365;

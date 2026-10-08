@@ -59,14 +59,22 @@ Deno.serve(async (request) => {
     }
     if (action === 'study-save') {
       const seconds = Math.max(0, Math.min(86400, Math.floor(Number(body?.seconds || 0))))
-      if (!seconds) return response({ ok: true })
       const weekKey = String(body?.weekKey || '')
-      const rows = await rest(`profiles?uid=eq.${encodeURIComponent(user.uid)}&select=total_study_seconds,weekly_study_seconds,study_week_key&limit=1`)
+      const studyDay = String(body?.studyDay || '').match(/^\d{4}-\d{2}-\d{2}$/) ? String(body?.studyDay) : new Date().toISOString().slice(0, 10)
+      const rows = await rest(`profiles?uid=eq.${encodeURIComponent(user.uid)}&select=total_study_seconds,weekly_study_seconds,study_week_key,study_days&limit=1`)
       const current = rows?.[0] || {}
       const total = Number(current.total_study_seconds || 0) + seconds
       const weekly = String(current.study_week_key || '') === weekKey ? Number(current.weekly_study_seconds || 0) + seconds : seconds
-      await rest(`profiles?uid=eq.${encodeURIComponent(user.uid)}`, { method: 'PATCH', body: JSON.stringify({ total_study_seconds: total, weekly_study_seconds: weekly, study_week_key: weekKey, updated_at: new Date().toISOString() }) })
-      return response({ ok: true, total, weekly })
+      const existingDays = Array.isArray(current.study_days) ? current.study_days.map(String).filter((day: string) => /^\d{4}-\d{2}-\d{2}$/.test(day)) : []
+      const studyDays = [...new Set([...existingDays, studyDay])].sort().slice(-730)
+      await rest(`profiles?uid=eq.${encodeURIComponent(user.uid)}`, { method: 'PATCH', body: JSON.stringify({ total_study_seconds: total, weekly_study_seconds: weekly, study_week_key: weekKey, study_days: studyDays, updated_at: new Date().toISOString() }) })
+      return response({ ok: true, totalSeconds: total, weeklySeconds: weekly, weekKey, studyDays })
+    }
+    if (action === 'study-stats') {
+      const weekKey = String(body?.weekKey || '')
+      const rows = await rest(`profiles?uid=eq.${encodeURIComponent(user.uid)}&select=total_study_seconds,weekly_study_seconds,study_week_key,study_days&limit=1`)
+      const current = rows?.[0] || {}
+      return response({ totalSeconds: Number(current.total_study_seconds || 0), weeklySeconds: String(current.study_week_key || '') === weekKey ? Number(current.weekly_study_seconds || 0) : 0, weekKey: String(current.study_week_key || weekKey), studyDays: Array.isArray(current.study_days) ? current.study_days.map(String).filter((day: string) => /^\d{4}-\d{2}-\d{2}$/.test(day)) : [] })
     }
     if (action === 'study-presence') {
       const active = body?.active === true

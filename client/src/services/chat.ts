@@ -23,7 +23,7 @@ import {
 } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { StorageManager } from './storageManager'
-import { addGroupMembers as addSupabaseGroupMembers, createDirect, createGroup as createSupabaseGroup, deleteConversation as deleteSupabaseConversation, deleteForMe as deleteSupabaseMessageForMe, getProfile as getSupabaseProfile, getStudyLeaderboard as getSupabaseStudyLeaderboard, isSupabaseChatEnabled, leaveGroup as leaveSupabaseGroup, markRead as markSupabaseRead, removeGroupMember as removeSupabaseGroupMember, saveStudySession as saveSupabaseStudySession, sendMessage as sendSupabaseMessage, unsend as unsendSupabaseMessage, updateGroup as updateSupabaseGroup, updateStudyPresence as updateSupabaseStudyPresence, upsertProfile as upsertSupabaseProfile, watchConversations as watchSupabaseConversations, watchMessages as watchSupabaseMessages, type StudyLeaderboardEntry } from './supabaseChat'
+import { addGroupMembers as addSupabaseGroupMembers, createDirect, createGroup as createSupabaseGroup, deleteConversation as deleteSupabaseConversation, deleteForMe as deleteSupabaseMessageForMe, getProfile as getSupabaseProfile, getStudyLeaderboard as getSupabaseStudyLeaderboard, getStudyStats as getSupabaseStudyStats, isSupabaseChatEnabled, leaveGroup as leaveSupabaseGroup, markRead as markSupabaseRead, removeGroupMember as removeSupabaseGroupMember, saveStudySession as saveSupabaseStudySession, sendMessage as sendSupabaseMessage, unsend as unsendSupabaseMessage, updateGroup as updateSupabaseGroup, updateStudyPresence as updateSupabaseStudyPresence, upsertProfile as upsertSupabaseProfile, watchConversations as watchSupabaseConversations, watchMessages as watchSupabaseMessages, type StudyLeaderboardEntry, type StudyStats } from './supabaseChat'
 export { isSupabaseChatEnabled } from './supabaseChat'
 
 export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; bio?: string; notificationsEnabled?: boolean; discoverable?: boolean; activeStatus?: boolean; theme?: 'light' | 'dark'; lastSeen?: Timestamp | null; profileComplete?: boolean }
@@ -55,8 +55,14 @@ export type FriendRequest = { id: string; fromUid: string; toUid: string; status
 
 export type { StudyLeaderboardEntry }
 
-export async function saveStudySession(seconds: number, weekKey: string) {
-  if (isSupabaseChatEnabled()) await saveSupabaseStudySession(seconds, weekKey)
+export async function saveStudySession(seconds: number, weekKey: string, studyDay?: string) {
+  if (isSupabaseChatEnabled()) return saveSupabaseStudySession(seconds, weekKey, studyDay)
+  return { ok: true, totalSeconds: seconds, weeklySeconds: seconds, weekKey, studyDays: [] } satisfies StudyStats & { ok: boolean }
+}
+
+export async function getStudyStats(weekKey: string): Promise<StudyStats | null> {
+  if (isSupabaseChatEnabled()) return getSupabaseStudyStats(weekKey)
+  return null
 }
 
 export async function updateStudyPresence(active: boolean, label = '') {
