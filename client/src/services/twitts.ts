@@ -48,6 +48,8 @@ export type TwittPage = {
 export type TwittComment = { id: string; uid: string; body: string; createdAt: DocumentData['createdAt'] | null; likes?: number; liked?: boolean; attachment?: TwittAttachment | null }
 
 const PAGE_SIZE = 20
+export const MODERATOR_UID = 'uOP77Ck5blVeo8e9zquV5s2dFwQ2'
+export const isModerator = (uid?: string | null) => uid === MODERATOR_UID
 
 // Keep the Firebase fallback aligned with the server-side social safety gate.
 // This is a text/name check only; image moderation needs a dedicated vision
@@ -187,7 +189,7 @@ export async function deleteTwitt(twittId: string, uid: string) {
   const twittRef = doc(db, 'twitts', twittId)
   return runTransaction(db, async (transaction) => {
     const twitt = await transaction.get(twittRef)
-    if (!twitt.exists() || String(twitt.data().uid || '') !== uid) throw new Error('Only the author can delete this Twitt.')
+    if (!twitt.exists() || (String(twitt.data().uid || '') !== uid && !isModerator(uid))) throw new Error('Only the author or a moderator can delete this Twitt.')
     transaction.delete(twittRef)
     return true
   })

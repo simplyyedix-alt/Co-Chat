@@ -113,7 +113,7 @@ service cloud.firestore {
           && existsAfter(/databases/$(database)/documents/twitts/$(twittId)/views/$(request.auth.uid)))
         || (signedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['comments'])
           && request.resource.data.comments == resource.data.comments + 1);
-      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && (resource.data.uid == request.auth.uid || request.auth.uid == 'uOP77Ck5blVeo8e9zquV5s2dFwQ2');
       match /likes/{userId} {
         allow read: if signedIn();
         allow create: if signedIn() && userId == request.auth.uid && request.resource.data.uid == request.auth.uid;

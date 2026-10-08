@@ -62,7 +62,7 @@ import {
   type StudyLeaderboardEntry,
   type UserProfile,
 } from "./services/chat";
-import { attachTwittCommentMedia, attachTwittMedia, createTwitt as createRemoteTwitt, createTwittComment, deleteTwitt, deleteTwittComment, hideTwitt, loadTwittComments, loadTwittPage, recordTwittView, toggleTwittCommentLike, toggleTwittLike, type TwittAttachment, type TwittComment } from "./services/twitts";
+import { attachTwittCommentMedia, attachTwittMedia, createTwitt as createRemoteTwitt, createTwittComment, deleteTwitt, deleteTwittComment, hideTwitt, isModerator, loadTwittComments, loadTwittPage, recordTwittView, toggleTwittCommentLike, toggleTwittLike, type TwittAttachment, type TwittComment } from "./services/twitts";
 import { StorageManager } from "./services/storageManager";
 import { clearStudyTimerNotification, listenNotificationActions, notifyIncomingCall, notifyIncomingMessage, notifyStudyTimer, registerFcmNotifications } from "./services/notifications";
 import "./index.css";
@@ -2532,8 +2532,9 @@ export default function App() {
             </div>
             <form className="profile-card settings-profile-card" onSubmit={save}>
               <div className="settings-card-kicker">PROFILE & IDENTITY <span>Changes sync across devices</span></div>
-              <div className="settings-profile-heading"><div className="settings-avatar-wrap"><Avatar name={profileName || liveUser.email || "U"} photoURL={liveUser.photoURL || undefined} className="avatar large" /><span className={`settings-presence ${activeStatus ? "online" : ""}`} /></div><div><span className="settings-eyebrow">PROFILE</span><h2>{profileName || "Co Chat member"}</h2><p>{liveUser.email}</p></div></div>
+              <div className="settings-profile-heading"><div className="settings-avatar-wrap"><Avatar name={profileName || liveUser.email || "U"} photoURL={liveUser.photoURL || undefined} className="avatar large" /><span className={`settings-presence ${activeStatus ? "online" : ""}`} /></div><div><span className="settings-eyebrow">{isModerator(liveUser.uid) ? "MODERATOR PROFILE" : "PROFILE"}</span><h2>{profileName || "Co Chat member"}</h2><p>{liveUser.email}</p></div></div>
               <div className="profile-details" aria-label="Profile details">
+                {isModerator(liveUser.uid) && <span className="moderator-badge"><b>✦</b>Moderator</span>}
                 <span><b>@</b>{profileUsername || "choose a username"}</span>
                 <span><b>✦</b>{liveUser.emailVerified ? "Verified account" : "Email verification pending"}</span>
                 <span><b>◌</b>{activeStatus ? "Available to friends" : "Activity hidden"}</span>
@@ -2550,6 +2551,7 @@ export default function App() {
               <article><span>⌁</span><div><b>Stay in the loop</b><small>Messages, calls, and study updates follow your notification choice.</small></div></article>
               <article><span>◉</span><div><b>Your boundaries</b><small>Control who can discover you and see your active status.</small></div></article>
             </div>
+            {isModerator(liveUser.uid) && <section className="moderator-tools" aria-label="Moderator tools"><div><strong>Moderator tools</strong><small>Remove a Twitt by its ID when it violates community rules.</small></div><button className="danger" type="button" onClick={async () => { const twittId = window.prompt("Enter the Twitt ID to remove:")?.trim(); if (!twittId) return; try { await deleteTwitt(twittId, liveUser.uid); setError("Twitt removed by moderator."); } catch (error) { setError(error instanceof Error ? error.message : "Could not remove that Twitt."); } }}>Remove Twitt</button></section>}
             <div className="settings settings-list">
               <div className="settings-section-label">YOUR CO-CHAT EXPERIENCE <span>Personalize your space</span></div>
               <button type="button" onClick={() => void shareProfile(profileName, profileUsername)}>
