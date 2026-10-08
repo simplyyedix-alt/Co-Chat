@@ -16,11 +16,19 @@ const timestamp = (value: unknown) => {
 async function request<T>(payload: Record<string, unknown>): Promise<T> {
   const token = await auth?.currentUser?.getIdToken()
   if (!token) throw new Error('Please sign in before using chat.')
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, apikey: supabaseAnonKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 10000)
+  let response: Response
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, apikey: supabaseAnonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    })
+  } finally {
+    window.clearTimeout(timeout)
+  }
   const data = await response.json().catch(() => null)
   if (!response.ok) throw new Error(typeof data?.error === 'string' ? data.error : `Chat request failed (${response.status})`)
   return data as T

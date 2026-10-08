@@ -521,21 +521,37 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
     let cancelled = false;
     const refresh = async () => {
       if (leaderboardOpen) setLeaderboardLoading(true);
+      const currentUser = auth?.currentUser;
+      const currentSessionSeconds = running ? Math.max(0, seconds) : 0;
+      const localEntry: StudyLeaderboardEntry = {
+        uid,
+        displayName: currentUser?.displayName || "You",
+        username: currentUser?.email?.split("@")[0] || "",
+        photoURL: currentUser?.photoURL || "",
+        weeklySeconds: Math.max(0, weeklySeconds + currentSessionSeconds),
+        totalSeconds: Math.max(0, totalSeconds + currentSessionSeconds),
+        active: running,
+        label: running ? "In a focus session" : "Your saved study time",
+      };
+      const withLocalUser = (entries: StudyLeaderboardEntry[]) => {
+        const withoutDuplicate = entries.filter((entry) => entry.uid !== uid);
+        return localEntry.weeklySeconds > 0 || localEntry.totalSeconds > 0 ? [localEntry, ...withoutDuplicate] : withoutDuplicate;
+      };
       try {
         if (leaderboardMode === "public" && leaderboardOpen) {
           const entries = await getStudyLeaderboard("public", [], weekKey);
-          if (!cancelled) setLeaderboardEntries(entries.filter((entry) => entry.weeklySeconds > 0));
+          if (!cancelled) setLeaderboardEntries(withLocalUser(entries).filter((entry) => entry.weeklySeconds > 0));
           return;
         }
         const entries = await getStudyLeaderboard("friends", [uid, ...studyFriendIds], weekKey);
         if (!cancelled) {
           setStudyZoneEntries(entries);
-          if (leaderboardMode === "friends") setLeaderboardEntries(entries.filter((entry) => entry.weeklySeconds > 0));
+          if (leaderboardMode === "friends") setLeaderboardEntries(withLocalUser(entries).filter((entry) => entry.weeklySeconds > 0));
         }
       } catch {
         if (!cancelled) {
-          setStudyZoneEntries([]);
-          if (leaderboardOpen) setLeaderboardEntries([]);
+          setStudyZoneEntries(running ? [localEntry] : []);
+          if (leaderboardOpen) setLeaderboardEntries(localEntry.weeklySeconds > 0 || localEntry.totalSeconds > 0 ? [localEntry] : []);
         }
       } finally {
         if (!cancelled) setLeaderboardLoading(false);
@@ -543,7 +559,7 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
     };
     void refresh();
     return () => { cancelled = true; };
-  }, [uid, weekKey, studyFriendIds, leaderboardMode, leaderboardOpen, leaderboardRefreshKey]);
+  }, [uid, weekKey, studyFriendIds, leaderboardMode, leaderboardOpen, leaderboardRefreshKey, weeklySeconds, totalSeconds, seconds, running]);
   useEffect(() => {
     void updateStudyPresence(running, timerTaskId ? "Working on an active task" : "In a focus session").catch(() => undefined);
     const timer = window.setInterval(() => void updateStudyPresence(running, timerTaskId ? "Working on an active task" : "In a focus session").catch(() => undefined), 30000);
@@ -554,9 +570,12 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
     let cancelled = false;
     void getStudyStats(weekKey).then((stats) => {
       if (cancelled || !stats) return;
-      setTotalSeconds(Math.max(0, stats.totalSeconds));
-      setWeeklySeconds(Math.max(0, stats.weeklySeconds));
-      setStudyDays([...new Set(stats.studyDays)].sort().slice(-730));
+      let local: { totalSeconds?: number; weeklySeconds?: number; weekKey?: string; studyDays?: unknown[] } = {};
+      try { local = JSON.parse(localStorage.getItem(studyKey) || "{}"); } catch { /* local cache is optional */ }
+      const localDays = Array.isArray(local.studyDays) ? local.studyDays.filter((day): day is string => typeof day === "string") : [];
+      setTotalSeconds(Math.max(0, stats.totalSeconds, Number(local.totalSeconds || 0)));
+      setWeeklySeconds(Math.max(0, stats.weeklySeconds, local.weekKey === weekKey ? Number(local.weeklySeconds || 0) : 0));
+      setStudyDays([...new Set([...localDays, ...stats.studyDays])].sort().slice(-730));
     }).catch(() => undefined).finally(() => { if (!cancelled) setStatsLoaded(true); });
     return () => { cancelled = true; };
   }, [weekKey, uid]);
@@ -579,10 +598,17 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   const saveSession = () => {
     if (seconds <= 0) return;
     const today = localStudyDateKey();
-    void saveStudySession(seconds, weekKey, today).then((saved) => { if (isSupabaseChatEnabled()) { setTotalSeconds(saved.totalSeconds); setWeeklySeconds(saved.weeklySeconds); setStudyDays(saved.studyDays); } setLeaderboardRefreshKey((value) => value + 1); }).catch(() => undefined);
     const nextTotal = totalSeconds + seconds;
     const nextWeekly = weeklySeconds + seconds;
     const nextDays = studyDays.includes(today) ? studyDays : [...studyDays, today].slice(-730);
+    void saveStudySession(seconds, weekKey, today).then((saved) => {
+      if (isSupabaseChatEnabled()) {
+        setTotalSeconds((value) => Math.max(value, saved.totalSeconds));
+        setWeeklySeconds((value) => Math.max(value, saved.weeklySeconds));
+        setStudyDays((value) => [...new Set([...value, ...saved.studyDays, today])].sort().slice(-730));
+      }
+      setLeaderboardRefreshKey((value) => value + 1);
+    }).catch(() => undefined);
     setTotalSeconds(nextTotal);
     setWeeklySeconds(nextWeekly);
     setStudyDays(nextDays);
@@ -598,7 +624,7 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   const studiedMinutes = Math.floor((totalSeconds % 3600) / 60);
   const studiedLabel = `${studiedHours}h ${studiedMinutes}m`;
   const today = new Date();
-  const activeStreak = (() => { let streak = 0; for (let index = 0; index < 730; index += 1) { const date = new Date(today); date.setDate(today.getDate() - index); if (!studyDays.includes(localStudyDateKey(date))) break; streak += 1; } return streak; })();
+  const activeStreak = (() => { let streak = 0; for (let index = 0; index < 730; index += 1) { const date = new Date(today); date.setDate(today.getDate() - index); const key = localStudyDateKey(date); if (index === 0 && (seconds > 0 || running)) { streak += 1; continue; } if (!studyDays.includes(key)) break; streak += 1; } return streak; })();
   const weeklyHours = Math.floor(weeklySeconds / 3600);
   const league = weeklyHours >= 40 ? "Legendary" : weeklyHours >= 30 ? "Platinum III" : weeklyHours >= 24 ? "Platinum II" : weeklyHours >= 18 ? "Platinum I" : weeklyHours >= 14 ? "Gold III" : weeklyHours >= 11 ? "Gold II" : weeklyHours >= 8 ? "Gold I" : weeklyHours >= 6 ? "Silver III" : weeklyHours >= 4 ? "Silver II" : weeklyHours >= 2 ? "Silver I" : weeklyHours >= 1 ? "Bronze III" : "Bronze I";
   const nextStreakMilestone = [7, 30, 100, 365].find((milestone) => milestone > activeStreak) || 365;
