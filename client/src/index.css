@@ -251,3 +251,27 @@ button:disabled{cursor:not-allowed;opacity:.55;transform:none!important}
 :root.dark .settings-page .settings-list .settings-value,:root.dark .settings-page .settings-list .chevron{color:#aeb4bd}
 :root.dark .settings-page .settings-hero{background:linear-gradient(135deg,#151b3b,#405de6);border-color:#405de6}
 :root.dark .settings-page .settings-profile-heading p,:root.dark .settings-page .settings-option-copy small{color:#aeb4bd}
+
+/* Compact profile/settings layout: keep the same Co-Chat theme on every mode. */
+.settings-page{width:min(100%,680px);margin-inline:auto;gap:11px}
+.settings-page .settings-hero{padding:16px 19px;border-radius:18px;box-shadow:0 10px 24px rgba(78,57,160,.14)}
+.settings-page .settings-hero h1{margin:5px 0 3px;font-size:22px}
+.settings-page .settings-hero p{font-size:12px}
+.settings-page .settings-hero-mark{width:42px;height:42px;border-radius:14px;font-size:21px}
+.settings-page .settings-profile-card{gap:12px;padding:18px!important;border-radius:19px;box-shadow:0 10px 26px rgba(78,57,160,.1)}
+.settings-page .settings-card-kicker{font-size:9px}
+.settings-page .settings-profile-heading{gap:11px}
+.settings-page .settings-profile-heading .avatar{width:58px;height:58px;border-radius:18px}
+.settings-page .settings-profile-heading h2{margin:2px 0;font-size:19px}
+.settings-page .settings-profile-heading p{font-size:11px}
+.settings-page .profile-details{margin:6px 0 1px;justify-content:flex-start}
+.settings-page .profile-details span{padding:5px 8px;font-size:10px}
+.settings-page .settings-form-grid{gap:10px}
+.settings-page .settings-form-grid input{height:44px;padding:9px 11px;border-radius:12px}
+.settings-page .settings-bio-field textarea{min-height:68px;padding:10px 11px;border-radius:12px}
+.settings-page .settings-save-row{padding-top:0}
+.settings-page .settings-save-row .primary{min-height:40px;padding:9px 15px}
+.settings-page .settings-quick-grid article{min-height:86px;padding:12px;border-radius:15px}
+.settings-page .settings-list{border-radius:19px}
+.settings-page .settings-list>button{min-height:58px!important;padding:9px 15px!important}
+@media(max-width:560px){.settings-page{width:100%}.settings-page .settings-hero{padding:14px 16px}.settings-page .settings-profile-card{padding:16px!important}.settings-page .settings-profile-heading .avatar{width:54px;height:54px}.settings-page .settings-save-row .primary{width:auto}}
