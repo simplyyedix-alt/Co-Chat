@@ -99,8 +99,11 @@ Deno.serve(async (request) => {
       if (socialUpload && !metadata.twittId) return response({ error: 'twittId is required for Twitt media' }, 400)
       const parent = safeSegment(socialUpload ? metadata.twittId || 'twitt' : metadata.conversationId || 'shared', socialUpload ? 'twitt' : 'shared')
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-120) || 'file'
+      // S3-compatible user-metadata values are sent as HTTP headers and must
+      // be ASCII-safe. Camera/gallery names can contain emoji or other Unicode.
+      const safeOriginalName = file.name.replace(/[^\x20-\x7E]/g, '_').slice(0, 200)
       const key = `${socialUpload ? 'twitt-media' : 'conversation-media'}/${parent}/${safeSegment(uid, 'user')}/${crypto.randomUUID()}-${safeName}`
-      await s3.send(new PutObjectCommand({ Bucket: config.bucket, Key: key, Body: new Uint8Array(await file.arrayBuffer()), ContentType: file.type, Metadata: { ownerid: uid, originalname: file.name.slice(0, 200) } }))
+      await s3.send(new PutObjectCommand({ Bucket: config.bucket, Key: key, Body: new Uint8Array(await file.arrayBuffer()), ContentType: file.type, Metadata: { ownerid: uid, originalname: safeOriginalName || 'file' } }))
       return response({ provider: 'backblaze-b2', storageKey: key, url: await signedUrl(s3, config.bucket, key, file.type), originalName: file.name, mimeType: file.type, sizeBytes: file.size })
     }
 
