@@ -1,3 +1,45 @@
 .chat-profile-menu{max-height:calc(100dvh - 110px);overflow-y:auto}.chat-profile-menu:has(.group-member-list){position:fixed;inset:0;z-index:20;margin:0;border-radius:0;max-height:none;overflow-y:auto;padding:32px max(18px,calc((100vw - 680px)/2));animation:group-page-in .32s cubic-bezier(.2,.8,.2,1)}.group-friend-picker{margin-top:10px;text-align:left}.group-friend-picker>small{margin-bottom:8px}.group-friend-picker .search{width:100%;height:42px;margin-bottom:8px}.group-friend-results{padding:4px 10px;border:1px solid #dfe1ef;border-radius:12px}.group-friend-results .person-result{cursor:pointer}@keyframes group-page-in{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}:root.dark .group-friend-results{border-color:#454862}
 .public-profile-details{width:100%;margin:12px 0;padding:12px 14px;border:1px solid #dfe1ef;border-radius:12px;background:#ffffff33;text-align:left}.public-profile-details p{margin:0 0 8px;line-height:1.45}.public-profile-details small{display:block;margin-top:4px}:root.dark .public-profile-details{border-color:#454862;background:#11142655}
 .chat-profile-menu:has(.group-member-list){background:linear-gradient(155deg,#f5f2ff 0%,#edf7ff 100%);color:#20233b}.chat-profile-menu:has(.group-member-list) .group-member-list{margin:18px 0;padding:8px;border:1px solid #d9dced;border-radius:16px;background:#ffffff99}.chat-profile-menu:has(.group-member-list) .group-member-list .person-result{padding:12px 6px}.chat-profile-menu:has(.group-member-list) .secondary{border:1px solid #d6d4f2;background:#fff;color:#5545c6}.chat-profile-menu:has(.group-member-list) .danger-text{color:#b43d58}:root.dark .chat-profile-menu:has(.group-member-list){background:linear-gradient(155deg,#29264b 0%,#202f46 100%);color:#f5f5ff}:root.dark .chat-profile-menu:has(.group-member-list) .group-member-list{border-color:#454862;background:#16182799}:root.dark .chat-profile-menu:has(.group-member-list) .secondary{border-color:#565276;background:#302d55;color:#eeeaff}
+.chat-profile-menu:has(.group-member-list){padding:clamp(22px,5vw,58px) 20px 120px!important;background:radial-gradient(circle at 50% -10%,#7662db55 0,#7662db00 34%),linear-gradient(160deg,#f8f7ff 0%,#eef5ff 100%)!important}
+.chat-profile-menu:has(.group-member-list)>*{width:min(100%,640px);margin-left:auto;margin-right:auto}
+.chat-profile-menu:has(.group-member-list) .close-profile{position:fixed;top:20px;right:20px;z-index:4;width:42px;height:42px;border:1px solid #ffffff2c;border-radius:14px;background:#17182a;color:#fff;font-size:24px;box-shadow:0 10px 26px #15152b25}
+.group-profile-hero{position:relative;display:flex;align-items:center;justify-content:flex-start;gap:16px;margin:0 auto 10px!important;padding:24px 26px;border:1px solid #ffffff40;border-radius:26px;background:linear-gradient(135deg,#ffffffcc,#f0efff99);box-shadow:0 18px 44px #4c3a9b1c}
+.group-profile-hero .avatar.large{width:78px!important;height:78px!important;border-radius:25px!important;border:4px solid #fff;box-shadow:0 10px 24px #3c2d7c32}
+.group-profile-hero h3{margin:0 0 4px!important;font-size:26px!important;letter-spacing:-.04em}
+.group-profile-subtitle{font-size:12px!important;color:#6f6d87!important}
+.chat-profile-menu:has(.group-member-list)>small{display:block;margin:0 auto 16px!important;padding:0 5px;color:#706d8a!important;font-size:12px!important;text-align:left}
+.group-profile-tools{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:18px auto 8px!important;padding:0 4px!important}
+.group-profile-tools span{color:#6d6792!important;font-size:10px!important;letter-spacing:.15em}
+.group-profile-tools small{margin:0!important;color:#85829a!important;font-size:11px!important;text-align:right}
+.chat-profile-menu:has(.group-member-list) .group-member-list{margin:0 auto 16px!important;padding:7px!important;border:1px solid #dcdcf0!important;border-radius:20px!important;background:#ffffffc9!important;box-shadow:0 12px 30px #493c9212}
+.chat-profile-menu:has(.group-member-list) .group-member-list .person-result{min-height:64px;padding:10px 11px!important;border-bottom:1px solid #e9e8f3!important;border-radius:14px;color:#24243b}
+.chat-profile-menu:has(.group-member-list) .group-member-list .person-result:last-child{border-bottom:0}
+.chat-profile-menu:has(.group-member-list) .group-member-list .person-result:hover{background:#f2efff}
+.chat-profile-menu:has(.group-member-list) .group-member-list .person-result .avatar{width:42px;height:42px;border-radius:14px}
+.chat-profile-menu:has(.group-member-list) .group-member-list .chat-copy{gap:3px}
+.chat-profile-menu:has(.group-member-list) .group-member-list .chat-copy strong{font-size:13px;color:#28263d}
+.chat-profile-menu:has(.group-member-list) .group-member-list .chat-copy span{font-size:11px;color:#85829a}
+.chat-profile-menu:has(.group-member-list) .profile-actions{display:grid!important;grid-template-columns:1fr 1fr;gap:10px;margin:10px auto 0!important}
+.chat-profile-menu:has(.group-member-list) .profile-actions.group-add-members{display:block!important;margin-top:10px!important}
+.chat-profile-menu:has(.group-member-list) .profile-actions.group-add-members>.secondary{width:100%}
+.chat-profile-menu:has(.group-member-list) .profile-actions input{min-width:0;width:100%;height:48px;border:1px solid #dcdcf0;border-radius:14px;background:#fff;color:#24243b;padding:0 14px}
+.chat-profile-menu:has(.group-member-list) .profile-actions .secondary{min-height:48px;border:1px solid #d8d3fa;background:#7160dc;color:#fff;border-radius:14px;font-weight:800;box-shadow:0 8px 18px #6654cf2b}
+.chat-profile-menu:has(.group-member-list) .profile-actions:last-child .secondary{grid-column:1/-1;background:#ebe9f7;color:#5c5873;box-shadow:none}
+.chat-profile-menu:has(.group-member-list) .group-friend-picker{padding:12px 0 0}
+.chat-profile-menu:has(.group-member-list) .group-friend-results{padding:6px;border-radius:16px;background:#fff;border-color:#dedced}
+:root.dark .chat-profile-menu:has(.group-member-list){background:radial-gradient(circle at 50% -10%,#7160d744 0,#7160d700 34%),linear-gradient(160deg,#171827 0%,#10141d 100%)!important}
+:root.dark .group-profile-hero{border-color:#ffffff12;background:linear-gradient(135deg,#292844cc,#1d2635cc);box-shadow:0 18px 44px #0004}
+:root.dark .group-profile-hero .avatar.large{border-color:#35334d}
+:root.dark .chat-profile-menu:has(.group-member-list)>small{color:#9f9db5!important}
+:root.dark .group-profile-tools span{color:#aaa4d9!important}
+:root.dark .group-profile-tools small{color:#9f9db5!important}
+:root.dark .chat-profile-menu:has(.group-member-list) .group-member-list{border-color:#34364f!important;background:#191b2a!important;box-shadow:0 12px 30px #0003}
+:root.dark .chat-profile-menu:has(.group-member-list) .group-member-list .person-result{border-color:#303247!important;color:#f3f2ff}
+:root.dark .chat-profile-menu:has(.group-member-list) .group-member-list .person-result:hover{background:#252341}
+:root.dark .chat-profile-menu:has(.group-member-list) .group-member-list .chat-copy strong{color:#f3f2ff}
+:root.dark .chat-profile-menu:has(.group-member-list) .group-member-list .chat-copy span{color:#aaa8bd}
+:root.dark .chat-profile-menu:has(.group-member-list) .profile-actions input{border-color:#36384e;background:#1c1f2a;color:#f5f5ff}
+:root.dark .chat-profile-menu:has(.group-member-list) .profile-actions .secondary{background:#6657d2;color:#fff}
+:root.dark .chat-profile-menu:has(.group-member-list) .profile-actions:last-child .secondary{background:#292b40;color:#e8e6f5}
+@media(max-width:520px){.chat-profile-menu:has(.group-member-list){padding:18px 14px 110px!important}.chat-profile-menu:has(.group-member-list) .close-profile{top:12px;right:12px}.group-profile-hero{padding:20px 17px;border-radius:22px}.group-profile-hero .avatar.large{width:64px!important;height:64px!important;border-radius:21px!important}.group-profile-hero h3{font-size:22px!important}.chat-profile-menu:has(.group-member-list) .profile-actions{grid-template-columns:1fr}.chat-profile-menu:has(.group-member-list) .profile-actions:last-child .secondary{grid-column:auto}}
