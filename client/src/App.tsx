@@ -366,7 +366,6 @@ function Nav({
         ["chats", "💬", "Chats"],
         ["study", "◷", "Study"],
         ["communities", "👥", "Communities"],
-        ["search", "⌕", "People"],
         ["discover", "✦", "Discover"],
         ["settings", "⚙", "Settings"],
       ].map(([id, icon, label]) => (
@@ -2226,8 +2225,11 @@ export default function App() {
               className="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search people and messages"
+              placeholder="Search chats or find people by username"
             />
+            {page === "chats" && search.trim() && (
+              <SearchPanel uid={liveUser.uid} onSelect={startConversation} externalTerm={search} onTermChange={setSearch} embedded />
+            )}
             {page === "chats" && (
               <section className="online-section" aria-label="Users online">
                 <div className="section-title">USERS ONLINE</div>
@@ -2414,7 +2416,6 @@ export default function App() {
         )}
         {page === "study" && <StudyHome uid={liveUser.uid} onOpenDiscover={() => { setDiscoverCommunity("all"); setPage("discover"); }} />}
         {page === "discover" && <TwittFeed initialCommunity={discoverCommunity} />}
-        {page === "search" && <SearchPanel uid={liveUser.uid} onSelect={startConversation} />}
         {page === "status" && (
           <div className="hero-card coming-soon">
             <span>◉</span>
@@ -2745,11 +2746,18 @@ function FriendZone({
 function SearchPanel({
   uid,
   onSelect,
+  externalTerm,
+  onTermChange,
+  embedded = false,
 }: {
   uid: string;
   onSelect: (profile: UserProfile) => void;
+  externalTerm?: string;
+  onTermChange?: (value: string) => void;
+  embedded?: boolean;
 }) {
   const [term, setTerm] = useState("");
+  const activeTerm = externalTerm ?? term;
   const [history, setHistory] = useState<
     Array<{ uid: string; displayName: string; username: string }>
   >(() => {
@@ -2773,14 +2781,14 @@ function SearchPanel({
   const [profileExpanded, setProfileExpanded] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (term.trim())
-        findUsers(term, uid)
+      if (activeTerm.trim())
+        findUsers(activeTerm, uid)
           .then(setResults)
           .catch(() => setResults([]));
       else setResults([]);
     }, 250);
     return () => clearTimeout(timer);
-  }, [term, uid]);
+  }, [activeTerm, uid]);
   useEffect(() => {
     Promise.all(
       results.map(
@@ -2860,15 +2868,8 @@ function SearchPanel({
     }
   };
   return (
-    <section className="search-panel">
-      <p className="eyebrow">FIND PEOPLE</p>
-      <h2>Search Co‑Chat</h2>
-      <input
-        autoFocus
-        value={term}
-        onChange={(e) => setTerm(e.target.value)}
-        placeholder="Search by username"
-      />
+    <section className={`search-panel ${embedded ? "search-panel-embedded" : ""}`}>
+      {!embedded && <><p className="eyebrow">FIND PEOPLE</p><h2>Search Co‑Chat</h2><input autoFocus value={activeTerm} onChange={(e) => { setTerm(e.target.value); onTermChange?.(e.target.value); }} placeholder="Search by username" /></>}
       {actionError && (
         <div className="notice">
           {actionError}
@@ -2903,6 +2904,7 @@ function SearchPanel({
               key={item.uid}
               onClick={() => {
                 setTerm(item.username);
+                onTermChange?.(item.username);
                 remember(item as UserProfile);
               }}
             >
@@ -2968,7 +2970,7 @@ function SearchPanel({
             </div>
           );
         })}
-        {term && !results.length && (
+        {activeTerm && !results.length && (
           <div className="empty-state">No matching people yet.</div>
         )}
       </div>
