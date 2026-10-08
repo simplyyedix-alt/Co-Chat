@@ -22,7 +22,7 @@ export async function verifyFirebaseIdentity(idToken: string) {
   return data as { uid: string; email: string; displayName: string; photoURL: string }
 }
 
-export async function invokeSocialApi(idToken: string, payload: { action: 'feed' | 'comments' | 'create' | 'view' | 'like' | 'comment' | 'attach' | 'attach-comment' | 'delete-twitt' | 'hide' | 'comment-like' | 'delete-comment'; twittId?: string; commentId?: string; text?: string; community?: string; cursor?: string | null; liked?: boolean; attachment?: { name: string; url: string; storageKey?: string; type: string; size: number } }) {
+export async function invokeSocialApi(idToken: string, payload: { action: 'feed' | 'comments' | 'create' | 'view' | 'like' | 'comment' | 'attach' | 'attach-comment' | 'delete-twitt' | 'hide' | 'comment-like' | 'delete-comment'; twittId?: string; commentId?: string; text?: string; community?: string; cursor?: string | null; liked?: boolean; mode?: 'study' | 'social'; friendIds?: string[]; attachment?: { name: string; url: string; storageKey?: string; type: string; size: number } }) {
   if (!supabaseReady) throw new Error('Supabase is not configured.')
   const result = await fetch(`${supabaseUrl}/functions/v1/social-api`, {
     method: 'POST',

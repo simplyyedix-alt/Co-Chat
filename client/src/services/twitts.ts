@@ -20,6 +20,7 @@ import { socialBackend, supabaseReady } from '../supabase'
 import { attachSupabaseTwittCommentMedia, attachSupabaseTwittMedia, createSupabaseTwitt, createSupabaseTwittComment, deleteSupabaseTwitt, deleteSupabaseTwittComment, hideSupabaseTwitt, loadSupabaseTwittComments, loadSupabaseTwittPage, recordSupabaseTwittView, toggleSupabaseTwittCommentLike, toggleSupabaseTwittLike } from './supabaseTwitts'
 
 export type TwittCommunity = string
+export type TwittFeedType = 'study' | 'social'
 export type TwittAttachment = { name: string; url: string; storageKey?: string; type: string; size: number }
 
 export type TwittRecord = {
@@ -27,6 +28,9 @@ export type TwittRecord = {
   uid: string
   body: string
   community: TwittCommunity
+  feedType: TwittFeedType
+  expiresAt?: string | null
+  seen?: boolean
   createdAt: DocumentData['createdAt'] | null
   likes: number
   comments: number
@@ -52,6 +56,9 @@ function fromDoc(item: QueryDocumentSnapshot<DocumentData>): TwittRecord {
     uid: String(data.uid || ''),
     body: String(data.body || ''),
     community: String(data.community || 'study').toLowerCase(),
+    feedType: data.feedType === 'social' ? 'social' : 'study',
+    expiresAt: data.expiresAt?.toDate?.()?.toISOString?.() || data.expiresAt || null,
+    seen: Boolean(data.seen),
     createdAt: data.createdAt || null,
     likes: Number(data.likes || 0),
     comments: Number(data.comments || 0),
@@ -68,8 +75,8 @@ function attachmentFromUnknown(value: unknown): TwittAttachment | null {
   return { name: String(item.name || 'attachment'), url, storageKey: item.storageKey ? String(item.storageKey) : undefined, type: String(item.type || 'application/octet-stream'), size: Number(item.size || 0) }
 }
 
-export async function loadTwittPage(community: TwittCommunity | 'all', cursor?: string | null): Promise<TwittPage> {
-  if (socialBackend === 'supabase' && supabaseReady) return loadSupabaseTwittPage(community, cursor)
+export async function loadTwittPage(community: TwittCommunity | 'all', cursor?: string | null, options: { feedType?: TwittFeedType; friendIds?: string[] } = {}): Promise<TwittPage> {
+  if (socialBackend === 'supabase' && supabaseReady) return loadSupabaseTwittPage(community, cursor, options)
   if (!db) return { items: [], cursor: null, hasMore: false }
   const constraints: QueryConstraint[] = community === 'all'
     ? [orderBy('createdAt', 'desc'), ...(cursor ? [where('createdAt', '<', Timestamp.fromDate(new Date(cursor)))] : []), limit(PAGE_SIZE)]
@@ -79,12 +86,12 @@ export async function loadTwittPage(community: TwittCommunity | 'all', cursor?: 
   return { items: snapshot.docs.map(fromDoc), cursor: lastCreatedAt?.toDate?.()?.toISOString?.() || null, hasMore: snapshot.size === PAGE_SIZE }
 }
 
-export async function createTwitt(uid: string, body: string, community: TwittCommunity, attachment?: TwittAttachment | null) {
-  if (socialBackend === 'supabase' && supabaseReady) return createSupabaseTwitt(uid, body, community, attachment)
+export async function createTwitt(uid: string, body: string, community: TwittCommunity, attachment?: TwittAttachment | null, feedType: TwittFeedType = 'study') {
+  if (socialBackend === 'supabase' && supabaseReady) return createSupabaseTwitt(uid, body, community, attachment, feedType)
   if (!db) throw new Error('Firebase is not configured.')
   const text = body.trim()
   if (!text || text.length > 280) throw new Error('Twitt must be between 1 and 280 characters.')
-  const ref = await addDoc(collection(db, 'twitts'), { uid, body: text, community, likes: 0, comments: 0, views: 0, ...(attachment ? { attachment } : {}), createdAt: serverTimestamp() })
+  const ref = await addDoc(collection(db, 'twitts'), { uid, body: text, community, feedType, ...(feedType === 'social' ? { expiresAt: new Date(Date.now() + 24 * 3_600_000) } : {}), likes: 0, comments: 0, views: 0, ...(attachment ? { attachment } : {}), createdAt: serverTimestamp() })
   return ref.id
 }
 

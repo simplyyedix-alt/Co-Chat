@@ -699,7 +699,7 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   );
 }
 
-type TwittPreview = { id: string; authorUid: string; author: string; handle: string; avatar: string; body: string; likes: number; comments: number; views: string; age: string; createdAt: number; community: string; liked?: boolean; attachment?: TwittAttachment | null };
+type TwittPreview = { id: string; authorUid: string; author: string; handle: string; avatar: string; body: string; likes: number; comments: number; views: string; age: string; createdAt: number; community: string; feedType: "study" | "social"; expiresAt?: string | null; seen?: boolean; liked?: boolean; attachment?: TwittAttachment | null };
 
 function CommentSheet({ post, comments, loading, hasMore, names, currentUid, onClose, onLoadMore, onSubmit, onLike, onDelete }: {
   post: TwittPreview; comments: TwittComment[]; loading: boolean; hasMore: boolean; names: Record<string, string>; currentUid?: string;
@@ -724,6 +724,7 @@ function CommentSheet({ post, comments, loading, hasMore, names, currentUid, onC
   </div>;
 }
 function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) {
+  const [feedType, setFeedType] = useState<"study" | "social">("study");
   const [tab, setTab] = useState<"recent" | "trending">("recent");
   const [posts, setPosts] = useState<TwittPreview[]>([]);
   const [authorNames, setAuthorNames] = useState<Record<string, string>>({});
@@ -732,6 +733,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
   const [community, setCommunity] = useState<string>(initialCommunity);
   const followKey = `cochat-following-${auth?.currentUser?.uid || "preview"}`;
   const [following, setFollowing] = useState<string[]>(() => { try { const value = JSON.parse(localStorage.getItem(followKey) || "null"); return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : []; } catch { return []; } });
+  const [friendIds, setFriendIds] = useState<string[]>([]);
   const [composerOpen, setComposerOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [publishError, setPublishError] = useState("");
@@ -759,6 +761,11 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
   const [hiddenPosts, setHiddenPosts] = useState<string[]>(() => { try { const saved = JSON.parse(localStorage.getItem(hiddenKey) || "[]"); return Array.isArray(saved) ? saved : []; } catch { return []; } });
   useEffect(() => { try { localStorage.setItem(reactionKey, JSON.stringify({ posts: likedPostIds, comments: likedCommentIds })); } catch { /* reaction cache is optional */ } }, [reactionKey, likedPostIds, likedCommentIds]);
   useEffect(() => { setCommunity(initialCommunity); setVisible(3); }, [initialCommunity]);
+  useEffect(() => {
+    const uid = auth?.currentUser?.uid;
+    if (!uid) return;
+    listFriends(uid).then((friends) => setFriendIds(friends.map((friend) => friend.uid))).catch(() => setFriendIds([]));
+  }, []);
   useEffect(() => { try { localStorage.setItem(followKey, JSON.stringify(following)); } catch { /* preferences are optional */ } }, [followKey, following]);
   useEffect(() => { try { localStorage.setItem(hiddenKey, JSON.stringify(hiddenPosts)); } catch { /* preferences are optional */ } }, [hiddenKey, hiddenPosts]);
   useEffect(() => {
@@ -767,30 +774,32 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
     let active = true;
     setRemoteLoading(true);
     setRemoteError("");
-    loadTwittPage("all").then((page) => {
+    loadTwittPage("all", null, { feedType, friendIds }).then((page) => {
       if (!active) return;
       {
         const now = Date.now();
-        setPosts(page.items.map((item) => ({ id: item.id, authorUid: item.uid, author: item.uid === viewerUid ? "You" : "Co-Chat member", handle: item.uid, avatar: item.uid === viewerUid ? "YO" : "CM", body: item.body, likes: Math.max(0, item.likes), liked: Boolean(item.liked), comments: Math.max(0, item.comments), views: String(item.views), attachment: item.attachment, age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community })));
+        setPosts(page.items.map((item) => ({ id: item.id, authorUid: item.uid, author: item.uid === viewerUid ? "You" : "Co-Chat member", handle: item.uid, avatar: item.uid === viewerUid ? "YO" : "CM", body: item.body, likes: Math.max(0, item.likes), liked: Boolean(item.liked), comments: Math.max(0, item.comments), views: String(item.views), attachment: item.attachment, age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community, feedType: item.feedType, expiresAt: item.expiresAt, seen: item.seen })));
         setVisible(20);
       }
       setRemoteCursor(page.cursor);
       setRemoteHasMore(page.hasMore);
     }).catch((error) => { if (active) setRemoteError(error instanceof Error ? error.message : "Could not load real Twitts."); }).finally(() => { if (active) setRemoteLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [feedType, friendIds]);
   const list = useMemo(() => {
     const now = Date.now();
-    const eligible = posts.filter((post) => now - post.createdAt <= (tab === "recent" ? 24 : 24 * 7) * 3_600_000);
-    return (tab === "recent" ? eligible.sort((a, b) => b.createdAt - a.createdAt) : eligible.sort((a, b) => b.likes - a.likes || b.comments - a.comments || b.createdAt - a.createdAt).slice(0, 10));
-  }, [posts, tab]);
+    const eligible = posts.filter((post) => post.feedType === feedType && (feedType === "social" ? now - post.createdAt <= 24 * 3_600_000 : now - post.createdAt <= (tab === "recent" ? 24 : 24 * 7) * 3_600_000));
+    if (feedType === "social") return eligible.sort((a, b) => Number(a.seen) - Number(b.seen) || Number(friendIds.includes(b.authorUid)) - Number(friendIds.includes(a.authorUid)) || b.createdAt - a.createdAt);
+    return (tab === "recent" ? eligible.sort((a, b) => b.createdAt - a.createdAt) : eligible.sort((a, b) => (b.likes + Number(b.views || 0)) - (a.likes + Number(a.views || 0)) || b.createdAt - a.createdAt).slice(0, 10));
+  }, [posts, tab, feedType, friendIds]);
   const loadMore = async () => {
+    if (visible < filtered.length) { setVisible((current) => current + 20); return; }
     if (remoteCursor && remoteHasMore && !remoteLoading) {
       setRemoteLoading(true);
       try {
-        const page = await loadTwittPage("all", remoteCursor);
+        const page = await loadTwittPage("all", remoteCursor, { feedType, friendIds });
         const now = Date.now();
-        setPosts((current) => [...current, ...page.items.map((item) => ({ id: item.id, authorUid: item.uid, author: item.uid === auth?.currentUser?.uid ? "You" : "Co-Chat member", handle: item.uid, avatar: item.uid === auth?.currentUser?.uid ? "YO" : "CM", body: item.body, likes: Math.max(0, item.likes), liked: Boolean(item.liked), comments: Math.max(0, item.comments), views: String(item.views), attachment: item.attachment, age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community }))]);
+        setPosts((current) => [...current, ...page.items.map((item) => ({ id: item.id, authorUid: item.uid, author: item.uid === auth?.currentUser?.uid ? "You" : "Co-Chat member", handle: item.uid, avatar: item.uid === auth?.currentUser?.uid ? "YO" : "CM", body: item.body, likes: Math.max(0, item.likes), liked: Boolean(item.liked), comments: Math.max(0, item.comments), views: String(item.views), attachment: item.attachment, age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community, feedType: item.feedType, expiresAt: item.expiresAt, seen: item.seen }))]);
         setRemoteCursor(page.cursor);
         setRemoteHasMore(page.hasMore);
         setVisible((current) => current + page.items.length);
@@ -827,7 +836,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
       if (post.id.startsWith("local-") || viewedPosts.current.has(post.id)) return;
       viewedPosts.current.add(post.id);
       void recordTwittView(post.id, uid).then((counted) => {
-        if (counted) setPosts((current) => current.map((item) => item.id === post.id ? { ...item, views: String(Number(item.views || 0) + 1) } : item));
+        if (counted) setPosts((current) => current.map((item) => item.id === post.id ? { ...item, views: String(Number(item.views || 0) + 1), seen: true } : item));
       }).catch(() => viewedPosts.current.delete(post.id));
     });
   }, [filtered, visible]);
@@ -998,7 +1007,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
     let attachment: TwittAttachment | null = null;
     if (uid && firebaseReady) {
       try {
-        id = await createRemoteTwitt(uid, body, draftCommunity);
+        id = await createRemoteTwitt(uid, body, feedType === "social" ? "public" : draftCommunity, undefined, feedType);
         if (draftFile) {
           const uploaded = await StorageManager.upload(draftFile, { ownerId: uid, originalName: draftFile.name, mimeType: draftFile.type, sizeBytes: draftFile.size, twittId: id, scope: 'twitt' });
           attachment = { name: uploaded.originalName, url: uploaded.url, storageKey: uploaded.storageKey, type: uploaded.mimeType, size: uploaded.sizeBytes };
@@ -1012,20 +1021,21 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
       }
     }
     const profile = uid ? await getUserProfile(uid).catch(() => null) : null;
-    const post: TwittPreview = { id, authorUid: uid || "your_profile", author: "You", handle: profile?.username || uid || "your_profile", avatar: "YO", body, likes: 0, comments: 0, views: "0", age: "now", createdAt: Date.now(), community: draftCommunity, attachment };
+    const post: TwittPreview = { id, authorUid: uid || "your_profile", author: "You", handle: profile?.username || uid || "your_profile", avatar: "YO", body, likes: 0, comments: 0, views: "0", age: "now", createdAt: Date.now(), community: feedType === "social" ? "public" : draftCommunity, feedType, expiresAt: feedType === "social" ? new Date(Date.now() + 24 * 3_600_000).toISOString() : null, attachment };
     setPosts((current) => [post, ...current]);
     setDraft(""); setDraftFile(null);
     setComposerOpen(false);
-    setCommunity(draftCommunity);
+    setCommunity(feedType === "social" ? "all" : draftCommunity);
     setTab("recent");
     setVisible(20);
     setPublishing(false);
   };
-  return <div className="twitt-feed">
-    <section className="discover-intro"><div><span className="kicker">CO-CHAT DISCOVER</span><h2>Drop something useful.</h2><p>Study wins, real questions, and people learning alongside you.</p></div><button className="primary compact" type="button" onClick={() => setComposerOpen(true)}>＋ Write a Twitt</button></section>
-    {composerOpen && <section className="twitt-composer"><div className="composer-heading"><strong>Write to your community</strong><button className="icon" type="button" disabled={publishing} onClick={() => setComposerOpen(false)}>×</button></div><textarea disabled={publishing} value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 280))} placeholder="Share a useful thought, question, or study win…" autoFocus /><label className="twitt-media-picker">📎 Add photo/PDF (max 5 MB)<input disabled={publishing} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => setDraftFile(event.target.files?.[0] || null)} /></label>{draftFile && <small className="twitt-file-name">{draftFile.name}</small>}{publishError && <p className="twitt-sync-error">{publishError}</p>}<div className="composer-footer"><div className="tag-input"><span>#</span><input disabled={publishing} list="twitt-tag-suggestions" value={draftCommunity} onChange={(event) => setDraftCommunity(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} placeholder="Add a tag (required)" /><datalist id="twitt-tag-suggestions">{tagSuggestions.map((tag) => <option value={tag} key={tag} />)}</datalist></div><span>{draft.length}/280</span><button className="primary compact" type="button" disabled={!draft.trim() || !draftCommunity || publishing} onClick={() => void createTwitt()}>{publishing ? "◌ Uploading…" : "Post Twitt"}</button></div></section>}
-    <div className="community-filter" aria-label="Twitt tag filter">{[["all", "All"], ["following", "Following"], ...popularTags.map((tag) => [tag, `#${tag}`] as const)].map(([id, label]) => <button key={id} className={community === id ? "active" : ""} onClick={() => { setCommunity(id); setVisible(3); }}>{label}</button>)}</div>
-    <div className="feed-tabs"><button className={tab === "recent" ? "active" : ""} onClick={() => setTab("recent")}>Recent <small>{communityLabel} · 24h</small></button><button className={tab === "trending" ? "active" : ""} onClick={() => setTab("trending")}>Trending <small>{communityLabel} · daily</small></button></div>
+  return <div className={`twitt-feed feed-type-${feedType}`}>
+    <div className="discovery-mode-tabs" role="tablist" aria-label="Discovery mode"><button type="button" role="tab" aria-selected={feedType === "study"} className={feedType === "study" ? "active" : ""} onClick={() => { setFeedType("study"); setTab("recent"); setCommunity("all"); setVisible(20); }}>Study <small>Questions & answers</small></button><button type="button" role="tab" aria-selected={feedType === "social"} className={feedType === "social" ? "active" : ""} onClick={() => { setFeedType("social"); setTab("recent"); setCommunity("all"); setVisible(20); }}>Social <small>24-hour moments</small></button></div>
+    <section className="discover-intro"><div><span className="kicker">CO-CHAT {feedType === "study" ? "STUDY" : "SOCIAL"}</span><h2>{feedType === "study" ? "Ask it. Solve it together." : "Share the moment."}</h2><p>{feedType === "study" ? "Post a doubt as text, photo, or PDF and get clear answers from your circle." : "Friends appear first. Once you see a post, it moves down so your feed stays fresh."}</p></div><button className="primary compact" type="button" onClick={() => setComposerOpen(true)}>＋ {feedType === "study" ? "Ask a doubt" : "Share a moment"}</button></section>
+    {composerOpen && <section className="twitt-composer"><div className="composer-heading"><strong>{feedType === "study" ? "Ask your study community" : "Share with friends"}</strong><button className="icon" type="button" disabled={publishing} onClick={() => setComposerOpen(false)}>×</button></div><textarea disabled={publishing} value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 280))} placeholder={feedType === "study" ? "Describe your doubt or study win…" : "What is happening today? (expires in 24 hours)"} autoFocus /><label className="twitt-media-picker">📎 Add photo/PDF (max 5 MB)<input disabled={publishing} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => setDraftFile(event.target.files?.[0] || null)} /></label>{draftFile && <small className="twitt-file-name">{draftFile.name}</small>}{publishError && <p className="twitt-sync-error">{publishError}</p>}<div className="composer-footer">{feedType === "study" ? <div className="tag-input"><span>#</span><input disabled={publishing} list="twitt-tag-suggestions" value={draftCommunity} onChange={(event) => setDraftCommunity(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} placeholder="Add a study tag (required)" /><datalist id="twitt-tag-suggestions">{tagSuggestions.map((tag) => <option value={tag} key={tag} />)}</datalist></div> : <span className="social-expiry-note">Visible for 24 hours</span>}<span>{draft.length}/280</span><button className="primary compact" type="button" disabled={!draft.trim() || (feedType === "study" && !draftCommunity) || publishing} onClick={() => void createTwitt()}>{publishing ? "◌ Uploading…" : "Post"}</button></div></section>}
+    {feedType === "study" && <div className="community-filter" aria-label="Twitt tag filter">{[["all", "All"], ["following", "Following"], ...popularTags.map((tag) => [tag, `#${tag}`] as const)].map(([id, label]) => <button key={id} className={community === id ? "active" : ""} onClick={() => { setCommunity(id); setVisible(3); }}>{label}</button>)}</div>}
+    {feedType === "study" && <div className="feed-tabs"><button className={tab === "recent" ? "active" : ""} onClick={() => setTab("recent")}>Recent <small>{communityLabel} · 24h</small></button><button className={tab === "trending" ? "active" : ""} onClick={() => setTab("trending")}>Trending <small>{communityLabel} · top 10</small></button></div>}
     <div className="follow-strip"><span>Following: {following.length ? following.map((id) => id.toUpperCase()).join(" · ") : "none"}</span><button onClick={() => setCommunity("following")}>View following</button></div>
     {remoteError && <div className="notice twitt-sync-error">{remoteError}<button className="secondary compact" type="button" onClick={() => window.location.reload()}>Retry</button></div>}
     {commentError && <div className="notice twitt-sync-error">{commentError}<button className="icon" type="button" aria-label="Dismiss comment error" onClick={() => setCommentError("")}>×</button></div>}
@@ -1034,7 +1044,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
     {commenting && posts.find((post) => post.id === commenting) && <CommentSheet post={posts.find((post) => post.id === commenting)!} comments={commentsByPost[commenting] || []} loading={commentLoading === commenting} hasMore={Boolean(commentMore[commenting])} names={commentNames} currentUid={auth?.currentUser?.uid} onClose={() => setCommenting(null)} onLoadMore={() => void loadMoreComments(commenting)} onSubmit={(body, file) => void submitComment(posts.find((post) => post.id === commenting)!, body, file)} onLike={(comment) => void likeComment(commenting, comment)} onDelete={(comment) => void removeComment(posts.find((post) => post.id === commenting)!, comment)} />}
     {!remoteLoading && !remoteError && !filtered.length && <div className="empty-state">No Twitts in {communityLabel} yet. Be the first to share something useful.</div>}
     {(visible < filtered.length || remoteHasMore) && <button className="load-more" type="button" onClick={() => void loadMore()} disabled={remoteLoading}>{remoteLoading ? "Loading Twitts…" : "Load 20 more Twitts"}</button>}
-    <p className="feed-note">Recent shows the newest posts in this community. Trending is refreshed periodically from eligible posts.</p>
+    <p className="feed-note">{feedType === "study" ? "Recent shows the newest study questions. Trending ranks the top 10 by likes and views." : "Social posts expire after 24 hours. Friends appear first, and posts you have seen move to the bottom."}</p>
   </div>;
 }
 

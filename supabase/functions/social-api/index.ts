@@ -76,6 +76,8 @@ type SocialRequest = {
   cursor?: string
   liked?: boolean
   attachment?: unknown
+  mode?: 'study' | 'social'
+  friendIds?: string[]
 }
 
 function validSocialAttachment(value: unknown) {
@@ -85,6 +87,18 @@ function validSocialAttachment(value: unknown) {
     typeof attachment.name === 'string' && attachment.name.length > 0 &&
     socialMediaTypes.has(String(attachment.type || '')) &&
     Number.isFinite(Number(attachment.size)) && Number(attachment.size) > 0 && Number(attachment.size) <= socialMediaLimit
+}
+
+function containsRestrictedContent(value: string) {
+  // Conservative, text-only safety gate. Media remains limited to images/PDFs;
+  // the app should still use moderation tooling for anything more sophisticated.
+  return /\b(?:porn|pornography|xxx|nsfw|nude|nudity|naked|onlyfans|blowjob|handjob|deepfake|genitals|sexual|sexually|erotic|boobs|breasts|pussy|dickpic|cumshot|fetish|escort)\b/i.test(value)
+}
+
+function attachmentNameIsRestricted(value: unknown) {
+  if (!value || typeof value !== 'object') return false
+  const item = value as Record<string, unknown>
+  return containsRestrictedContent(`${String(item.name || '')} ${String(item.url || '')}`)
 }
 
 Deno.serve(async (request) => {
@@ -106,7 +120,11 @@ Deno.serve(async (request) => {
 
   try {
     if (body.action === 'feed') {
-      const params = new URLSearchParams({ select: 'id,author_id,community,body,attachment,likes_count,comments_count,views_count,created_at', order: 'created_at.desc', limit: '20' })
+      const mode = body.mode === 'social' ? 'social' : 'study'
+      if (mode === 'social') await callRpc('purge_expired_social_twitts', {}).catch(() => undefined)
+      const params = new URLSearchParams({ select: 'id,author_id,community,body,attachment,likes_count,comments_count,views_count,created_at,feed_type,expires_at', order: 'created_at.desc', limit: mode === 'social' ? '50' : '100' })
+      params.set('feed_type', `eq.${mode}`)
+      if (mode === 'social') params.set('expires_at', `gt.${new Date().toISOString()}`)
       if (body.community && body.community !== 'all') params.set('community', `eq.${body.community}`)
       if (body.cursor) params.set('created_at', `lt.${body.cursor}`)
       const hidden = await callRest(`twitt_hidden?select=twitt_id&user_id=eq.${encodeURIComponent(uid)}`) as Array<{ twitt_id: string }>
@@ -114,8 +132,21 @@ Deno.serve(async (request) => {
       const rows = await callRest(`twitts?${params.toString()}`) as Array<{ id: string } & Record<string, unknown>>
       const ids = rows.map((item) => item.id)
       const likes = ids.length ? await callRest(`twitt_likes?select=twitt_id&user_id=eq.${encodeURIComponent(uid)}&twitt_id=in.(${ids.join(',')})`) as Array<{ twitt_id: string }> : []
+      const seenRows = ids.length ? await callRest(`twitt_views?select=twitt_id&user_id=eq.${encodeURIComponent(uid)}&twitt_id=in.(${ids.join(',')})`) as Array<{ twitt_id: string }> : []
       const likedIds = new Set(likes.map((item) => item.twitt_id))
-      return response({ items: rows.map((item) => ({ ...item, liked: likedIds.has(item.id) })) })
+      const seenIds = new Set(seenRows.map((item) => item.twitt_id))
+      const friendIds = new Set((body.friendIds || []).filter((id) => typeof id === 'string'))
+      const items: Array<Record<string, unknown> & { id: string; seen: boolean; friend: boolean }> = rows.map((item) => ({ ...item, liked: likedIds.has(item.id), seen: seenIds.has(item.id), friend: friendIds.has(String(item.author_id || '')) }))
+      if (mode === 'social') {
+        items.sort((a, b) => {
+          const seenOrder = Number(a.seen) - Number(b.seen)
+          if (seenOrder) return seenOrder
+          const friendOrder = Number(b.friend) - Number(a.friend)
+          if (friendOrder) return friendOrder
+          return String(b.created_at || '').localeCompare(String(a.created_at || ''))
+        })
+      }
+      return response({ items })
     }
     if (body.action === 'comments') {
       if (!body.twittId) return response({ error: 'twittId is required' }, 400)
@@ -129,10 +160,13 @@ Deno.serve(async (request) => {
     }
     if (body.action === 'create') {
       const text = body.text?.trim() || ''
+      const mode = body.mode === 'social' ? 'social' : 'study'
       if (!text || text.length > 280 || !normalizedCommunity || (body.attachment !== undefined && !validSocialAttachment(body.attachment))) {
         return response({ error: 'Valid text and community are required' }, 400)
       }
-      const rows = await callRest('twitts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ author_id: uid, body: text, community: normalizedCommunity, attachment: body.attachment || null }) })
+      if (containsRestrictedContent(text) || attachmentNameIsRestricted(body.attachment)) return response({ error: 'Adult or explicit content is not allowed.' }, 400)
+      if (mode === 'social') await callRpc('purge_expired_social_twitts', {}).catch(() => undefined)
+      const rows = await callRest('twitts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ author_id: uid, body: text, community: normalizedCommunity, feed_type: mode, expires_at: mode === 'social' ? new Date(Date.now() + 24 * 3_600_000).toISOString() : null, attachment: body.attachment || null }) })
       return response({ id: rows?.[0]?.id || null })
     }
     if (!body.twittId) return response({ error: 'twittId is required' }, 400)
@@ -145,18 +179,21 @@ Deno.serve(async (request) => {
     if (body.action === 'comment') {
       const comment = body.text?.trim() || ''
       if (!comment || comment.length > 240 || (body.attachment !== undefined && !validSocialAttachment(body.attachment))) return response({ error: 'Comment must be 1–240 characters and the attachment must be a photo or PDF up to 5 MB' }, 400)
+      if (containsRestrictedContent(comment) || attachmentNameIsRestricted(body.attachment)) return response({ error: 'Adult or explicit content is not allowed.' }, 400)
       const id = await callRpc('create_twitt_comment', { p_twitt_id: body.twittId, p_user_id: uid, p_body: comment })
       if (body.attachment) await callRest(`twitt_comments?id=eq.${encodeURIComponent(String(id))}&author_id=eq.${encodeURIComponent(uid)}`, { method: 'PATCH', body: JSON.stringify({ attachment: body.attachment }) })
       return response({ id })
     }
     if (body.action === 'attach') {
       if (!validSocialAttachment(body.attachment)) return response({ error: 'Attachment must be a photo or PDF up to 5 MB' }, 400)
+      if (attachmentNameIsRestricted(body.attachment)) return response({ error: 'Adult or explicit content is not allowed.' }, 400)
       const rows = await callRest(`twitts?id=eq.${encodeURIComponent(body.twittId)}&author_id=eq.${encodeURIComponent(uid)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ attachment: body.attachment }) })
       if (!Array.isArray(rows) || !rows.length) return response({ error: 'Only the author can attach media to this Twitt' }, 403)
       return response({ attached: true })
     }
     if (body.action === 'attach-comment') {
       if (!body.commentId || !validSocialAttachment(body.attachment)) return response({ error: 'Attachment must be a photo or PDF up to 5 MB' }, 400)
+      if (attachmentNameIsRestricted(body.attachment)) return response({ error: 'Adult or explicit content is not allowed.' }, 400)
       const rows = await callRest(`twitt_comments?id=eq.${encodeURIComponent(body.commentId)}&author_id=eq.${encodeURIComponent(uid)}&twitt_id=eq.${encodeURIComponent(body.twittId)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ attachment: body.attachment }) })
       if (!Array.isArray(rows) || !rows.length) return response({ error: 'Only the comment author can attach media' }, 403)
       return response({ attached: true })
