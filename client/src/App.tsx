@@ -126,6 +126,7 @@ const initials = (name: string) =>
     .join("")
     .slice(0, 2)
     .toUpperCase() || "U";
+const VerifiedTick = () => <span className="verified-tick" title="Verified account" aria-label="Verified account">✓</span>;
 const formatTime = (value?: { toDate?: () => Date } | null) =>
   value?.toDate
     ? value
@@ -1037,7 +1038,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
     {remoteError && <div className="notice twitt-sync-error">{remoteError}<button className="secondary compact" type="button" onClick={() => window.location.reload()}>Retry</button></div>}
     {commentError && <div className="notice twitt-sync-error">{commentError}<button className="icon" type="button" aria-label="Dismiss comment error" onClick={() => setCommentError("")}>×</button></div>}
     {remoteLoading && !posts.length && <div className="twitt-skeleton-list" aria-label="Loading Twitts"><article><span/><div><b/><i/></div></article><article><span/><div><b/><i/></div></article><article><span/><div><b/><i/></div></article></div>}
-    <div className="twitt-list">{filtered.slice(0, visible).map((post) => <article className="twitt-card" key={post.id}><div className="twitt-head"><span className="avatar">{authorProfiles[post.handle]?.photoURL ? <img src={authorProfiles[post.handle].photoURL} alt="" /> : post.avatar}</span><div><strong>{post.author}</strong>{isModerator(post.authorUid) && <span className="twitt-role-title">Community Moderator</span>}<small>@{post.handle} · {post.age} · {post.community.toUpperCase()}</small></div><div className="twitt-actions"><button className="icon" aria-label="Twitt options" aria-expanded={postMenu === post.id} onClick={() => setPostMenu(postMenu === post.id ? null : post.id)}>•••</button>{postMenu === post.id && <div className="twitt-menu">{post.authorUid === auth?.currentUser?.uid ? <button type="button" className="danger" onClick={() => void removePost(post)}>Delete Twitt</button> : <button type="button" onClick={() => void dismissPost(post)}>Not interested</button>}<button type="button" onClick={() => setPostMenu(null)}>Cancel</button></div>}</div></div><p>{post.body}</p>{post.attachment && (post.attachment.type.startsWith("image/") ? <a className="twitt-media-preview" href={post.attachment.url} target="_blank" rel="noreferrer" download={post.attachment.name}><img src={post.attachment.url} alt={post.attachment.name} /><span>Open / save image</span></a> : <a className="twitt-attachment" href={post.attachment.url} target="_blank" rel="noreferrer" download={post.attachment.name}>📄 {post.attachment.name} · Open / save</a>)}<div className="twitt-meta"><button className={post.liked ? "liked" : ""} aria-label={post.liked ? "Unlike Twitt" : "Like Twitt"} onClick={() => void handleLike(post)}><span className="like-icon" aria-hidden="true">♡</span> {post.likes}</button><button className="comment-action" aria-label="Open comments" onClick={() => void openComments(post.id)}><span className="comment-icon" aria-hidden="true" /> {post.comments}</button><span>◉ {post.views}</span><button className={following.includes(post.community) ? "followed" : ""} onClick={() => setFollowing((current) => current.includes(post.community) ? current.filter((id) => id !== post.community) : [...current, post.community])}>{following.includes(post.community) ? "Following" : `Follow ${post.community.toUpperCase()}`}</button></div></article>)}</div>
+    <div className="twitt-list">{filtered.slice(0, visible).map((post) => <article className="twitt-card" key={post.id}><div className="twitt-head"><span className="avatar">{authorProfiles[post.handle]?.photoURL ? <img src={authorProfiles[post.handle].photoURL} alt="" /> : post.avatar}</span><div><strong>{post.author}</strong>{isModerator(post.authorUid) && <VerifiedTick />}<small>@{post.handle} · {post.age} · {post.community.toUpperCase()}</small></div><div className="twitt-actions"><button className="icon" aria-label="Twitt options" aria-expanded={postMenu === post.id} onClick={() => setPostMenu(postMenu === post.id ? null : post.id)}>•••</button>{postMenu === post.id && <div className="twitt-menu">{post.authorUid === auth?.currentUser?.uid ? <button type="button" className="danger" onClick={() => void removePost(post)}>Delete Twitt</button> : <button type="button" onClick={() => void dismissPost(post)}>Not interested</button>}<button type="button" onClick={() => setPostMenu(null)}>Cancel</button></div>}</div></div><p>{post.body}</p>{post.attachment && (post.attachment.type.startsWith("image/") ? <a className="twitt-media-preview" href={post.attachment.url} target="_blank" rel="noreferrer" download={post.attachment.name}><img src={post.attachment.url} alt={post.attachment.name} /><span>Open / save image</span></a> : <a className="twitt-attachment" href={post.attachment.url} target="_blank" rel="noreferrer" download={post.attachment.name}>📄 {post.attachment.name} · Open / save</a>)}<div className="twitt-meta"><button className={post.liked ? "liked" : ""} aria-label={post.liked ? "Unlike Twitt" : "Like Twitt"} onClick={() => void handleLike(post)}><span className="like-icon" aria-hidden="true">♡</span> {post.likes}</button><button className="comment-action" aria-label="Open comments" onClick={() => void openComments(post.id)}><span className="comment-icon" aria-hidden="true" /> {post.comments}</button><span>◉ {post.views}</span><button className={following.includes(post.community) ? "followed" : ""} onClick={() => setFollowing((current) => current.includes(post.community) ? current.filter((id) => id !== post.community) : [...current, post.community])}>{following.includes(post.community) ? "Following" : `Follow ${post.community.toUpperCase()}`}</button></div></article>)}</div>
     {commenting && posts.find((post) => post.id === commenting) && <CommentSheet post={posts.find((post) => post.id === commenting)!} comments={commentsByPost[commenting] || []} loading={commentLoading === commenting} hasMore={Boolean(commentMore[commenting])} names={commentNames} currentUid={auth?.currentUser?.uid} onClose={() => setCommenting(null)} onLoadMore={() => void loadMoreComments(commenting)} onSubmit={(body, file) => void submitComment(posts.find((post) => post.id === commenting)!, body, file)} onLike={(comment) => void likeComment(commenting, comment)} onDelete={(comment) => void removeComment(posts.find((post) => post.id === commenting)!, comment)} />}
     {!remoteLoading && !remoteError && !filtered.length && <div className="empty-state">No Twitts in {communityLabel} yet. Be the first to share something useful.</div>}
     {(visible < filtered.length || remoteHasMore) && <button className="load-more" type="button" onClick={() => void loadMore()} disabled={remoteLoading}>{remoteLoading ? "Loading Twitts…" : "Load 20 more Twitts"}</button>}
@@ -2065,7 +2066,7 @@ export default function App() {
                     </a>
                   ))}
                     {selected.memberIds.length > 2 && (
-                  <strong className="message-sender">{sender}</strong>
+                  <strong className="message-sender">{sender}{isModerator(item.senderId) && <VerifiedTick />}</strong>
                 )}
                 {item.text && <span>{item.text}</span>}
                 <small>
@@ -2532,9 +2533,9 @@ export default function App() {
             </div>
             <form className="profile-card settings-profile-card" onSubmit={save}>
               <div className="settings-card-kicker">PROFILE & IDENTITY <span>Changes sync across devices</span></div>
-              <div className="settings-profile-heading"><div className="settings-avatar-wrap"><Avatar name={profileName || liveUser.email || "U"} photoURL={liveUser.photoURL || undefined} className="avatar large" /><span className={`settings-presence ${activeStatus ? "online" : ""}`} /></div><div><span className="settings-eyebrow">{isModerator(liveUser.uid) ? "MODERATOR PROFILE" : "PROFILE"}</span><h2>{profileName || "Co Chat member"}</h2><p>{liveUser.email}</p></div></div>
+              <div className="settings-profile-heading"><div className="settings-avatar-wrap"><Avatar name={profileName || liveUser.email || "U"} photoURL={liveUser.photoURL || undefined} className="avatar large" /><span className={`settings-presence ${activeStatus ? "online" : ""}`} /></div><div><span className="settings-eyebrow">PROFILE</span><h2>{profileName || "Co Chat member"}</h2><p>{liveUser.email}</p></div></div>
               <div className="profile-details" aria-label="Profile details">
-                {isModerator(liveUser.uid) && <span className="moderator-badge"><b>✦</b>Moderator</span>}
+                {isModerator(liveUser.uid) && <span className="verified-profile-label"><VerifiedTick />Verified account</span>}
                 <span><b>@</b>{profileUsername || "choose a username"}</span>
                 <span><b>✦</b>{liveUser.emailVerified ? "Verified account" : "Email verification pending"}</span>
                 <span><b>◌</b>{activeStatus ? "Available to friends" : "Activity hidden"}</span>
@@ -2800,7 +2801,7 @@ function FriendZone({
           </button>
           <Avatar profile={focused} className="avatar large" />
           <h3>{focused.displayName}</h3>
-          <p>@{focused.username}</p>
+          <p>@{focused.username}{isModerator(focused.uid) && <VerifiedTick />}</p>
           <div className="public-profile-atmosphere">
             <div className="public-profile-level"><span className="profile-rank-badge">I</span><div><b>Bronze I</b><small>Study level · building momentum</small></div><span className="profile-online-pill">{focused.activeStatus === false ? "Offline" : "Available"}</span></div>
             <div className="public-profile-stats"><span><b>0h</b><small>study logged</small></span><span><b>0</b><small>day streak</small></span><span><b>New</b><small>member</small></span></div>
@@ -3062,7 +3063,7 @@ function SearchPanel({
           </button>
           <Avatar profile={focused} className="avatar large" />
           <h3>{focused.displayName}</h3>
-          <p>@{focused.username}</p>
+          <p>@{focused.username}{isModerator(focused.uid) && <VerifiedTick />}</p>
           <div className="public-profile-atmosphere">
             <div className="public-profile-level"><span className="profile-rank-badge">I</span><div><b>Bronze I</b><small>Study level · building momentum</small></div><span className="profile-online-pill">{focused.activeStatus === false ? "Offline" : "Available"}</span></div>
             <div className="public-profile-stats"><span><b>0h</b><small>study logged</small></span><span><b>0</b><small>day streak</small></span><span><b>New</b><small>member</small></span></div>
