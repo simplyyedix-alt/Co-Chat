@@ -23,7 +23,7 @@ import {
 } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { StorageManager } from './storageManager'
-import { createDirect, createGroup as createSupabaseGroup, deleteConversation as deleteSupabaseConversation, deleteForMe as deleteSupabaseMessageForMe, getProfile as getSupabaseProfile, getStudyLeaderboard as getSupabaseStudyLeaderboard, isSupabaseChatEnabled, markRead as markSupabaseRead, saveStudySession as saveSupabaseStudySession, sendMessage as sendSupabaseMessage, unsend as unsendSupabaseMessage, updateStudyPresence as updateSupabaseStudyPresence, upsertProfile as upsertSupabaseProfile, watchConversations as watchSupabaseConversations, watchMessages as watchSupabaseMessages, type StudyLeaderboardEntry } from './supabaseChat'
+import { addGroupMembers as addSupabaseGroupMembers, createDirect, createGroup as createSupabaseGroup, deleteConversation as deleteSupabaseConversation, deleteForMe as deleteSupabaseMessageForMe, getProfile as getSupabaseProfile, getStudyLeaderboard as getSupabaseStudyLeaderboard, isSupabaseChatEnabled, leaveGroup as leaveSupabaseGroup, markRead as markSupabaseRead, removeGroupMember as removeSupabaseGroupMember, saveStudySession as saveSupabaseStudySession, sendMessage as sendSupabaseMessage, unsend as unsendSupabaseMessage, updateGroup as updateSupabaseGroup, updateStudyPresence as updateSupabaseStudyPresence, upsertProfile as upsertSupabaseProfile, watchConversations as watchSupabaseConversations, watchMessages as watchSupabaseMessages, type StudyLeaderboardEntry } from './supabaseChat'
 export { isSupabaseChatEnabled } from './supabaseChat'
 
 export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; bio?: string; notificationsEnabled?: boolean; discoverable?: boolean; activeStatus?: boolean; theme?: 'light' | 'dark'; lastSeen?: Timestamp | null; profileComplete?: boolean }
@@ -207,7 +207,7 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
       const lastMessageAt = asTimestamp(data.lastMessageAt)
       const readAt = data.readAt && typeof data.readAt === 'object' ? data.readAt as Record<string, unknown> : {}
       const otherReadAt = otherId ? asTimestamp(readAt[otherId]) : null
-      return { id: item.id, name, memberIds, type: data.type === 'group' ? ('group' as const) : ('direct' as const), adminId: data.adminId ? String(data.adminId) : undefined, lastMessage: String(data.lastMessage || ''), lastSenderId: data.lastSenderId ? String(data.lastSenderId) : undefined, lastMessageAt, lastMessageSeen: Boolean(lastMessageAt && otherReadAt && otherReadAt.toMillis() >= lastMessageAt.toMillis()), createdAt: asTimestamp(data.createdAt), hiddenFor: Array.isArray(data.hiddenFor) ? data.hiddenFor.map(String) : [], avatar: initials(name), photoURL: data.type === 'group' ? '' : (other?.photoURL || ''), active: other?.activeStatus !== false && Date.now() - lastSeen < 90000, lastSeen: other?.lastSeen || null, unreadCount: Number(data.unreadCounts?.[uid] || 0) }
+      return { id: item.id, name, memberIds, type: data.type === 'group' ? ('group' as const) : ('direct' as const), adminId: data.adminId ? String(data.adminId) : undefined, lastMessage: String(data.lastMessage || ''), lastSenderId: data.lastSenderId ? String(data.lastSenderId) : undefined, lastMessageAt, lastMessageSeen: Boolean(lastMessageAt && otherReadAt && otherReadAt.toMillis() >= lastMessageAt.toMillis()), createdAt: asTimestamp(data.createdAt), hiddenFor: Array.isArray(data.hiddenFor) ? data.hiddenFor.map(String) : [], avatar: initials(name), photoURL: data.type === 'group' ? String(data.photoURL || '') : (other?.photoURL || ''), active: other?.activeStatus !== false && Date.now() - lastSeen < 90000, lastSeen: other?.lastSeen || null, unreadCount: Number(data.unreadCounts?.[uid] || 0) }
     })).then(items => callback(items.filter(item => !item.hiddenFor?.includes(uid)).sort((a, b) => ((b.lastMessageAt?.toMillis() || b.createdAt?.toMillis() || 0) - (a.lastMessageAt?.toMillis() || a.createdAt?.toMillis() || 0)))))
   })
 }
@@ -444,14 +444,16 @@ export async function createGroup(uid: string, name: string, members: UserProfil
   return ref.id
 }
 
-export async function updateGroup(conversationId: string, uid: string, name: string) {
+export async function updateGroup(conversationId: string, uid: string, name: string, photoURL = '') {
+  if (isSupabaseChatEnabled()) { await updateSupabaseGroup(conversationId, name, photoURL); return }
   if (!db) return
   const ref = doc(db, 'conversations', conversationId); const snapshot = await getDoc(ref)
   if (!snapshot.exists() || snapshot.data().adminId !== uid) throw new Error('Only the group admin can edit this group.')
-  await updateDoc(ref, { name: name.trim().slice(0, 80) || 'Group chat' })
+  await updateDoc(ref, { name: name.trim().slice(0, 80) || 'Group chat', ...(photoURL ? { photoURL } : {}) })
 }
 
 export async function removeGroupMember(conversationId: string, uid: string, memberUid: string) {
+  if (isSupabaseChatEnabled()) { await removeSupabaseGroupMember(conversationId, memberUid); return }
   if (!db) return
   const ref = doc(db, 'conversations', conversationId); const snapshot = await getDoc(ref); const data = snapshot.data()
   if (!snapshot.exists() || data?.adminId !== uid) throw new Error('Only the group admin can remove members.')
@@ -459,6 +461,7 @@ export async function removeGroupMember(conversationId: string, uid: string, mem
 }
 
 export async function leaveGroup(conversationId: string, uid: string) {
+  if (isSupabaseChatEnabled()) { await leaveSupabaseGroup(conversationId); return }
   if (!db) return
   const ref = doc(db, 'conversations', conversationId); const snapshot = await getDoc(ref); const data = snapshot.data()
   if (!snapshot.exists() || data?.type !== 'group' || !Array.isArray(data.memberIds) || !data.memberIds.includes(uid)) throw new Error('You are not a member of this group.')
@@ -469,6 +472,7 @@ export async function leaveGroup(conversationId: string, uid: string) {
 }
 
 export async function addGroupMembers(conversationId: string, uid: string, members: UserProfile[]) {
+  if (isSupabaseChatEnabled()) { if (members.length) await addSupabaseGroupMembers(conversationId, members.map(member => member.uid)); return }
   if (!db || !members.length) return
   const ref = doc(db, 'conversations', conversationId); const snapshot = await getDoc(ref); const data = snapshot.data()
   if (!snapshot.exists() || data?.type !== 'group' || !Array.isArray(data.memberIds) || !data.memberIds.includes(uid)) throw new Error('Only group members can add members.')

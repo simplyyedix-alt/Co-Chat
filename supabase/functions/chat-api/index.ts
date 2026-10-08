@@ -93,7 +93,7 @@ Deno.serve(async (request) => {
       return response({ profile: rows?.[0] || null })
     }
     if (action === 'conversations') {
-      const rows = await rest(`conversation_members?uid=eq.${encodeURIComponent(user.uid)}&select=conversation_id,hidden_at,unread_count,read_at,conversations(id,type,name,admin_id,created_by,last_message,last_sender_id,last_message_at,created_at)&order=joined_at.desc`)
+      const rows = await rest(`conversation_members?uid=eq.${encodeURIComponent(user.uid)}&select=conversation_id,hidden_at,unread_count,read_at,conversations(id,type,name,photo_url,admin_id,created_by,last_message,last_sender_id,last_message_at,created_at)&order=joined_at.desc`)
       const items = await Promise.all((rows || []).map(async (item: Record<string, unknown>) => {
         const memberIds = await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(String(item.conversation_id))}&select=uid`)
         const otherUid = (memberIds || []).map((member: Record<string, unknown>) => String(member.uid || '')).find((uid: string) => uid && uid !== user.uid)
@@ -134,6 +134,45 @@ Deno.serve(async (request) => {
       if (!conversationId) throw new Error('Group could not be created')
       await rest('conversation_members', { method: 'POST', body: JSON.stringify(memberIds.map((uid: string) => ({ conversation_id: conversationId, uid }))) })
       return response({ id: conversationId })
+    }
+    if (action === 'update-group') {
+      const conversationId = String(body?.conversationId || '')
+      const name = String(body?.name || 'Group chat').trim().slice(0, 80) || 'Group chat'
+      const photoURL = String(body?.photoURL || '').slice(0, 2000)
+      const rows = await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}&select=id,admin_id&limit=1`)
+      if (!rows?.[0] || String(rows[0].admin_id || '') !== user.uid) return response({ error: 'Only the group admin can edit this group.' }, 403)
+      await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: 'PATCH', body: JSON.stringify({ name, photo_url: photoURL }) })
+      return response({ ok: true })
+    }
+    if (action === 'add-group-members') {
+      const conversationId = String(body?.conversationId || '')
+      if (!conversationId || !(await member(conversationId, user.uid))) return response({ error: 'Conversation access denied' }, 403)
+      const requested = Array.isArray(body?.memberIds) ? [...new Set(body.memberIds.map(String).filter(Boolean))] : []
+      if (!requested.length) return response({ ok: true })
+      const existing = await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&select=uid`)
+      const known = new Set((existing || []).map((item: Record<string, unknown>) => String(item.uid || '')))
+      const additions = requested.filter((uid: string) => !known.has(uid))
+      if (additions.length) await rest('conversation_members', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates' }, body: JSON.stringify(additions.map((uid: string) => ({ conversation_id: conversationId, uid }))) })
+      return response({ added: additions.length })
+    }
+    if (action === 'remove-group-member') {
+      const conversationId = String(body?.conversationId || '')
+      const memberUid = String(body?.memberUid || '')
+      const groups = await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}&select=id,admin_id,type&limit=1`)
+      if (!groups?.[0] || groups[0].type !== 'group' || String(groups[0].admin_id || '') !== user.uid) return response({ error: 'Only the group admin can remove members.' }, 403)
+      await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(memberUid)}`, { method: 'DELETE' })
+      return response({ removed: true })
+    }
+    if (action === 'leave-group') {
+      const conversationId = String(body?.conversationId || '')
+      if (!conversationId || !(await member(conversationId, user.uid))) return response({ error: 'You are not a member of this group.' }, 403)
+      const groups = await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}&select=id,admin_id,type&limit=1`)
+      if (!groups?.[0] || groups[0].type !== 'group') return response({ error: 'This is not a group conversation.' }, 400)
+      const members = await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&select=uid`)
+      if (String(groups[0].admin_id || '') === user.uid && (members || []).length > 1) return response({ error: 'The admin can leave only after all other members have left.' }, 400)
+      if (String(groups[0].admin_id || '') === user.uid) await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: 'DELETE' })
+      else await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(user.uid)}`, { method: 'DELETE' })
+      return response({ left: true })
     }
     if (action === 'messages') {
       const conversationId = String(body?.conversationId || '')

@@ -1103,6 +1103,7 @@ export default function App() {
   const [showFriendRequests, setShowFriendRequests] = useState(false);
   const [unseenFriendRequestIds, setUnseenFriendRequestIds] = useState<string[]>([]);
   const [showChatProfile, setShowChatProfile] = useState(false);
+  const [groupPhotoBusy, setGroupPhotoBusy] = useState(false);
   const [groupMembers, setGroupMembers] = useState<UserProfile[]>([]);
   const [groupFriends, setGroupFriends] = useState<UserProfile[]>([]);
   const [friendProfiles, setFriendProfiles] = useState<UserProfile[]>([]);
@@ -1802,8 +1803,7 @@ export default function App() {
             >
               ×
             </button>
-            <Avatar name={selected.name} photoURL={selected.photoURL} className="avatar large" />
-            <h3>{selected.name}</h3>
+            <div className="group-profile-hero"><div className="group-profile-avatar"><Avatar name={selected.name} photoURL={selected.photoURL} className="avatar large" />{selected.adminId === liveUser.uid && <label className="group-avatar-edit" title="Change group photo">✎<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" disabled={groupPhotoBusy} onChange={async (event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (!file) return; if (file.size > 5 * 1024 * 1024) { setError("Group photos must be smaller than 5 MB."); return; } setGroupPhotoBusy(true); try { const uploaded = await StorageManager.upload(file, { ownerId: liveUser.uid, originalName: file.name, mimeType: file.type, sizeBytes: file.size, conversationId: selected.id }); await updateGroup(selected.id, liveUser.uid, selected.name, uploaded.url); setSelected(old => old ? { ...old, photoURL: uploaded.url } : old); } catch (error) { setError(error instanceof Error ? error.message : "Could not update group photo."); } finally { setGroupPhotoBusy(false); } }} /></label>}</div><div><h3>{selected.name}</h3><p className="group-profile-subtitle">{selected.memberIds.length} members · {activeGroupCount} active now</p></div></div>
             <small>
               {selected.type === "group"
                 ? `${selected.memberIds.length} members · Admin: ${groupMembers.find((member) => member.uid === selected.adminId)?.displayName || "Group creator"}`
@@ -1811,6 +1811,7 @@ export default function App() {
             </small>
             {selected.type === "group" && (
               <>
+                <div className="group-profile-tools"><span>GROUP PHOTO</span><small>{selected.adminId === liveUser.uid ? (groupPhotoBusy ? "Uploading…" : "Admin can change this photo") : "Only the group admin can change this photo"}</small></div>
                 <div className="group-member-list">
                   {groupMembers.map((member) => (
                     <div className="person-result" key={member.uid}>

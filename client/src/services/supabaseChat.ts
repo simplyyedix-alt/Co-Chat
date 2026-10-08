@@ -79,7 +79,7 @@ export async function listConversations(uid: string): Promise<Conversation[]> {
       lastMessage: String(nested.last_message || ''), lastSenderId: nested.last_sender_id ? String(nested.last_sender_id) : undefined,
       lastMessageAt: timestamp(nested.last_message_at), createdAt: timestamp(nested.created_at), username: profile?.username || '',
       avatar: name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'U',
-      active: profile?.activeStatus !== false && lastSeenMs > 0 && Date.now() - lastSeenMs < 90000, lastSeen, photoURL: profile?.photoURL || '', unreadCount: Number(item.unread_count || 0), hiddenFor: item.hidden_at ? [uid] : [],
+      active: profile?.activeStatus !== false && lastSeenMs > 0 && Date.now() - lastSeenMs < 90000, lastSeen, photoURL: String(nested.type === 'group' ? (nested.photo_url || '') : (profile?.photoURL || '')), unreadCount: Number(item.unread_count || 0), hiddenFor: item.hidden_at ? [uid] : [],
     }
   }).filter(item => item.id && !item.hiddenFor?.includes(uid)).sort((a, b) => (b.lastMessageAt?.toMillis() || b.createdAt?.toMillis() || 0) - (a.lastMessageAt?.toMillis() || a.createdAt?.toMillis() || 0)).filter((item, index, items) => item.type !== 'direct' || items.findIndex(candidate => candidate.type === 'direct' && [...candidate.memberIds].sort().join(':') === [...item.memberIds].sort().join(':')) === index)
 }
@@ -121,6 +121,22 @@ export async function createDirect(otherUid: string, name: string) {
 export async function createGroup(name: string, memberIds: string[]) {
   const data = await request<{ id?: string }>({ action: 'create-group', name, memberIds })
   return String(data.id || '')
+}
+
+export async function updateGroup(conversationId: string, name: string, photoURL = '') {
+  await request({ action: 'update-group', conversationId, name, photoURL })
+}
+
+export async function addGroupMembers(conversationId: string, memberIds: string[]) {
+  await request({ action: 'add-group-members', conversationId, memberIds })
+}
+
+export async function removeGroupMember(conversationId: string, memberUid: string) {
+  await request({ action: 'remove-group-member', conversationId, memberUid })
+}
+
+export async function leaveGroup(conversationId: string) {
+  await request({ action: 'leave-group', conversationId })
 }
 
 export async function deleteConversation(conversationId: string) {
