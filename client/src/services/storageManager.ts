@@ -1,6 +1,5 @@
 import { getDownloadURL, ref, uploadBytes, deleteObject, getMetadata as getStorageMetadata } from 'firebase/storage'
 import { auth, storage } from '../firebase'
-import { supabaseAnonKey } from '../supabase'
 
 export type UploadMetadata = { ownerId: string; originalName: string; mimeType: string; sizeBytes: number; conversationId?: string; twittId?: string; scope?: 'conversation' | 'twitt' }
 export type StorageObject = { provider: string; storageKey: string; url: string; originalName: string; mimeType: string; sizeBytes: number }
@@ -19,9 +18,12 @@ const socialMaxFileSize = 5 * 1024 * 1024
 const mediaApiUrl = (import.meta.env.VITE_MEDIA_API_URL || '').replace(/\/$/, '')
 
 async function mediaHeaders() {
-  const token = await auth?.currentUser?.getIdToken()
-  if (!token) throw new Error('Please sign in before sharing media.')
-  return { Authorization: `Bearer ${token}`, ...(supabaseAnonKey ? { apikey: supabaseAnonKey } : {}) }
+  const token = (await auth?.currentUser?.getIdToken())?.trim()
+  if (!token || /[\r\n]/.test(token)) throw new Error('Please sign in again before sharing media.')
+  // The media edge function authenticates with the Firebase bearer token;
+  // forwarding an untrimmed optional Supabase key can make fetch reject the
+  // request before it reaches the server on Android WebViews.
+  return { Authorization: `Bearer ${token}` }
 }
 
 function validateFile(file: File, metadata?: UploadMetadata) {
