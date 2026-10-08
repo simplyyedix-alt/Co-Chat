@@ -275,3 +275,41 @@ button:disabled{cursor:not-allowed;opacity:.55;transform:none!important}
 .settings-page .settings-list{border-radius:19px}
 .settings-page .settings-list>button{min-height:58px!important;padding:9px 15px!important}
 @media(max-width:560px){.settings-page{width:100%}.settings-page .settings-hero{padding:14px 16px}.settings-page .settings-profile-card{padding:16px!important}.settings-page .settings-profile-heading .avatar{width:54px;height:54px}.settings-page .settings-save-row .primary{width:auto}}
+
+/* Final compact account layout. */
+.settings-page{max-width:620px;gap:9px}
+.settings-page .settings-hero{padding:14px 17px;border-radius:17px}
+.settings-page .settings-hero h1{font-size:20px}
+.settings-page .settings-hero p{font-size:11px}
+.settings-page .settings-hero-meta{margin-top:8px}
+.settings-page .settings-hero-meta span{padding:4px 7px;font-size:9px}
+.settings-page .settings-hero-mark{width:38px;height:38px;border-radius:12px;font-size:19px}
+.settings-page .settings-profile-card{gap:9px;padding:15px!important;border-radius:17px}
+.settings-page .settings-profile-heading{gap:9px}
+.settings-page .settings-profile-heading .avatar{width:52px;height:52px;border-radius:16px}
+.settings-page .settings-profile-heading h2{font-size:18px}
+.settings-page .settings-profile-heading p{font-size:10px}
+.settings-page .settings-presence{width:11px;height:11px;border-width:2px}
+.settings-page .profile-details{gap:5px;margin:3px 0 0}
+.settings-page .profile-details span{padding:4px 7px;font-size:9px}
+.settings-page .settings-form-grid{gap:8px}
+.settings-page .field-label{margin:8px 0;font-size:11px}
+.settings-page .settings-form-grid input{height:40px;padding:8px 10px}
+.settings-page .settings-form-grid small,.settings-page .settings-bio-field small{font-size:9px}
+.settings-page .settings-bio-field textarea{min-height:56px;padding:9px 10px}
+.settings-page .settings-save-row{align-items:center;gap:8px}
+.settings-page .settings-save-row>span{font-size:9px}
+.settings-page .settings-save-row .primary{min-height:36px;padding:8px 13px;font-size:12px}
+.settings-page .settings-quick-grid{gap:7px}
+.settings-page .settings-quick-grid article{min-height:74px;padding:10px;border-radius:13px}
+.settings-page .settings-quick-grid article>span{width:25px;height:25px;border-radius:8px;font-size:11px}
+.settings-page .settings-quick-grid b{font-size:11px}
+.settings-page .settings-quick-grid small{font-size:9px}
+.settings-page .settings-list{border-radius:17px}
+.settings-page .settings-section-label{padding:8px 13px 6px;font-size:9px}
+.settings-page .settings-list>button{min-height:52px!important;padding:8px 13px!important;gap:9px}
+.settings-page .settings-list .settings-row-icon{width:26px;height:26px;margin-right:0;font-size:12px}
+.settings-page .settings-option-copy b{font-size:11px}
+.settings-page .settings-option-copy small{font-size:9px}
+@media(max-width:560px){.settings-page{max-width:none}.settings-page .settings-profile-card{padding:13px!important}.settings-page .settings-profile-heading .avatar{width:48px;height:48px}.settings-page .settings-form-grid{grid-template-columns:1fr 1fr}.settings-page .settings-save-row{align-items:flex-start}.settings-page .settings-save-row .primary{width:auto}}
+@media(max-width:400px){.settings-page .settings-form-grid{grid-template-columns:1fr}}
