@@ -163,7 +163,7 @@ const relativeMessageTime = (value?: { toMillis?: () => number } | null) => {
   return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
 };
 
-function AuthScreen({ onPreview }: { onPreview: () => void }) {
+function AuthScreen() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -273,15 +273,12 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
         {!firebaseReady ? (
           <>
             <div className="hero-card">
-              <h2>Preview mode</h2>
+              <h2>Sign-in unavailable</h2>
               <p>
-                Firebase is not configured in this build. Explore the full
-                interface locally, then add your project keys to enable
-                accounts.
+                This build is missing the Firebase configuration required for
+                accounts. Rebuild the app with the project environment file;
+                your conversations and Twitts are not available offline.
               </p>
-              <button className="secondary" onClick={onPreview}>
-                Continue preview
-              </button>
             </div>
           </>
         ) : (
@@ -1642,7 +1639,7 @@ export default function App() {
         </section>
       </main>
     );
-  if (!liveUser) return <AuthScreen onPreview={() => setPreview(true)} />;
+  if (!liveUser) return <AuthScreen />;
   if (needsUsername && !preview)
     return (
       <UsernameSetup
