@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type TouchEvent as ReactTouchEvent } from "react";
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -358,12 +358,14 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
 function Nav({
   page,
   setPage,
+  isAndroid = false,
 }: {
   page: string;
   setPage: (value: string) => void;
+  isAndroid?: boolean;
 }) {
   return (
-    <nav className="bottom-nav">
+    <nav className={`bottom-nav${isAndroid ? " android-nav" : ""}`}>
       {[
         ["chats", "💬", "Chats"],
         ["study", "◷", "Study"],
@@ -375,10 +377,12 @@ function Nav({
           type="button"
           key={id}
           className={page === id ? "active" : ""}
+          aria-label={label}
+          title={isAndroid ? label : undefined}
           onClick={() => setPage(id)}
         >
           <span>{icon}</span>
-          {label}
+          {!isAndroid && label}
         </button>
       ))}
     </nav>
@@ -573,7 +577,7 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   }, [uid, weekKey, studyFriendIds, viewerUsername, leaderboardMode, leaderboardOpen, leaderboardRefreshKey, weeklySeconds, totalSeconds, seconds, running]);
   useEffect(() => {
     void updateStudyPresence(running, timerTaskId ? "Working on an active task" : "In a focus session").catch(() => undefined);
-    const timer = window.setInterval(() => void updateStudyPresence(running, timerTaskId ? "Working on an active task" : "In a focus session").catch(() => undefined), 30000);
+    const timer = window.setInterval(() => void updateStudyPresence(running, timerTaskId ? "Working on an active task" : "In a focus session").catch(() => undefined), 60000);
     return () => window.clearInterval(timer);
   }, [uid, running, timerTaskId]);
   useEffect(() => () => { void updateStudyPresence(false).catch(() => undefined); }, [uid]);
@@ -1119,6 +1123,7 @@ function UsernameSetup({
 }
 
 export default function App() {
+  const isNativeAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
   const [user, setUser] = useState<User | null>(null);
   const [preview, setPreview] = useState(false);
   const [loading, setLoading] = useState(firebaseReady);
@@ -1132,6 +1137,21 @@ export default function App() {
   const [conversationsLoading, setConversationsLoading] = useState(false);
   const notificationConversationSeen = useRef<Record<string, number>>({});
   const [selected, setSelected] = useState<Conversation | null>(null);
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
+  const handleChatTouchStart = (event: ReactTouchEvent<HTMLElement>) => {
+    if (!isNativeAndroid) return;
+    const touch = event.changedTouches[0];
+    swipeStart.current = { x: touch.clientX, y: touch.clientY };
+  };
+  const handleChatTouchEnd = (event: ReactTouchEvent<HTMLElement>) => {
+    const start = swipeStart.current;
+    swipeStart.current = null;
+    if (!isNativeAndroid || !start || !selected) return;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (dx > 72 && Math.abs(dx) > Math.abs(dy) * 1.35) setSelected(null);
+  };
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationOpening, setConversationOpening] = useState(false);
   const conversationOpeningAt = useRef(0);
@@ -1833,7 +1853,7 @@ export default function App() {
     return <main className="app"><GroupVoiceCall uid={liveUser.uid} callId={groupCall.id} groupName={groupCall.name} memberIds={groupCall.memberIds} callerId={groupCall.callerId} host={groupCall.host} onClose={closeGroupCall} /></main>;
   if (selected)
     return (
-      <main className="app chat-screen">
+      <main className={`app chat-screen${isNativeAndroid ? " native-android" : ""}`} onTouchStart={handleChatTouchStart} onTouchEnd={handleChatTouchEnd}>
         <header className="chat-header">
           <button className="icon" onClick={() => setSelected(null)}>
             ←
@@ -2232,7 +2252,7 @@ export default function App() {
       </main>
     );
   return (
-    <main className="app">
+    <main className={`app${isNativeAndroid ? " native-android" : ""}`}>
       <header className="topbar">
         {page === "settings" ? (
           <div className="settings-topbar-title">
@@ -2587,7 +2607,7 @@ export default function App() {
           </div>
         )}
       </section>
-      <Nav page={page} setPage={setPage} />
+      <Nav page={page} setPage={setPage} isAndroid={isNativeAndroid} />
     </main>
   );
 }

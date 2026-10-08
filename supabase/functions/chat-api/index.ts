@@ -44,6 +44,18 @@ async function member(conversationId: string, uid: string) {
   return Array.isArray(rows) && rows.length > 0
 }
 
+async function notifyMessageRecipients(targetUids: string[], senderName: string, message: string, conversationId: string) {
+  const base = Deno.env.get('SUPABASE_URL') || ''
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+  const secret = Deno.env.get('INTERNAL_NOTIFICATIONS_SECRET') || ''
+  if (!base || !serviceKey || !secret || !targetUids.length) return
+  await fetch(`${base}/functions/v1/fcm-notifications`, {
+    method: 'POST',
+    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json', 'x-internal-notifications-secret': secret },
+    body: JSON.stringify({ targetUids, title: senderName || 'New Co-Chat message', body: message || '📎 Attachment', data: { type: 'message', conversationId } }),
+  })
+}
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (request.method !== 'POST') return response({ error: 'POST required' }, 405)
@@ -102,12 +114,28 @@ Deno.serve(async (request) => {
     }
     if (action === 'conversations') {
       const rows = await rest(`conversation_members?uid=eq.${encodeURIComponent(user.uid)}&select=conversation_id,hidden_at,unread_count,read_at,conversations(id,type,name,photo_url,admin_id,created_by,last_message,last_sender_id,last_message_at,created_at)&order=joined_at.desc`)
-      const items = await Promise.all((rows || []).map(async (item: Record<string, unknown>) => {
-        const memberIds = await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(String(item.conversation_id))}&select=uid`)
-        const otherUid = (memberIds || []).map((member: Record<string, unknown>) => String(member.uid || '')).find((uid: string) => uid && uid !== user.uid)
-        const profiles = otherUid ? await rest(`profiles?uid=eq.${encodeURIComponent(otherUid)}&select=uid,display_name,email,username,photo_url,bio,notifications_enabled,discoverable,active_status,last_seen&limit=1`) : []
-        return { ...item, member_ids: memberIds, other_profile: profiles?.[0] || null }
-      }))
+      const conversationIds = (rows || []).map((item: Record<string, unknown>) => String(item.conversation_id || '')).filter(Boolean)
+      const members = conversationIds.length
+        ? await rest(`conversation_members?conversation_id=in.(${conversationIds.map((id: string) => encodeURIComponent(id)).join(',')})&select=conversation_id,uid`)
+        : []
+      const membersByConversation = new Map<string, Array<Record<string, unknown>>>()
+      for (const member of members || []) {
+        const conversationId = String(member.conversation_id || '')
+        const list = membersByConversation.get(conversationId) || []
+        list.push(member)
+        membersByConversation.set(conversationId, list)
+      }
+      const otherUids = [...new Set((members || []).map((member: Record<string, unknown>) => String(member.uid || '')).filter((uid: string) => uid && uid !== user.uid))]
+      const profiles = otherUids.length
+        ? await rest(`profiles?uid=in.(${otherUids.map((uid: string) => encodeURIComponent(uid)).join(',')})&select=uid,display_name,email,username,photo_url,bio,notifications_enabled,discoverable,active_status,last_seen`)
+        : []
+      const profileByUid = new Map((profiles || []).map((profile: Record<string, unknown>) => [String(profile.uid || ''), profile]))
+      const items = (rows || []).map((item: Record<string, unknown>) => {
+        const conversationId = String(item.conversation_id || '')
+        const memberIds = membersByConversation.get(conversationId) || []
+        const otherUid = memberIds.map((member) => String(member.uid || '')).find((uid: string) => uid && uid !== user.uid)
+        return { ...item, member_ids: memberIds, other_profile: otherUid ? profileByUid.get(otherUid) || null : null }
+      })
       return response({ items })
     }
     if (action === 'create-direct') {
@@ -198,6 +226,8 @@ Deno.serve(async (request) => {
       const members = await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&select=uid,unread_count`)
       for (const item of members || []) if (item.uid !== user.uid) await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(item.uid)}`, { method: 'PATCH', body: JSON.stringify({ unread_count: Number(item.unread_count || 0) + 1 }) })
       await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: 'PATCH', body: JSON.stringify({ last_message: text || '📎 Attachment', last_sender_id: user.uid, last_message_at: new Date().toISOString() }) })
+      const targets = (members || []).map((item: Record<string, unknown>) => String(item.uid || '')).filter((uid: string) => uid && uid !== user.uid)
+      void notifyMessageRecipients(targets, user.displayName, text || '📎 Attachment', conversationId).catch(() => undefined)
       return response({ message: rows?.[0] || null })
     }
     if (action === 'delete-conversation') {

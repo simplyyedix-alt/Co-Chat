@@ -109,18 +109,32 @@ export async function listMessages(conversationId: string, uid: string): Promise
 
 export function watchConversations(uid: string, callback: (items: Conversation[]) => void): Unsubscribe {
   let active = true
-  const refresh = () => listConversations(uid).then(items => { if (active) callback(items) }).catch(() => undefined)
+  let inFlight = false
+  const refresh = () => {
+    if (!active || inFlight || document.visibilityState === 'hidden') return
+    inFlight = true
+    void listConversations(uid).then(items => { if (active) callback(items) }).catch(() => undefined).finally(() => { inFlight = false })
+  }
   refresh()
-  const timer = window.setInterval(refresh, 7000)
-  return () => { active = false; window.clearInterval(timer) }
+  const timer = window.setInterval(refresh, 30000)
+  const onVisibilityChange = () => { if (document.visibilityState === 'visible') refresh() }
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  return () => { active = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisibilityChange) }
 }
 
 export function watchMessages(conversationId: string, uid: string, callback: (items: ChatMessage[]) => void): Unsubscribe {
   let active = true
-  const refresh = () => listMessages(conversationId, uid).then(items => { if (active) callback(items) }).catch(() => undefined)
+  let inFlight = false
+  const refresh = () => {
+    if (!active || inFlight || document.visibilityState === 'hidden') return
+    inFlight = true
+    void listMessages(conversationId, uid).then(items => { if (active) callback(items) }).catch(() => undefined).finally(() => { inFlight = false })
+  }
   refresh()
-  const timer = window.setInterval(refresh, 5000)
-  return () => { active = false; window.clearInterval(timer) }
+  const timer = window.setInterval(refresh, 15000)
+  const onVisibilityChange = () => { if (document.visibilityState === 'visible') refresh() }
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  return () => { active = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisibilityChange) }
 }
 
 export async function sendMessage(conversationId: string, text: string, attachmentValue: ChatAttachment | null, replyTo?: ChatMessage | null) {

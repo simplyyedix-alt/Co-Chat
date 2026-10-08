@@ -9,3 +9,6 @@ verify_jwt = false
 
 [functions.chat-api]
 verify_jwt = false
+
+[functions.fcm-notifications]
+verify_jwt = false

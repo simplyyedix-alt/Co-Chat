@@ -8,6 +8,13 @@ const config: CapacitorConfig = {
     androidScheme: 'https',
   },
   plugins: {
+    PushNotifications: {
+      presentationOptions: ['sound', 'alert'],
+    },
+    LocalNotifications: {
+      smallIcon: 'ic_stat_cochat',
+      iconColor: '#6D5DFB',
+    },
     FirebaseAuthentication: {
       skipNativeAuth: true,
       providers: ['google.com'],
