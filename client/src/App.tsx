@@ -126,7 +126,7 @@ const initials = (name: string) =>
     .join("")
     .slice(0, 2)
     .toUpperCase() || "U";
-const VerifiedTick = () => <span className="verified-tick" title="Verified account" aria-label="Verified account">✓</span>;
+const VerifiedTick = () => <span className="verified-tick" title="Verified account" aria-label="Verified account"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="m4.2 9.2 3.1 3.1 6.6-7" /></svg></span>;
 const formatTime = (value?: { toDate?: () => Date } | null) =>
   value?.toDate
     ? value
