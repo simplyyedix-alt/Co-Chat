@@ -2225,7 +2225,7 @@ export default function App() {
               className="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Find a chat, or meet someone new…"
+              placeholder="Find your people"
             />
             {page === "chats" && search.trim() && (
               <SearchPanel uid={liveUser.uid} onSelect={startConversation} externalTerm={search} onTermChange={setSearch} embedded />
