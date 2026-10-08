@@ -379,6 +379,36 @@ button:disabled{cursor:not-allowed;opacity:.55;transform:none!important}
   -webkit-overflow-scrolling: touch;
 }
 
+.native-android .emoji-button,
+.native-android .emoji-picker {
+  display: none;
+}
+
+.media-icon {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -4px;
+}
+
+.attach-button .media-icon,
+.comment-media-picker .media-icon,
+.twitt-media-picker .media-icon {
+  width: 20px;
+  height: 20px;
+  vertical-align: -5px;
+}
+
+.brand-line .mini-mark,
+.chat-header:before {
+  color: transparent;
+  background: var(--cc-primary) url('./assets/logo.svg') center / 78% no-repeat;
+}
+
 .conversation-security {
   animation: conversation-notice-in 180ms ease-out;
   transition: opacity 180ms ease, transform 180ms ease;

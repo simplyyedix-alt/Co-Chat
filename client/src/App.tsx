@@ -128,6 +128,7 @@ const initials = (name: string) =>
     .slice(0, 2)
     .toUpperCase() || "U";
 const VerifiedTick = () => <span className="verified-tick" title="Verified account" aria-label="Verified account"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="m4.2 9.2 3.1 3.1 6.6-7" /></svg></span>;
+const MediaIcon = () => <svg className="media-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8.5 12.5 5.8-5.8a3.2 3.2 0 0 1 4.5 4.5l-7.5 7.5a5 5 0 0 1-7.1-7.1l7.1-7.1" /><path d="m9.2 15.1 6.4-6.4" /></svg>;
 const formatTime = (value?: { toDate?: () => Date } | null) =>
   value?.toDate
     ? value
@@ -722,7 +723,7 @@ function CommentSheet({ post, comments, loading, hasMore, names, currentUid, onC
         {comments.map((comment) => <article className="sheet-comment" key={comment.id}><div className="comment-avatar">{(names[comment.uid] || comment.uid).slice(0, 2).toUpperCase()}</div><div className="sheet-comment-body"><div><strong>@{names[comment.uid] || comment.uid.slice(0, 10)}</strong>{comment.uid === currentUid && <button className="comment-delete" type="button" onClick={() => onDelete(comment)}>Delete</button>}</div><p>{comment.body}</p>{comment.attachment && (comment.attachment.type.startsWith("image/") ? <a className="twitt-media-preview" href={comment.attachment.url} target="_blank" rel="noreferrer" download={comment.attachment.name}><img src={comment.attachment.url} alt={comment.attachment.name} /><span>Open / save image</span></a> : <a className="twitt-attachment" href={comment.attachment.url} target="_blank" rel="noreferrer" download={comment.attachment.name}>📄 {comment.attachment.name} · Open / save</a>)}<button className={comment.liked ? "comment-like liked" : "comment-like"} type="button" onClick={() => onLike(comment)}>♡ {comment.likes || 0}</button></div></article>)}
         {hasMore && <button className="load-comments" type="button" disabled={loading} onClick={onLoadMore}>{loading ? "Loading…" : "Load more comments"}</button>}
       </div>
-      <form className="comment-sheet-compose" onSubmit={submit}><input value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 240))} placeholder="Add a thoughtful comment" autoFocus /><label className="comment-media-picker" title="Photo or PDF, max 5 MB">📎<input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label>{file && <small className="comment-file-name" title={file.name}>{file.name}</small>}<button className="primary compact" type="submit" disabled={!draft.trim() && !file}>Send</button></form>
+      <form className="comment-sheet-compose" onSubmit={submit}><input value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 240))} placeholder="Add a thoughtful comment" autoFocus /><label className="comment-media-picker" title="Photo or PDF, max 5 MB"><MediaIcon /><input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label>{file && <small className="comment-file-name" title={file.name}>{file.name}</small>}<button className="primary compact" type="submit" disabled={!draft.trim() && !file}>Send</button></form>
     </section>
   </div>;
 }
@@ -1034,7 +1035,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
   return <div className={`twitt-feed feed-type-${feedType}`}>
     <div className="discovery-mode-tabs" role="tablist" aria-label="Discovery mode"><button type="button" role="tab" aria-selected={feedType === "study"} className={feedType === "study" ? "active" : ""} onClick={() => { setFeedType("study"); setTab("recent"); setCommunity("all"); setVisible(20); }}>Study <small>Questions & answers</small></button><button type="button" role="tab" aria-selected={feedType === "social"} className={feedType === "social" ? "active" : ""} onClick={() => { setFeedType("social"); setTab("recent"); setCommunity("all"); setVisible(20); }}>Social <small>24-hour moments</small></button></div>
     <section className="discover-intro"><div><span className="kicker">CO-CHAT {feedType === "study" ? "STUDY" : "SOCIAL"}</span><h2>{feedType === "study" ? "Ask it. Solve it together." : "Share the moment."}</h2><p>{feedType === "study" ? "Post a doubt as text, photo, or PDF and get clear answers from your circle." : "Friends appear first. Once you see a post, it moves down so your feed stays fresh."}</p></div><button className="primary compact" type="button" onClick={() => setComposerOpen(true)}>＋ {feedType === "study" ? "Ask a doubt" : "Share a moment"}</button></section>
-    {composerOpen && <section className="twitt-composer"><div className="composer-heading"><strong>{feedType === "study" ? "Ask your study community" : "Share with friends"}</strong><button className="icon" type="button" disabled={publishing} onClick={() => setComposerOpen(false)}>×</button></div><textarea disabled={publishing} value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 280))} placeholder={feedType === "study" ? "Describe your doubt or study win…" : "What is happening today? (expires in 24 hours)"} autoFocus /><label className="twitt-media-picker">📎 Add photo/PDF (max 5 MB)<input disabled={publishing} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => setDraftFile(event.target.files?.[0] || null)} /></label><small className="twitt-safety-note">Adult or explicit content is not allowed.</small>{draftFile && <small className="twitt-file-name">{draftFile.name}</small>}{publishError && <p className="twitt-sync-error">{publishError}</p>}<div className="composer-footer">{feedType === "study" ? <div className="tag-input"><span>#</span><input disabled={publishing} list="twitt-tag-suggestions" value={draftCommunity} onChange={(event) => setDraftCommunity(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} placeholder="Add a study tag (required)" /><datalist id="twitt-tag-suggestions">{tagSuggestions.map((tag) => <option value={tag} key={tag} />)}</datalist></div> : <span className="social-expiry-note">Visible for 24 hours</span>}<span>{draft.length}/280</span><button className="primary compact" type="button" disabled={!draft.trim() || (feedType === "study" && !draftCommunity) || publishing} onClick={() => void createTwitt()}>{publishing ? "◌ Checking & uploading…" : "Post"}</button></div></section>}
+    {composerOpen && <section className="twitt-composer"><div className="composer-heading"><strong>{feedType === "study" ? "Ask your study community" : "Share with friends"}</strong><button className="icon" type="button" disabled={publishing} onClick={() => setComposerOpen(false)}>×</button></div><textarea disabled={publishing} value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 280))} placeholder={feedType === "study" ? "Describe your doubt or study win…" : "What is happening today? (expires in 24 hours)"} autoFocus /><label className="twitt-media-picker"><MediaIcon /> Add photo/PDF (max 5 MB)<input disabled={publishing} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => setDraftFile(event.target.files?.[0] || null)} /></label><small className="twitt-safety-note">Adult or explicit content is not allowed.</small>{draftFile && <small className="twitt-file-name">{draftFile.name}</small>}{publishError && <p className="twitt-sync-error">{publishError}</p>}<div className="composer-footer">{feedType === "study" ? <div className="tag-input"><span>#</span><input disabled={publishing} list="twitt-tag-suggestions" value={draftCommunity} onChange={(event) => setDraftCommunity(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} placeholder="Add a study tag (required)" /><datalist id="twitt-tag-suggestions">{tagSuggestions.map((tag) => <option value={tag} key={tag} />)}</datalist></div> : <span className="social-expiry-note">Visible for 24 hours</span>}<span>{draft.length}/280</span><button className="primary compact" type="button" disabled={!draft.trim() || (feedType === "study" && !draftCommunity) || publishing} onClick={() => void createTwitt()}>{publishing ? "◌ Checking & uploading…" : "Post"}</button></div></section>}
     {feedType === "study" && <div className="community-filter" aria-label="Twitt tag filter">{[["all", "All"], ...popularTags.map((tag) => [tag, `#${tag}`] as const)].map(([id, label]) => <button key={id} className={community === id ? "active" : ""} onClick={() => { setCommunity(id); setVisible(3); }}>{label}</button>)}</div>}
     {feedType === "study" && <div className="feed-tabs"><button className={tab === "recent" ? "active" : ""} onClick={() => setTab("recent")}>Recent <small>{communityLabel} · 24h</small></button><button className={tab === "trending" ? "active" : ""} onClick={() => setTab("trending")}>Trending <small>{communityLabel} · top 10</small></button></div>}
     {remoteError && <div className="notice twitt-sync-error">{remoteError}<button className="secondary compact" type="button" onClick={() => window.location.reload()}>Retry</button></div>}
@@ -1874,6 +1875,11 @@ export default function App() {
   const activeGroupCount = selected?.type === "group"
     ? Math.min(selected.memberIds.length, groupMembers.filter((member) => member.activeStatus !== false && Boolean(member.lastSeen) && presenceNow - (member.lastSeen?.toMillis() || 0) < 90000).length)
     : 0;
+  const selectedFriendProfile = selected?.type === "direct" && liveUser
+    ? friendProfiles.find((profile) => selected.memberIds.includes(profile.uid) && profile.uid !== liveUser.uid)
+    : null;
+  const selectedIsActive = selectedFriendProfile ? selectedFriendProfile.activeStatus !== false && presenceNow - (selectedFriendProfile.lastSeen?.toMillis() || 0) < 90000 : selected?.active;
+  const selectedLastSeen = selectedFriendProfile?.lastSeen || selected?.lastSeen;
   if (groupCall)
     return <main className="app"><GroupVoiceCall uid={liveUser.uid} callId={groupCall.id} groupName={groupCall.name} memberIds={groupCall.memberIds} callerId={groupCall.callerId} host={groupCall.host} onClose={closeGroupCall} /></main>;
   if (selected)
@@ -1898,7 +1904,7 @@ export default function App() {
                 ? (activeGroupCount > 0 && <span className="group-active-summary"><span className="presence-dot" />{activeGroupCount} Active now</span>)
                 : selected.id.startsWith("preview-") ? "Preview conversation" : (
                 <span className={selected.active ? "active-presence" : ""}>
-                  {presenceLabel(selected.active, selected.lastSeen)}
+                  {presenceLabel(selectedIsActive, selectedLastSeen)}
                 </span>
               )}
             </small>
@@ -2108,7 +2114,7 @@ export default function App() {
                       target="_blank"
                       rel="noreferrer"
                     >
-                      📎 {item.attachment.name}
+                      <MediaIcon /> {item.attachment.name}
                     </a>
                   ))}
                     {selected.memberIds.length > 2 && (
@@ -2245,7 +2251,7 @@ export default function App() {
           </div>}
           <button className="emoji-button" type="button" title="Add emoji" onClick={() => setEmojiOpen(open => !open)}>☺</button>
           <label className="attach-button" title="Attach a file">
-            📎
+            <MediaIcon />
             <input
               type="file"
               onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
