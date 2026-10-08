@@ -43,3 +43,12 @@
 :root.dark .chat-profile-menu:has(.group-member-list) .profile-actions .secondary{background:#6657d2;color:#fff}
 :root.dark .chat-profile-menu:has(.group-member-list) .profile-actions:last-child .secondary{background:#292b40;color:#e8e6f5}
 @media(max-width:520px){.chat-profile-menu:has(.group-member-list){padding:18px 14px 110px!important}.chat-profile-menu:has(.group-member-list) .close-profile{top:12px;right:12px}.group-profile-hero{padding:20px 17px;border-radius:22px}.group-profile-hero .avatar.large{width:64px!important;height:64px!important;border-radius:21px!important}.group-profile-hero h3{font-size:22px!important}.chat-profile-menu:has(.group-member-list) .profile-actions{grid-template-columns:1fr}.chat-profile-menu:has(.group-member-list) .profile-actions:last-child .secondary{grid-column:auto}}
+:root.dark .chat-profile-menu:has(.group-member-list){background:#080a0d!important;color:#f5f5f5!important}
+:root.dark .chat-profile-menu:has(.group-member-list) .group-profile-hero{border:1px solid #30353c;background:#15181c;box-shadow:0 16px 36px #0004}
+:root.dark .chat-profile-menu:has(.group-member-list) .group-profile-hero .avatar.large{border-color:#252a30;box-shadow:0 8px 20px #0006}
+:root.dark .chat-profile-menu:has(.group-member-list) .group-member-list{border-color:#30353c!important;background:#15181c!important}
+:root.dark .chat-profile-menu:has(.group-member-list) .group-member-list .person-result{border-color:#30353c!important;background:#15181c;color:#f5f5f5}
+:root.dark .chat-profile-menu:has(.group-member-list) .group-member-list .person-result:hover{background:#20242a}
+:root.dark .chat-profile-menu:has(.group-member-list) .profile-actions input{border-color:#30353c;background:#1d2126;color:#f5f5f5}
+:root.dark .chat-profile-menu:has(.group-member-list) .profile-actions .secondary{border-color:#405de6;background:#405de6;color:#fff;box-shadow:0 8px 18px #405de644}
+:root.dark .chat-profile-menu:has(.group-member-list) .profile-actions:last-child .secondary{border-color:#30353c;background:#252a31;color:#dce2ea;box-shadow:none}
