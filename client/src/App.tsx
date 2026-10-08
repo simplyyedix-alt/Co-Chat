@@ -2091,14 +2091,6 @@ export default function App() {
                 {item.text && <span>{item.text}</span>}
                 <small>
                   {formatTime(item.createdAt) || "now"}
-                  {mine && (
-                    <span
-                      className={`read-receipt ${item.seenBy?.some((id) => selected.memberIds.includes(id) && id !== liveUser.uid) ? "seen" : ""}`}
-                      title={item.seenBy?.some((id) => selected.memberIds.includes(id) && id !== liveUser.uid) ? "Seen" : "Delivered"}
-                    >
-                      {item.createdAt ? " · ✓✓" : " · ✓"}
-                    </span>
-                  )}
                   <button
                     className="reply-button"
                     type="button"

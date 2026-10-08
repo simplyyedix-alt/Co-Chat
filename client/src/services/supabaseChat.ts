@@ -1,6 +1,6 @@
 import { Timestamp, type Unsubscribe } from 'firebase/firestore'
 import { auth } from '../firebase'
-import { supabaseAnonKey, supabaseProjectUrl, supabaseReady } from '../supabase'
+import { supabase, supabaseAnonKey, supabaseProjectUrl, supabaseReady } from '../supabase'
 import type { ChatAttachment, ChatMessage, Conversation } from './chat'
 import type { UserProfile } from './chat'
 
@@ -132,9 +132,12 @@ export function watchMessages(conversationId: string, uid: string, callback: (it
   }
   refresh()
   const timer = window.setInterval(refresh, 15000)
+  const channel = supabase?.channel(`chat-messages:${conversationId}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, refresh)
+    .subscribe()
   const onVisibilityChange = () => { if (document.visibilityState === 'visible') refresh() }
   document.addEventListener('visibilitychange', onVisibilityChange)
-  return () => { active = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisibilityChange) }
+  return () => { active = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisibilityChange); if (channel) void supabase?.removeChannel(channel) }
 }
 
 export async function sendMessage(conversationId: string, text: string, attachmentValue: ChatAttachment | null, replyTo?: ChatMessage | null) {

@@ -234,8 +234,8 @@ export function watchMessages(conversationId: string, uid: string, callback: (it
     cutoff = asTimestamp(snapshot.data()?.hiddenAt?.[uid])
     if (active) callback(visible())
   }).catch(() => undefined)
-  const q = query(collection(db, 'conversations', conversationId, 'messages'), orderBy('createdAt', 'desc'), limit(30))
-  const unsubscribe = onSnapshot(q, snapshot => { latest = snapshot.docs.map(item => { const data = item.data(); return { id: item.id, text: String(data.text || ''), senderId: String(data.senderId || ''), createdAt: asTimestamp(data.createdAt), attachment: data.attachment ? { name: String(data.attachment.name || 'file'), url: String(data.attachment.url || ''), type: String(data.attachment.type || ''), size: Number(data.attachment.size || 0) } : null, replyTo: data.replyTo ? { id: String(data.replyTo.id || ''), text: String(data.replyTo.text || ''), senderId: String(data.replyTo.senderId || '') } : null, seenBy: Array.isArray(data.seenBy) ? data.seenBy.map(String) : [], hiddenFor: Array.isArray(data.hiddenFor) ? data.hiddenFor.map(String) : [] } }).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)); if (active) callback(visible()) })
+  const q = query(collection(db, 'conversations', conversationId, 'messages'), orderBy('createdAt', 'desc'), limit(100))
+  const unsubscribe = onSnapshot(q, snapshot => { latest = snapshot.docs.map(item => { const data = item.data(); return { id: item.id, text: String(data.text || ''), senderId: String(data.senderId || ''), createdAt: asTimestamp(data.createdAt), attachment: data.attachment ? { name: String(data.attachment.name || 'file'), url: String(data.attachment.url || ''), type: String(data.attachment.type || ''), size: Number(data.attachment.size || 0) } : null, replyTo: data.replyTo ? { id: String(data.replyTo.id || ''), text: String(data.replyTo.text || ''), senderId: String(data.replyTo.senderId || '') } : null, seenBy: Array.isArray(data.seenBy) ? data.seenBy.map(String) : [], hiddenFor: Array.isArray(data.hiddenFor) ? data.hiddenFor.map(String) : [] } }).filter(item => !item.createdAt || Date.now() - item.createdAt.toMillis() <= 24 * 60 * 60 * 1000).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)); if (active) callback(visible()) })
   return () => { active = false; unsubscribe() }
 }
 
@@ -274,8 +274,12 @@ export async function sendMessage(conversationId: string, senderId: string, text
   // 30-message cleanup can complete independently after the write succeeds.
   await Promise.all([
     updateDoc(conversationRef, { lastMessage: attachment ? `📎 ${attachment.name}` : text, lastSenderId: senderId, lastMessageAt: serverTimestamp(), hiddenFor: [], ...unreadUpdates }),
-    getDocs(query(collection(conversationRef, 'messages'), orderBy('createdAt', 'desc'), limit(31))).then(async (overflow) => {
-      if (overflow.size > 30) await deleteDoc(overflow.docs[overflow.docs.length - 1].ref)
+    getDocs(query(collection(conversationRef, 'messages'), orderBy('createdAt', 'desc'), limit(100))).then(async (overflow) => {
+      const cutoff = Date.now() - 24 * 60 * 60 * 1000
+      await Promise.all(overflow.docs.filter((item) => {
+        const createdAt = asTimestamp(item.data().createdAt)?.toMillis() || Date.now()
+        return createdAt < cutoff
+      }).map((item) => deleteDoc(item.ref)))
     }),
   ])
 }

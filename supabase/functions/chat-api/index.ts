@@ -213,7 +213,8 @@ Deno.serve(async (request) => {
     if (action === 'messages') {
       const conversationId = String(body?.conversationId || '')
       if (!conversationId || !(await member(conversationId, user.uid))) return response({ error: 'Conversation access denied' }, 403)
-      const rows = await rest(`messages?conversation_id=eq.${encodeURIComponent(conversationId)}&select=id,conversation_id,sender_id,text,attachment,reply_to,seen_by,hidden_for,created_at&order=created_at.desc&limit=50`)
+      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      const rows = await rest(`messages?conversation_id=eq.${encodeURIComponent(conversationId)}&created_at=gte.${encodeURIComponent(cutoff)}&select=id,conversation_id,sender_id,text,attachment,reply_to,seen_by,hidden_for,created_at&order=created_at.desc&limit=50`)
       return response({ items: (rows || []).reverse() })
     }
     if (action === 'send-message') {
@@ -223,6 +224,8 @@ Deno.serve(async (request) => {
       if (!text && !body?.attachment) return response({ error: 'Message cannot be empty' }, 400)
       if (text.length > 2000) return response({ error: 'Messages must be 2,000 characters or fewer' }, 400)
       const rows = await rest('messages', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ conversation_id: conversationId, sender_id: user.uid, text, attachment: body?.attachment || null, reply_to: body?.replyTo || null, seen_by: [user.uid] }) })
+      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      void rest(`messages?conversation_id=eq.${encodeURIComponent(conversationId)}&created_at=lt.${encodeURIComponent(cutoff)}&select=id`, { method: 'DELETE' }).catch(() => undefined)
       const members = await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&select=uid,unread_count`)
       for (const item of members || []) if (item.uid !== user.uid) await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(item.uid)}`, { method: 'PATCH', body: JSON.stringify({ unread_count: Number(item.unread_count || 0) + 1 }) })
       await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: 'PATCH', body: JSON.stringify({ last_message: text || '📎 Attachment', last_sender_id: user.uid, last_message_at: new Date().toISOString() }) })
