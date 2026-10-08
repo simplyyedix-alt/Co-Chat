@@ -226,3 +226,27 @@ button:disabled{cursor:not-allowed;opacity:.55;transform:none!important}
 .chat-home-actions { display: flex; flex-wrap: wrap; gap: .55rem; justify-content: flex-end; }
 .chat-home-actions .secondary { background: rgba(18, 18, 28, .34); border-color: rgba(255,255,255,.2); color: #fff; }
 @media (max-width: 620px) { .chat-home-hero { display: block; } .chat-home-actions { justify-content: flex-start; margin-top: 1rem; } }
+:root.dark .settings-page .settings-profile-card{gap:12px;padding:18px!important;border-radius:20px}
+:root.dark .settings-page .settings-profile-heading{gap:11px}
+:root.dark .settings-page .settings-profile-heading .avatar{width:58px;height:58px;border-radius:18px}
+:root.dark .settings-page .settings-profile-heading h2{margin:2px 0;font-size:19px}
+:root.dark .settings-page .settings-profile-heading p{font-size:11px}
+:root.dark .settings-page .profile-details{margin:6px 0 2px;justify-content:flex-start}
+:root.dark .settings-page .profile-details span{padding:5px 8px;font-size:10px}
+:root.dark .settings-page .settings-form-grid{gap:10px}
+:root.dark .settings-page .settings-form-grid input{height:46px;padding:10px 12px;border-radius:13px}
+:root.dark .settings-page .settings-bio-field textarea{min-height:68px;padding:11px 12px;border-radius:13px}
+:root.dark .settings-page .settings-save-row{padding-top:0}
+:root.dark .settings-page .settings-save-row .primary{min-height:42px;padding:10px 16px}
+@media(max-width:560px){:root.dark .settings-page .settings-profile-card{padding:16px!important}.settings-page .settings-profile-heading .avatar{width:54px;height:54px}.settings-page .settings-save-row .primary{width:auto}}
+:root.dark .settings-page{color:#f5f5f5}
+:root.dark .settings-page .settings-quick-grid article{background:#15181c;border-color:#30353c;box-shadow:none}
+:root.dark .settings-page .settings-quick-grid article>span{background:#20242a;color:#8f9dff}
+:root.dark .settings-page .settings-list,:root.dark .settings-page .settings-profile-card{background:#15181c;border-color:#30353c;box-shadow:none}
+:root.dark .settings-page .settings-list>button{background:#15181c;color:#f5f5f5;border-color:#30353c!important}
+:root.dark .settings-page .settings-list>button:hover{background:#20242a}
+:root.dark .settings-page .settings-list .settings-row-icon{background:#20242a;color:#8f9dff}
+:root.dark .settings-page .settings-list .settings-row-icon.online{background:#193b2d;color:#54dc8b}
+:root.dark .settings-page .settings-list .settings-value,:root.dark .settings-page .settings-list .chevron{color:#aeb4bd}
+:root.dark .settings-page .settings-hero{background:linear-gradient(135deg,#151b3b,#405de6);border-color:#405de6}
+:root.dark .settings-page .settings-profile-heading p,:root.dark .settings-page .settings-option-copy small{color:#aeb4bd}
