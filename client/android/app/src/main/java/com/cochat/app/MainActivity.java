@@ -8,6 +8,7 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.window.OnBackInvokedDispatcher;
 import com.getcapacitor.BridgeActivity;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,10 +26,23 @@ public class MainActivity extends BridgeActivity {
         // Wait until the first frame is visible. Android will then show each
         // permission sheet above Co-Chat instead of behind the launch screen.
         new Handler(Looper.getMainLooper()).postDelayed(this::requestCoChatPermissions, 1400);
+        // Android 13+ delivers the system gesture through this callback. Route
+        // it into the WebView first so React can close the current sheet/chat
+        // page instead of exiting the app immediately.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+                    this::dispatchBackToWebView
+            );
+        }
     }
 
     @Override
     public void onBackPressed() {
+        dispatchBackToWebView();
+    }
+
+    private void dispatchBackToWebView() {
         if (getBridge() == null || getBridge().getWebView() == null) {
             super.onBackPressed();
             return;

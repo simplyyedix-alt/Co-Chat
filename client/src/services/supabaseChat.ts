@@ -116,10 +116,15 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
     void listConversations(uid).then(items => { if (active) callback(items) }).catch(() => undefined).finally(() => { inFlight = false })
   }
   refresh()
-  const timer = window.setInterval(refresh, 30000)
+  // Broadcast is preferred, but a reconnect or a backgrounded tab can miss
+  // one. Keep the safety refresh short so the inbox never feels stale.
+  const timer = window.setInterval(refresh, 2500)
+  const channel = supabase?.channel(`chat-conversations:${uid}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_members', filter: `uid=eq.${uid}` }, refresh)
+    .subscribe()
   const onVisibilityChange = () => { if (document.visibilityState === 'visible') refresh() }
   document.addEventListener('visibilitychange', onVisibilityChange)
-  return () => { active = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisibilityChange) }
+  return () => { active = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisibilityChange); if (channel) void supabase?.removeChannel(channel) }
 }
 
 export function watchMessages(conversationId: string, uid: string, callback: (items: ChatMessage[]) => void): Unsubscribe {
@@ -134,9 +139,12 @@ export function watchMessages(conversationId: string, uid: string, callback: (it
   // Realtime broadcasts deliver messages immediately. This is only a safety
   // refresh for a missed broadcast, so keep it slow to avoid burning edge
   // function/database quota while the chat remains open.
-  const timer = window.setInterval(refresh, 30000)
+  // Broadcast is preferred, but a reconnect can miss one. This short safety
+  // refresh keeps the open conversation responsive without a 30s delay.
+  const timer = window.setInterval(refresh, 2500)
   const channel = supabase?.channel(`chat-messages:${conversationId}`)
     .on('broadcast', { event: 'message' }, refresh)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, refresh)
     .subscribe()
   const onVisibilityChange = () => { if (document.visibilityState === 'visible') refresh() }
   document.addEventListener('visibilitychange', onVisibilityChange)
