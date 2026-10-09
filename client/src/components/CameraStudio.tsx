@@ -189,6 +189,7 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onSneak, onEr
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const activeDeviceIdRef = useRef<string | null>(null);
+  const activeDeviceLabelRef = useRef<string | null>(null);
   const timerRef = useRef<number | null>(null);
   const inferenceRef = useRef<number | null>(null);
   const faceRef = useRef<FaceBox | null>(null);
@@ -231,7 +232,7 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onSneak, onEr
     let active = true;
     setCameraLoading(true);
     setCameraMessage("");
-    setMirror(facing === "user");
+    setMirror(false);
     const open = async () => {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("This browser does not support live camera access. Use a current browser over HTTPS.");
       stopStream();
@@ -241,22 +242,24 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onSneak, onEr
       const track = stream.getVideoTracks()[0];
       const settings = track?.getSettings?.();
       const deviceId = settings?.deviceId || null;
+      const deviceLabel = track?.label || null;
       // Some desktop browsers expose multiple logical inputs but return the
       // same physical webcam for both facingMode values. Never turn that into
       // a mirror-only “flip”; keep the current front camera instead.
-      if (facing === "environment" && activeDeviceIdRef.current && deviceId && activeDeviceIdRef.current === deviceId) {
+      const samePhysicalCamera = (activeDeviceIdRef.current && deviceId && activeDeviceIdRef.current === deviceId)
+        || (activeDeviceLabelRef.current && deviceLabel && activeDeviceLabelRef.current === deviceLabel);
+      if (facing === "environment" && samePhysicalCamera) {
         stream.getTracks().forEach((item) => item.stop());
         streamRef.current = null;
         setFacing("user");
-        setMirror(true);
+        setMirror(false);
         setCameraMessage("This device has no separate rear camera, so Flip stays on the front camera.");
         return;
       }
       activeDeviceIdRef.current = deviceId;
+      activeDeviceLabelRef.current = deviceLabel;
       const availableCameras = (await navigator.mediaDevices.enumerateDevices().catch(() => [] as MediaDeviceInfo[])).filter((device) => device.kind === "videoinput");
-      if (availableCameras.length < 2 && facing === "environment") { setFacing("user"); setMirror(true); }
-      const actualFacing = settings?.facingMode;
-      setMirror(actualFacing ? actualFacing === "user" : facing === "user");
+      if (availableCameras.length < 2 && facing === "environment") { setFacing("user"); setMirror(false); }
       const capabilities = track?.getCapabilities?.() as MediaTrackCapabilities & { torch?: boolean; zoom?: { min: number; max: number; step?: number } } | undefined;
       setTorchSupported(Boolean(capabilities?.torch));
       if (capabilities?.zoom) { setZoomRange({ min: capabilities.zoom.min, max: Math.min(4, capabilities.zoom.max), step: capabilities.zoom.step || .1 }); setZoom(capabilities.zoom.min); }
@@ -277,7 +280,7 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onSneak, onEr
   }, [isOpen, facing, retryToken]);
 
   useEffect(() => {
-    if (!isOpen) activeDeviceIdRef.current = null;
+    if (!isOpen) { activeDeviceIdRef.current = null; activeDeviceLabelRef.current = null; }
   }, [isOpen]);
 
   useEffect(() => {
@@ -405,7 +408,7 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onSneak, onEr
     stopStream();
     setFacing((value) => value === "environment" ? "user" : "environment");
   };
-  const retake = () => { setCapturedPreview(null); setMirror(facing === "user"); setCaptured(null); };
+  const retake = () => { setCapturedPreview(null); setMirror(false); setCaptured(null); };
   const focusCameraOption = (event: MouseEvent<HTMLButtonElement>) => {
     event.currentTarget.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
   };
