@@ -5,6 +5,10 @@ export type CameraLens = "natural" | "puppy" | "cat" | "eyes" | "hearts" | "sung
 
 export const cameraFilterOptions: Array<{ id: CameraFilter; label: string; icon: string; category: "Natural" | "Portrait" | "Cinematic" }> = [
   { id: "none", label: "Natural", icon: "◉", category: "Natural" },
+  { id: "vhs", label: "VHS", icon: "▤", category: "Cinematic" },
+  { id: "y2k", label: "Y2K", icon: "✺", category: "Natural" },
+  { id: "pastel", label: "Pastel glow", icon: "❀", category: "Portrait" },
+  { id: "glow", label: "Soft glow", icon: "✧", category: "Portrait" },
   { id: "enhance", label: "Enhanced", icon: "✦", category: "Natural" },
   { id: "golden", label: "Golden hour", icon: "☀", category: "Portrait" },
   { id: "cool", label: "Cool pop", icon: "❄", category: "Portrait" },
@@ -15,10 +19,6 @@ export const cameraFilterOptions: Array<{ id: CameraFilter; label: string; icon:
   { id: "vivid", label: "Vivid", icon: "◆", category: "Natural" },
   { id: "portrait", label: "Soft portrait", icon: "●", category: "Portrait" },
   { id: "night", label: "Night", icon: "☾", category: "Cinematic" },
-  { id: "vhs", label: "VHS", icon: "▤", category: "Cinematic" },
-  { id: "y2k", label: "Y2K", icon: "✺", category: "Natural" },
-  { id: "pastel", label: "Pastel glow", icon: "❀", category: "Portrait" },
-  { id: "glow", label: "Soft glow", icon: "✧", category: "Portrait" },
 ];
 
 export const cameraFilterCss: Record<CameraFilter, string> = {
