@@ -428,20 +428,18 @@ function studyMinutes(seconds: number) {
 
 function leaderboardHandle(entry: StudyLeaderboardEntry) {
   const username = entry.username.trim().replace(/^@/, "");
-  // Do not expose the technical username generated for legacy profiles.
+  // Leaderboards must never expose generated IDs or display-name fallbacks.
   if (username && !/^user_[a-z0-9]{6,}$/i.test(username) && username.toLowerCase() !== "user") return username;
-  const displayName = entry.displayName.trim().replace(/[^a-zA-Z0-9_]+/g, "").slice(0, 24);
-  return displayName || "Co-Chat member";
+  return "";
 }
 
-function LeaderboardPodiumCard({ entry, rank, currentUid, mode }: { entry?: StudyLeaderboardEntry; rank: 1 | 2 | 3; currentUid: string; mode: "friends" | "public" }) {
+function LeaderboardPodiumCard({ entry, rank }: { entry?: StudyLeaderboardEntry; rank: 1 | 2 | 3 }) {
   const medal = rank === 1 ? "🏆" : rank === 2 ? "🥈" : "🥉";
   return <article className={`leaderboard-podium-card rank-${rank}`}>
     <span className="leaderboard-medal" aria-label={`Rank ${rank}`}>{medal}</span>
     {entry ? <>
       <Avatar name={entry.displayName} photoURL={entry.photoURL} className="leaderboard-avatar" />
       <strong>{leaderboardHandle(entry)}</strong>
-      <small>{entry.uid === currentUid ? "You" : mode === "friends" ? "Friend" : "Student"}</small>
       <b>{studyMinutes(entry.weeklySeconds)}</b>
     </> : <>
       <span className="leaderboard-avatar leaderboard-avatar-empty">—</span>
@@ -453,13 +451,13 @@ function LeaderboardPodiumCard({ entry, rank, currentUid, mode }: { entry?: Stud
 
 function LeaderboardSheet({ mode, entries, currentUid, loading, onModeChange, onClose }: { mode: "friends" | "public"; entries: StudyLeaderboardEntry[]; currentUid: string; loading: boolean; onModeChange: (mode: "friends" | "public") => void; onClose: () => void }) {
   const ranked = entries
-    .filter((entry) => entry.weeklySeconds > 0)
+    .filter((entry) => entry.weeklySeconds > 0 && Boolean(leaderboardHandle(entry)))
     .sort((a, b) => b.weeklySeconds - a.weeklySeconds || b.totalSeconds - a.totalSeconds || leaderboardHandle(a).localeCompare(leaderboardHandle(b)))
     .map((entry) => ({ ...entry, username: leaderboardHandle(entry) }))
     .slice(0, 10);
   const podium = [ranked[1], ranked[0], ranked[2]] as const;
   const lowerRanks = Array.from({ length: 7 }, (_, index) => ranked[index + 3]);
-  return <div className="task-sheet-backdrop" role="presentation" onMouseDown={onClose}><section className="leaderboard-sheet" role="dialog" aria-modal="true" aria-label="Study leaderboard" onMouseDown={(event) => event.stopPropagation()}><div className="sheet-handle"/><header className="sheet-page-header"><button className="icon" type="button" aria-label="Close leaderboard" onClick={onClose}>×</button><div><strong>{mode === "friends" ? "Friends leaderboard" : "Public leaderboard"}</strong><small>Top 10 · weekly totals reset every Monday</small></div><span>🏆</span></header><div className="leaderboard-sheet-body"><div className="leaderboard-mode-tabs"><button className={mode === "friends" ? "active" : ""} type="button" onClick={() => onModeChange("friends")}>Friends</button><button className={mode === "public" ? "active" : ""} type="button" onClick={() => onModeChange("public")}>Public</button></div>{loading ? <p className="leaderboard-disclaimer">Loading study totals…</p> : !ranked.length ? <p className="leaderboard-disclaimer">No saved study sessions yet.</p> : <><div className="leaderboard-podium">{podium.map((entry, index) => <LeaderboardPodiumCard key={entry?.uid || `empty-${index}`} entry={entry} rank={index === 0 ? 2 : index === 1 ? 1 : 3} currentUid={currentUid} mode={mode} />)}</div><p className="leaderboard-disclaimer">Finished study sessions saved to your account.</p><p className="leaderboard-section-label">Ranks 4–10</p><div className="leaderboard-ranks">{lowerRanks.map((entry, index) => <article className={entry ? "" : "rank-waiting"} key={entry?.uid || `waiting-${index + 4}`}><b>{index + 4}</b><div><strong>{entry ? `@${entry.username || "user"}` : "Open rank"}</strong><small>{entry ? (entry.uid === currentUid ? "You" : mode === "friends" ? "Friend" : "Student") : "Waiting"}</small></div><span>{entry ? studyMinutes(entry.weeklySeconds) : "—"}</span></article>)}</div></>}</div></section></div>;
+  return <div className="task-sheet-backdrop" role="presentation" onMouseDown={onClose}><section className="leaderboard-sheet" role="dialog" aria-modal="true" aria-label="Study leaderboard" onMouseDown={(event) => event.stopPropagation()}><div className="sheet-handle"/><header className="sheet-page-header"><button className="icon" type="button" aria-label="Close leaderboard" onClick={onClose}>×</button><div><strong>{mode === "friends" ? "Friends leaderboard" : "Public leaderboard"}</strong><small>Top 10 · weekly totals reset every Monday</small></div><span>🏆</span></header><div className="leaderboard-sheet-body"><div className="leaderboard-mode-tabs"><button className={mode === "friends" ? "active" : ""} type="button" onClick={() => onModeChange("friends")}>Friends</button><button className={mode === "public" ? "active" : ""} type="button" onClick={() => onModeChange("public")}>Public</button></div>{loading ? <p className="leaderboard-disclaimer">Loading study totals…</p> : !ranked.length ? <p className="leaderboard-disclaimer">No saved study sessions yet.</p> : <><div className="leaderboard-podium">{podium.map((entry, index) => <LeaderboardPodiumCard key={entry?.uid || `empty-${index}`} entry={entry} rank={index === 0 ? 2 : index === 1 ? 1 : 3} />)}</div><p className="leaderboard-disclaimer">Finished study sessions saved to your account.</p><p className="leaderboard-section-label">Ranks 4–10</p><div className="leaderboard-ranks">{lowerRanks.map((entry, index) => <article className={entry ? "" : "rank-waiting"} key={entry?.uid || `waiting-${index + 4}`}><b>{index + 4}</b><div><strong>{entry ? `@${entry.username}` : "Open rank"}</strong></div><span>{entry ? studyMinutes(entry.weeklySeconds) : "—"}</span></article>)}</div></>}</div></section></div>;
 }
 
 function JourneySheet({ streak, league, weeklySeconds, totalSeconds, nextStreakMilestone, nextLeaguePromotion, onClose }: { streak: number; league: string; weeklySeconds: number; totalSeconds: number; nextStreakMilestone: number; nextLeaguePromotion: number; onClose: () => void }) {
