@@ -28,6 +28,8 @@ yarn-error.log*
 .idea/
 *.swp
 *.swo
+.android-studio-*/
+android-studio-cocchat.properties
 
 # OS
 Thumbs.db
