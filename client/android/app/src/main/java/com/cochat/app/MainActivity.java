@@ -90,6 +90,7 @@ public class MainActivity extends BridgeActivity {
             return;
         }
         missing.clear();
+        addIfMissing(missing, Manifest.permission.CAMERA);
         addIfMissing(missing, Manifest.permission.RECORD_AUDIO);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             addIfMissing(missing, Manifest.permission.READ_MEDIA_IMAGES);
