@@ -55,7 +55,11 @@ async function sendToToken(token: string, title: string, body: string, data: Rec
   const response = await fetch(`https://fcm.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/messages:send`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: { token, notification: { title, body }, data, android: { priority: 'HIGH', notification: { channel_id: 'cochat-general', sound: 'default', notification_priority: 'PRIORITY_HIGH' } } } }),
+    // Keep a notification payload (rather than data-only) so Android's FCM
+    // receiver displays it while the WebView/app is backgrounded or closed.
+    // `icon` must reference a drawable resource, not the full-colour launcher
+    // icon; Android status bars require a monochrome notification glyph.
+    body: JSON.stringify({ message: { token, notification: { title, body }, data, android: { priority: 'HIGH', notification: { channel_id: 'cochat-general', icon: 'ic_stat_cochat', sound: 'default', notification_priority: 'PRIORITY_HIGH' } } } }),
   })
   return { ok: response.ok, status: response.status }
 }

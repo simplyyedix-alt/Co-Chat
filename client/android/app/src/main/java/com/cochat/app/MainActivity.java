@@ -6,6 +6,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import com.getcapacitor.BridgeActivity;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,9 +21,24 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        createNotificationChannel();
         // Wait until the first frame is visible. Android will then show each
         // permission sheet above Co-Chat instead of behind the launch screen.
         new Handler(Looper.getMainLooper()).postDelayed(this::requestCoChatPermissions, 1400);
+    }
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager == null) return;
+        NotificationChannel channel = new NotificationChannel(
+                "cochat-general",
+                "Co-Chat updates",
+                NotificationManager.IMPORTANCE_HIGH
+        );
+        channel.setDescription("Messages, calls, and focus timer updates");
+        channel.enableVibration(true);
+        manager.createNotificationChannel(channel);
     }
 
     private void requestCoChatPermissions() {
