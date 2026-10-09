@@ -52,3 +52,31 @@
 :root.dark .chat-profile-menu:has(.group-member-list) .profile-actions input{border-color:#30353c;background:#1d2126;color:#f5f5f5}
 :root.dark .chat-profile-menu:has(.group-member-list) .profile-actions .secondary{border-color:#405de6;background:#405de6;color:#fff;box-shadow:0 8px 18px #405de644}
 :root.dark .chat-profile-menu:has(.group-member-list) .profile-actions:last-child .secondary{border-color:#30353c;background:#252a31;color:#dce2ea;box-shadow:none}
+
+/* Final theme contract for the group member sheet. Keep the surface and text
+   colors tied to the same tokens as the rest of the app so the sheet cannot
+   become white-on-white while the theme is loading. */
+.chat-profile-menu:has(.group-member-list){
+  background:var(--cc-bg)!important;
+  color:var(--cc-text)!important;
+}
+.chat-profile-menu:has(.group-member-list) .group-profile-hero,
+.chat-profile-menu:has(.group-member-list) .group-member-list{
+  background:var(--cc-surface)!important;
+  border-color:var(--cc-border)!important;
+}
+.chat-profile-menu:has(.group-member-list) .group-member-list .person-result{
+  background:transparent!important;
+  color:var(--cc-text)!important;
+  border-color:var(--cc-border)!important;
+}
+.chat-profile-menu:has(.group-member-list) .group-member-list .person-result:hover{
+  background:var(--cc-surface-soft)!important;
+}
+.chat-profile-menu:has(.group-member-list) .group-member-list .chat-copy strong{color:var(--cc-text)!important}
+.chat-profile-menu:has(.group-member-list) .group-member-list .chat-copy span{color:var(--cc-muted)!important}
+.chat-profile-menu:has(.group-member-list) .group-profile-subtitle,
+.chat-profile-menu:has(.group-member-list)>small,
+.chat-profile-menu:has(.group-member-list) .group-profile-tools span,
+.chat-profile-menu:has(.group-member-list) .group-profile-tools small{color:var(--cc-muted)!important}
+.chat-profile-menu:has(.group-member-list) .close-profile{background:var(--cc-surface-soft);color:var(--cc-text);border-color:var(--cc-border)}
