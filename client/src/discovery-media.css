@@ -21,6 +21,12 @@
 .camera-studio-full{grid-template-rows:auto auto auto auto auto!important;align-content:start!important;overflow-y:auto!important;overflow-x:hidden!important}
 .camera-stage{height:min(62dvh,620px)!important;min-height:280px!important;max-height:62dvh!important;flex:none!important}
 .camera-control-row,.camera-filter-strip,.camera-lens-strip{flex:none!important}
+.camera-studio-topbar{position:relative!important;z-index:4!important;padding-inline:4px!important}
+.camera-studio-icon,.camera-control,.camera-tools-panel,.camera-filter-scroll button{backdrop-filter:blur(16px)!important;-webkit-backdrop-filter:blur(16px)!important}
+.camera-control-row{margin:0 2px!important;border:1px solid #ffffff12!important;border-radius:22px!important;background:linear-gradient(180deg,#171a27e8,#0d0f17e8)!important;box-shadow:0 10px 30px #0005!important}
+.camera-filter-strip,.camera-lens-strip{margin-inline:2px!important;padding:10px 10px 5px!important;border:1px solid #ffffff0f!important;border-radius:18px!important;background:#121521cc!important}
+.camera-filter-scroll button.active{background:linear-gradient(135deg,#7066ff55,#b06cff33)!important;border-color:#a18cff!important}
+.camera-studio-primary{background:linear-gradient(135deg,#7066ff,#bd75ff)!important}
 @media(max-width:700px){
   .camera-studio-full{grid-template-rows:auto auto auto auto auto!important;padding-top:max(10px,env(safe-area-inset-top))!important}
   .camera-stage{height:42dvh!important;min-height:240px!important;max-height:42dvh!important}
