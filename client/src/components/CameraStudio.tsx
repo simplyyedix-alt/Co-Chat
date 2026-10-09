@@ -358,7 +358,6 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onError, onNa
     if (lens === "particles" || lens === "confetti") { const particles = [[.15, .22], [.78, .27], [.24, .72], [.84, .76], [.52, .12], [.53, .86]]; particles.forEach(([x, y], index) => { context.fillStyle = index % 2 ? "#ff9fca" : "#b69cff"; context.beginPath(); context.arc(canvas.width * x, canvas.height * y, Math.max(4, canvas.width * .008), 0, Math.PI * 2); context.fill(); }); }
     context.restore();
     setCaptured(canvas.toDataURL("image/jpeg", .98));
-    setMirror(false);
     setFlash(true);
     window.setTimeout(() => setFlash(false), 140);
   };
