@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 export type CameraFilter = "none" | "enhance" | "golden" | "cool" | "mono" | "retro" | "dreamy" | "cinematic" | "vivid" | "portrait" | "night" | "vhs" | "y2k" | "pastel" | "glow";
 export type CameraLens = "natural" | "puppy" | "cat" | "eyes" | "hearts" | "sunglasses" | "crown" | "particles" | "confetti";
@@ -358,7 +359,7 @@ export function CameraStudio({ isOpen, onClose, onCapture, onError, onNativeFall
 
   if (!isOpen) return null;
   const boxStyle = face && videoRef.current?.videoWidth ? { left: `${(face.x / videoRef.current.videoWidth) * 100}%`, top: `${(face.y / videoRef.current.videoHeight) * 100}%`, width: `${(face.width / videoRef.current.videoWidth) * 100}%`, height: `${(face.height / videoRef.current.videoHeight) * 100}%` } : undefined;
-  return <div className="camera-studio-shell" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+  return createPortal(<div className="camera-studio-shell" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="camera-studio-full" role="dialog" aria-modal="true" aria-label="Camera studio">
       <header className="camera-studio-topbar"><button className="camera-studio-icon" type="button" aria-label="Close camera" onClick={onClose}>×</button><div><strong>Camera studio</strong><small>{captured ? "Review your capture" : "Create a moment"}</small></div><button className="camera-studio-icon" type="button" aria-label="Toggle tools" aria-expanded={showTools} onClick={() => setShowTools((value) => !value)}>⋯</button></header>
       <div className={`camera-stage ${grid ? "with-grid" : ""} ${captured ? "is-captured" : ""}`}>
@@ -377,5 +378,5 @@ export function CameraStudio({ isOpen, onClose, onCapture, onError, onNativeFall
         <div className="camera-bottom-dock"><nav className="camera-dock-tabs" aria-label="Camera categories">{([["popular", "Popular", "✦"], ["lenses", "AR Lenses", "◉"], ["looks", "Color", "◌"], ["fx", "FX Party", "✧"]] as const).map(([id, label, icon]) => <button key={id} type="button" className={dockCategory === id ? "active" : ""} onClick={() => setDockCategory(id)}><span>{icon}</span>{label}</button>)}</nav><div className="camera-snap-carousel" aria-label={`${dockCategory} camera effects`}>{dockCategory === "popular" && <>{popularLooks.map((option) => <button key={`look-${option.id}`} className={filter === option.id ? "active" : ""} type="button" onClick={() => setFilter(option.id)}><span>{option.icon}</span><small>{option.label}</small></button>)}{popularLenses.map((option) => <button key={`lens-${option.id}`} className={lens === option.id ? "active" : ""} type="button" onClick={() => setLens(option.id)}><span>{option.icon}</span><small>{option.label}</small></button>)}</>}{dockCategory === "looks" && cameraFilterOptions.map((option) => <button key={option.id} className={filter === option.id ? "active" : ""} type="button" onClick={() => setFilter(option.id)}><span>{option.icon}</span><small>{option.label}</small></button>)}{dockCategory === "lenses" && cameraLensOptions.map((option) => <button key={option.id} className={lens === option.id ? "active" : ""} type="button" onClick={() => setLens(option.id)}><span>{option.icon}</span><small>{option.label}</small></button>)}{dockCategory === "fx" && cameraLensOptions.filter((option) => ["hearts", "crown", "particles", "confetti"].includes(option.id)).map((option) => <button key={option.id} className={lens === option.id ? "active" : ""} type="button" onClick={() => setLens(option.id)}><span>{option.icon}</span><small>{option.label}</small></button>)}</div><div className="camera-dock-capture"><span className="camera-cochat-mark">C</span><button className={`camera-shutter-dock ${countdown !== null ? "is-counting" : ""}`} type="button" aria-label="Capture photo" onClick={capture}><i /></button><button className="camera-dock-fx" type="button" aria-label="Open camera tools" onClick={() => setShowTools((value) => !value)}>✦<small>FX</small></button></div></div>
       </>}
     </section>
-  </div>;
+  </div>, document.body);
 }
