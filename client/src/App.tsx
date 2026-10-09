@@ -773,7 +773,7 @@ function CommentSheet({ post, comments, loading, hasMore, names, currentUid, onC
       <div className="comment-sheet-list">
         {loading && !comments.length && <p className="comment-loading">Loading comments…</p>}
         {!loading && !comments.length && <div className="comment-empty"><strong>Start the conversation</strong><span>Be the first to leave a helpful comment.</span></div>}
-        {comments.map((comment) => <article className="sheet-comment" key={comment.id}><div className="comment-avatar">{(names[comment.uid] || comment.uid).slice(0, 2).toUpperCase()}</div><div className="sheet-comment-body"><div><strong>@{names[comment.uid] || comment.uid.slice(0, 10)}</strong>{comment.uid === currentUid && <button className="comment-delete" type="button" onClick={() => onDelete(comment)}>Delete</button>}</div><p>{comment.body}</p>{comment.attachment && (comment.attachment.type.startsWith("image/") ? <a className="twitt-media-preview" href={comment.attachment.url} target="_blank" rel="noreferrer" download={comment.attachment.name}><img src={comment.attachment.url} alt={comment.attachment.name} /><span>Open / save image</span></a> : <a className="twitt-attachment" href={comment.attachment.url} target="_blank" rel="noreferrer" download={comment.attachment.name}>📄 {comment.attachment.name} · Open / save</a>)}<button className={comment.liked ? "comment-like liked" : "comment-like"} type="button" onClick={() => onLike(comment)}>♡ {comment.likes || 0}</button></div></article>)}
+        {comments.map((comment) => { const name = names[comment.uid] || "Profile unavailable"; return <article className="sheet-comment" key={comment.id}><div className="comment-avatar">{name.slice(0, 2).toUpperCase()}</div><div className="sheet-comment-body"><div><strong>{name === "Profile unavailable" ? name : `@${name}`}</strong>{comment.uid === currentUid && <button className="comment-delete" type="button" onClick={() => onDelete(comment)}>Delete</button>}</div><p>{comment.body}</p>{comment.attachment && (comment.attachment.type.startsWith("image/") ? <a className="twitt-media-preview" href={comment.attachment.url} target="_blank" rel="noreferrer" download={comment.attachment.name}><img src={comment.attachment.url} alt={comment.attachment.name} /><span>Open / save image</span></a> : <a className="twitt-attachment" href={comment.attachment.url} target="_blank" rel="noreferrer" download={comment.attachment.name}>📄 {comment.attachment.name} · Open / save</a>)}<button className={comment.liked ? "comment-like liked" : "comment-like"} type="button" onClick={() => onLike(comment)}>♡ {comment.likes || 0}</button></div></article>; })}
         {hasMore && <button className="load-comments" type="button" disabled={loading} onClick={onLoadMore}>{loading ? "Loading…" : "Load more comments"}</button>}
       </div>
       <form className="comment-sheet-compose" onSubmit={submit}><input value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 240))} placeholder="Add a thoughtful comment" autoFocus /><label className="comment-media-picker" title="Photo or PDF, max 5 MB"><MediaIcon /><input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label>{file && <small className="comment-file-name" title={file.name}>{file.name}</small>}<button className="primary compact" type="submit" disabled={!draft.trim() && !file}>Send</button></form>
@@ -1018,7 +1018,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
       const page = await loadTwittComments(postId);
       const items = page.items;
       const profiles = await Promise.all(items.map(async (comment) => [comment.uid, await getUserProfile(comment.uid)] as const));
-      setCommentNames((current) => ({ ...current, ...Object.fromEntries(profiles.map(([uid, profile]) => [uid, profile?.username || uid.slice(0, 10)])) }));
+      setCommentNames((current) => ({ ...current, ...Object.fromEntries(profiles.map(([uid, profile]) => [uid, profile?.username || "Profile unavailable"])) }));
       setCommentsByPost((current) => ({ ...current, [postId]: items }));
       setCommentCursors((current) => ({ ...current, [postId]: page.cursor }));
       setCommentMore((current) => ({ ...current, [postId]: page.hasMore }));
@@ -1032,7 +1032,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
       const page = await loadTwittComments(postId, cursor);
       const items = page.items;
       const profiles = await Promise.all(items.map(async (comment) => [comment.uid, await getUserProfile(comment.uid)] as const));
-      setCommentNames((current) => ({ ...current, ...Object.fromEntries(profiles.map(([uid, profile]) => [uid, profile?.username || uid.slice(0, 10)])) }));
+      setCommentNames((current) => ({ ...current, ...Object.fromEntries(profiles.map(([uid, profile]) => [uid, profile?.username || "Profile unavailable"])) }));
       setCommentsByPost((current) => ({ ...current, [postId]: [...(current[postId] || []), ...items] }));
       setCommentCursors((current) => ({ ...current, [postId]: page.cursor }));
       setCommentMore((current) => ({ ...current, [postId]: page.hasMore }));
@@ -1177,7 +1177,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
       }
     }
     const profile = uid ? await getUserProfile(uid).catch(() => null) : null;
-    const post: TwittPreview = { id, authorUid: uid || "your_profile", author: "You", handle: profile?.username || uid || "your_profile", avatar: "YO", body, likes: 0, comments: 0, views: "0", age: "now", createdAt: Date.now(), community: feedType === "social" ? "public" : draftCommunity, feedType, expiresAt: feedType === "social" ? new Date(Date.now() + 24 * 3_600_000).toISOString() : null, attachment };
+    const post: TwittPreview = { id, authorUid: uid || "your_profile", author: "You", handle: profile?.username || "", avatar: "YO", body, likes: 0, comments: 0, views: "0", age: "now", createdAt: Date.now(), community: feedType === "social" ? "public" : draftCommunity, feedType, expiresAt: feedType === "social" ? new Date(Date.now() + 24 * 3_600_000).toISOString() : null, attachment };
     setPosts((current) => [post, ...current]);
     setDraft(""); setDraftFile(null); setCameraDataUrl(null); setCameraFilter("none");
     setComposerOpen(false);
