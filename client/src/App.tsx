@@ -151,7 +151,7 @@ async function cameraDataUrlToFile(dataUrl: string, filter: CameraFilter) {
   if (!blob) throw new Error("Could not prepare the camera photo.");
   return new File([blob], `cochat-camera-${Date.now()}.jpg`, { type: "image/jpeg" });
 }
-const VerifiedTick = () => <span className="verified-tick" title="Verified account" aria-label="Verified account"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="m4.2 9.2 3.1 3.1 6.6-7" /></svg></span>;
+const VerifiedTick = () => <span className="verified-tick" title="Verified account" aria-label="Verified account"><svg viewBox="0 0 24 24" aria-hidden="true"><path className="verified-tick-shape" d="M12 1.7l2.15 1.92 2.82-.54 1.34 2.53 2.7 1.02-.02 2.87 1.87 2.18-1.38 2.52.53 2.82-2.53 1.34-1.03 2.7-2.86-.02L12 22.3l-2.18-1.87-2.82.53-1.34-2.53-2.7-1.03.02-2.86-1.87-2.18 1.38-2.52-.53-2.82 2.53-1.34 1.03-2.7 2.86.02L12 1.7Z" /><path className="verified-tick-check" d="m7.3 12.15 3.05 3.02 6.35-6.48" /></svg></span>;
 const MediaIcon = () => <svg className="media-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8.5 12.5 5.8-5.8a3.2 3.2 0 0 1 4.5 4.5l-7.5 7.5a5 5 0 0 1-7.1-7.1l7.1-7.1" /><path d="m9.2 15.1 6.4-6.4" /></svg>;
 const formatTime = (value?: { toDate?: () => Date } | null) =>
   value?.toDate
@@ -782,6 +782,10 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
   const [cameraDataUrl, setCameraDataUrl] = useState<string | null>(null);
   const [cameraFilter, setCameraFilter] = useState<CameraFilter>("none");
   const [cameraBusy, setCameraBusy] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState<"user" | "environment">("environment");
+  const cameraVideoRef = useRef<HTMLVideoElement | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
   const [commenting, setCommenting] = useState<string | null>(null);
   const [postMenu, setPostMenu] = useState<string | null>(null);
   const [remoteCursor, setRemoteCursor] = useState<Awaited<ReturnType<typeof loadTwittPage>>["cursor"]>(null);
@@ -801,10 +805,53 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
   const [publishing, setPublishing] = useState(false);
   const [busyDeletes, setBusyDeletes] = useState<string[]>([]);
   const hiddenKey = `cochat-hidden-twitts-${auth?.currentUser?.uid || "preview"}`;
+  const stopBrowserCamera = () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    if (cameraVideoRef.current) cameraVideoRef.current.srcObject = null;
+  };
+  const closeBrowserCamera = () => {
+    stopBrowserCamera();
+    setCameraOpen(false);
+  };
+  const openBrowserCamera = async (facing = cameraFacing) => {
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error("This browser does not support camera access. Use a current browser over HTTPS.");
+    stopBrowserCamera();
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1920 } }, audio: false });
+    cameraStreamRef.current = stream;
+    setCameraOpen(true);
+    requestAnimationFrame(() => {
+      if (cameraVideoRef.current) {
+        cameraVideoRef.current.srcObject = stream;
+        void cameraVideoRef.current.play().catch(() => undefined);
+      }
+    });
+  };
+  const captureBrowserPhoto = () => {
+    const video = cameraVideoRef.current;
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      setPublishError("Your camera is still starting. Please try again in a moment.");
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+    if (!context) { setPublishError("Could not capture this photo."); return; }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    setCameraDataUrl(canvas.toDataURL("image/jpeg", 0.9));
+    closeBrowserCamera();
+  };
   const captureCameraPhoto = async () => {
     setCameraBusy(true);
     setPublishError("");
     try {
+      // Capacitor's web implementation presents a file chooser. Only use the
+      // plugin on Android; browsers get a real live camera preview below.
+      if (!Capacitor.isNativePlatform()) {
+        await openBrowserCamera();
+        return;
+      }
       const photo = await Camera.getPhoto({
         resultType: CameraResultType.DataUrl,
         source: CameraSource.Camera,
@@ -825,6 +872,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
       setCameraBusy(false);
     }
   };
+  useEffect(() => () => { stopBrowserCamera(); }, []);
   useEffect(() => {
     if (!cameraDataUrl) return;
     let active = true;
@@ -1112,6 +1160,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
     <div className="discovery-mode-tabs" role="tablist" aria-label="Discovery mode"><button type="button" role="tab" aria-selected={feedType === "study"} className={feedType === "study" ? "active" : ""} onClick={() => { setFeedType("study"); setTab("recent"); setCommunity("all"); setVisible(20); }}>Study <small>Questions & answers</small></button><button type="button" role="tab" aria-selected={feedType === "social"} className={feedType === "social" ? "active" : ""} onClick={() => { setFeedType("social"); setTab("recent"); setCommunity("all"); setVisible(20); }}>Social <small>24-hour moments</small></button></div>
     <section className="discover-intro"><div><span className="kicker">CO-CHAT {feedType === "study" ? "STUDY" : "SOCIAL"}</span><h2>{feedType === "study" ? "Ask it. Solve it together." : "Share the moment."}</h2><p>{feedType === "study" ? "Post a doubt as text, photo, or PDF and get clear answers from your circle." : "Friends appear first. Once you see a post, it moves down so your feed stays fresh."}</p></div><button className="primary compact" type="button" onClick={() => setComposerOpen(true)}>＋ {feedType === "study" ? "Ask a doubt" : "Share a moment"}</button></section>
     {composerOpen && <section className="twitt-composer"><div className="composer-heading"><strong>{feedType === "study" ? "Ask your study community" : "Share with friends"}</strong><button className="icon" type="button" disabled={publishing || cameraBusy} onClick={() => setComposerOpen(false)}>×</button></div><textarea disabled={publishing || cameraBusy} value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 280))} placeholder={feedType === "study" ? "Describe your doubt or study win…" : "What is happening today? (expires in 24 hours)"} autoFocus /><div className="twitt-media-actions"><button className="twitt-camera-button" type="button" disabled={publishing || cameraBusy} onClick={() => void captureCameraPhoto()}>📸 {cameraBusy ? "Opening camera…" : "Open camera"}</button><label className="twitt-media-picker"><MediaIcon /> Add photo/PDF (max 5 MB)<input disabled={publishing || cameraBusy} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => { setCameraDataUrl(null); setDraftFile(event.target.files?.[0] || null); }} /></label></div>{cameraDataUrl && <div className="camera-filter-picker"><div className="camera-filter-heading"><strong>Camera studio</strong><small>Normal first · choose a look before posting</small></div><div className="camera-filter-list">{cameraFilterOptions.map(({ id, label, icon }) => <button key={id} type="button" className={cameraFilter === id ? "active" : ""} disabled={publishing || cameraBusy} onClick={() => setCameraFilter(id)}><span>{icon}</span>{label}</button>)}</div><img className={`camera-capture-preview filter-${cameraFilter}`} style={{ filter: cameraFilterCss[cameraFilter] }} src={cameraDataUrl} alt="Captured moment preview" /></div>}<small className="twitt-safety-note">Explicit porn content is not allowed. Normal photos are welcome.</small>{draftFile && <small className="twitt-file-name">{draftFile.name}</small>}{publishError && <p className="twitt-sync-error">{publishError}</p>}<div className="composer-footer">{feedType === "study" ? <div className="tag-input"><span>#</span><input disabled={publishing} list="twitt-tag-suggestions" value={draftCommunity} onChange={(event) => setDraftCommunity(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} placeholder="Add a study tag (required)" /><datalist id="twitt-tag-suggestions">{tagSuggestions.map((tag) => <option value={tag} key={tag} />)}</datalist></div> : <span className="social-expiry-note">Visible for 24 hours</span>}<span>{draft.length}/280</span><button className="primary compact" type="button" disabled={(!draft.trim() && !draftFile) || (feedType === "study" && !draftCommunity) || publishing || cameraBusy} onClick={() => void createTwitt()}>{publishing ? "◌ Posting…" : "Post"}</button></div></section>}
+    {cameraOpen && <div className="camera-studio-backdrop" role="presentation" onMouseDown={closeBrowserCamera}><section className="camera-studio" role="dialog" aria-modal="true" aria-label="Take a photo" onMouseDown={(event) => event.stopPropagation()}><header><div><strong>Camera</strong><small>Choose a look, then capture</small></div><button className="icon" type="button" aria-label="Close camera" onClick={closeBrowserCamera}>×</button></header><div className="camera-live-preview"><video ref={cameraVideoRef} muted playsInline style={{ filter: cameraFilterCss[cameraFilter], transform: cameraFacing === "user" ? "scaleX(-1)" : "none" }} /></div><div className="camera-filter-list" aria-label="Camera filters">{cameraFilterOptions.map(({ id, label, icon }) => <button key={id} type="button" className={cameraFilter === id ? "active" : ""} onClick={() => setCameraFilter(id)}><span>{icon}</span>{label}</button>)}</div><footer><button className="secondary compact" type="button" onClick={() => { const next = cameraFacing === "environment" ? "user" : "environment"; setCameraFacing(next); void openBrowserCamera(next).catch((error) => setPublishError(error instanceof Error ? error.message : "Could not switch the camera.")); }}>↺ Flip</button><button className="camera-shutter" type="button" aria-label="Capture photo" onClick={captureBrowserPhoto}><i /></button><span /></footer></section></div>}
     {feedType === "study" && <div className="community-filter" aria-label="Twitt tag filter">{[["all", "All"], ...popularTags.map((tag) => [tag, `#${tag}`] as const)].map(([id, label]) => <button key={id} className={community === id ? "active" : ""} onClick={() => { setCommunity(id); setVisible(3); }}>{label}</button>)}</div>}
     {feedType === "study" && <div className="feed-tabs"><button className={tab === "recent" ? "active" : ""} onClick={() => setTab("recent")}>Recent <small>{communityLabel} · 24h</small></button><button className={tab === "trending" ? "active" : ""} onClick={() => setTab("trending")}>Trending <small>{communityLabel} · top 10</small></button></div>}
     {remoteError && <div className="notice twitt-sync-error">{remoteError}<button className="secondary compact" type="button" onClick={() => window.location.reload()}>Retry</button></div>}
