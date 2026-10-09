@@ -27,6 +27,22 @@
 .camera-filter-strip,.camera-lens-strip{margin-inline:2px!important;padding:10px 10px 5px!important;border:1px solid #ffffff0f!important;border-radius:18px!important;background:#121521cc!important}
 .camera-filter-scroll button.active{background:linear-gradient(135deg,#7066ff55,#b06cff33)!important;border-color:#a18cff!important}
 .camera-studio-primary{background:linear-gradient(135deg,#7066ff,#bd75ff)!important}
+/* Snapchat-like composition: actions float over the preview while the
+   looks/lenses remain in a bottom dock. */
+@media(min-width:701px){
+  .camera-studio-full{display:block!important;position:relative!important;padding:14px 18px 18px!important}
+  .camera-studio-topbar{height:50px}
+  .camera-stage{height:calc(100dvh - 390px)!important;max-height:620px!important}
+  .camera-control-row{position:absolute!important;z-index:6!important;top:86px!important;right:28px!important;display:flex!important;flex-direction:column!important;gap:8px!important;width:58px!important;padding:9px 5px!important;margin:0!important;border-radius:22px!important;background:#10131bcc!important;box-shadow:0 10px 28px #0007!important}
+  .camera-control-row .camera-control{min-width:46px!important}
+  .camera-control-row .camera-shutter-large{width:58px!important;height:58px!important;order:2}
+  .camera-control-row .camera-shutter-large i{width:44px!important;height:44px!important}
+  .camera-control-row .camera-zoom-control{width:44px!important;order:4}
+  .camera-control-row .camera-control:first-child{order:1}
+  .camera-control-row .camera-control:nth-last-child(1){order:3}
+  .camera-control-row .camera-control:nth-last-child(2){order:5}
+  .camera-filter-strip,.camera-lens-strip{position:relative!important;z-index:5!important;margin-top:10px!important}
+}
 @media(max-width:700px){
   .camera-studio-full{grid-template-rows:auto auto auto auto auto!important;padding-top:max(10px,env(safe-area-inset-top))!important}
   .camera-stage{height:42dvh!important;min-height:240px!important;max-height:42dvh!important}
