@@ -28,6 +28,8 @@ menu?.addEventListener('click', () => nav?.classList.toggle('open'))
 nav?.querySelectorAll('a').forEach(link => link.addEventListener('click', () => nav.classList.remove('open')))
 const year = document.querySelector('#year')
 if (year) year.textContent = String(new Date().getFullYear())
+const androidVersion = document.querySelector('.download-note')
+if (androidVersion) androidVersion.textContent = 'Android 8.0+ · Free download · Version 1.0.4'
 const form = document.querySelector('#join-form')
 const note = document.querySelector('#form-note')
 form?.addEventListener('submit', event => {
