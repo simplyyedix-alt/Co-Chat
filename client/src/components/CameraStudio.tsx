@@ -371,7 +371,13 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onError, onNa
     timerRef.current = window.setTimeout(tick, 1000);
   };
 
-  const flip = () => { stopStream(); setFacing((value) => { const next = value === "environment" ? "user" : "environment"; setMirror(next === "user"); return next; }); };
+  const flip = async () => {
+    const devices = await navigator.mediaDevices?.enumerateDevices?.().catch(() => [] as MediaDeviceInfo[]);
+    const cameras = (devices || []).filter((device) => device.kind === "videoinput");
+    if (cameras.length < 2) { setCameraMessage("This device has one camera, so Flip is unavailable."); return; }
+    stopStream();
+    setFacing((value) => { const next = value === "environment" ? "user" : "environment"; setMirror(next === "user"); return next; });
+  };
   const retake = () => { setCapturedPreview(null); setMirror(facing === "user"); setCaptured(null); };
   const focusCameraOption = (event: MouseEvent<HTMLButtonElement>) => {
     event.currentTarget.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
