@@ -836,7 +836,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
     Promise.all(ids.map(async (uid) => [uid, await getUserProfile(uid === "member" ? "" : uid)] as const)).then((items) => {
       setAuthorNames((current) => {
         const next = { ...current };
-        items.forEach(([uid, profile]) => { if (profile?.username) { next[uid] = profile.username; next[profile.username] = profile.username; } });
+        items.forEach(([uid, profile]) => { if (profile?.username) { next[uid] = profile.username; next[profile.username] = profile.username; } else { next[uid] = "member"; next.member = "member"; } });
         return next;
       });
       setAuthorProfiles((current) => {
