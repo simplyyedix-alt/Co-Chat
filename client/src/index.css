@@ -458,3 +458,20 @@ button:disabled{cursor:not-allowed;opacity:.55;transform:none!important}
     transition: none;
   }
 }
+
+/* Motion polish: short, purposeful transitions keep Android navigation smooth
+   without adding heavyweight animation assets. */
+.content>*,.settings-page>*,.search-panel,.hero-card,.study-home,.twitt-feed{animation:cochat-page-in .28s cubic-bezier(.2,.8,.2,1) both}
+.chat-row{transition:transform .2s ease,background-color .2s ease,box-shadow .2s ease}
+.chat-row:hover{transform:translateX(3px);box-shadow:0 7px 18px #33247712}
+.chat-row:active{transform:scale(.985)}
+.chat-row:nth-child(2){animation-delay:.025s}.chat-row:nth-child(3){animation-delay:.05s}.chat-row:nth-child(4){animation-delay:.075s}.chat-row:nth-child(5){animation-delay:.1s}
+.bubble{animation:bubble-pop .24s cubic-bezier(.2,.8,.2,1) both;transform-origin:bottom right}.bubble:not(.me){transform-origin:bottom left}
+.avatar{transition:transform .22s ease,box-shadow .22s ease}.avatar:hover{transform:translateY(-2px) scale(1.03);box-shadow:0 8px 18px #5b49d733}
+.presence-dot{animation:presence-pulse 2.1s ease-in-out infinite}
+.primary:active,.secondary:active,.icon:active,.bottom-nav button:active{transform:scale(.96)}
+.twitt-card{animation:cochat-page-in .3s cubic-bezier(.2,.8,.2,1) both}.twitt-card:nth-child(2){animation-delay:.04s}.twitt-card:nth-child(3){animation-delay:.08s}
+@keyframes cochat-page-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes bubble-pop{from{opacity:0;transform:translateY(7px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes presence-pulse{0%,100%{box-shadow:0 0 0 0 #32cf7066}50%{box-shadow:0 0 0 5px #32cf7000}}
+@media(prefers-reduced-motion:reduce){.content>*,.settings-page>*,.search-panel,.hero-card,.study-home,.twitt-feed,.chat-row,.bubble,.twitt-card,.presence-dot{animation:none!important;transition:none!important}}
