@@ -1902,8 +1902,8 @@ export default function App() {
     try {
       const file = await cameraDataUrlToFile(dataUrl, "none", 1);
       await sendSneak(selected.id, liveUser.uid, recipientId, file);
-      setSneakCameraOpen(false);
-    } catch (error) { setError(error instanceof Error ? error.message : "Could not send Sneak."); }
+        setSneakCameraOpen(false);
+    } catch (error) { setSneakCameraOpen(false); setError(error instanceof Error ? error.message : "Could not send Sneak."); }
     finally { setSneakBusy(false); }
   };
   const openSneak = async (message: ChatMessage) => {
