@@ -30,6 +30,10 @@
 .camera-dock-tabs button{display:inline-flex;align-items:center;gap:5px;min-height:30px;padding:6px 11px;border:0;border-radius:999px;background:transparent;color:#9da5bb;font:inherit;font-size:11px;font-weight:800;white-space:nowrap;cursor:pointer}
 .camera-dock-tabs button.active{background:#ffffff18;color:#fff;box-shadow:0 4px 16px #0003}
 .camera-dock-tabs button span{color:#a895ff;font-size:13px}
+.camera-dock-tabs button:nth-child(1) span{color:#ffd34d;text-shadow:0 0 10px #ffd34d}
+.camera-dock-tabs button:nth-child(2) span{color:#7ddcff;text-shadow:0 0 10px #7ddcff}
+.camera-dock-tabs button:nth-child(3) span{color:#ff9ee8;text-shadow:0 0 10px #ff9ee8}
+.camera-dock-tabs button:nth-child(4) span{color:#a891ff;text-shadow:0 0 10px #a891ff}
 .camera-filter-scroll button.active{background:linear-gradient(135deg,#7066ff55,#b06cff33)!important;border-color:#a18cff!important}
 .camera-studio-primary{background:linear-gradient(135deg,#7066ff,#bd75ff)!important}
 /* Snapchat-like composition: actions float over the preview while the
@@ -56,6 +60,11 @@
 .camera-snap-carousel button span{display:grid;place-items:center;width:56px;height:56px;border:2px solid #ffffff22;border-radius:50%;background:linear-gradient(135deg,#2e254b,#171b2c);box-shadow:0 6px 18px #0007;font-size:24px;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
 .camera-snap-carousel button small{max-width:72px;overflow:hidden;font-size:10px;font-weight:800;text-overflow:ellipsis;white-space:nowrap}
 .camera-snap-carousel button.active span{border-color:#a58cff;background:linear-gradient(135deg,#735cff,#b66dff);box-shadow:0 0 0 3px #a58cff55,0 0 24px #8565ff99;transform:scale(1.1)}
+.camera-snap-carousel button:nth-child(4n+1) span{background:linear-gradient(135deg,#ff9b45,#ff4f9a);color:#fff;border-color:#ffb36b;box-shadow:0 6px 18px #ff6b6b55}
+.camera-snap-carousel button:nth-child(4n+2) span{background:linear-gradient(135deg,#55c8ff,#7168ff);color:#fff;border-color:#8bdcff;box-shadow:0 6px 18px #5e9dff55}
+.camera-snap-carousel button:nth-child(4n+3) span{background:linear-gradient(135deg,#ffd86b,#ff8b39);color:#321b00;border-color:#ffe99b;box-shadow:0 6px 18px #ffb34755}
+.camera-snap-carousel button:nth-child(4n) span{background:linear-gradient(135deg,#71e2b1,#4cb7ff);color:#06251d;border-color:#a5f5d1;box-shadow:0 6px 18px #58d6b055}
+.camera-snap-carousel button.active span{background:linear-gradient(135deg,#ffd84f,#ff9b42)!important;color:#fff;border-color:#ffe77d!important;box-shadow:0 0 0 3px #f4d84a66,0 0 24px #f4b84a!important}
 .camera-bottom-dock~.camera-filter-strip,.camera-bottom-dock~.camera-lens-strip{display:none!important}
 @media(min-width:701px){
   .camera-studio-full{display:flex!important;flex-direction:column!important;height:100dvh!important;min-height:0!important;padding:10px 18px 0!important}
