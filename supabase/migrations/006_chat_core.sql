@@ -79,6 +79,7 @@ create table if not exists public.messages (
   sender_id text not null,
   text text not null default '' check (char_length(text) <= 2000),
   attachment jsonb,
+  sneak jsonb,
   reply_to jsonb,
   seen_by text[] not null default '{}',
   hidden_for text[] not null default '{}',

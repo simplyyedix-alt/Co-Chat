@@ -102,7 +102,7 @@ export async function listMessages(conversationId: string, uid: string, since?: 
   const data = await request<{ items?: Record<string, unknown>[] }>({ action: 'messages', conversationId, ...(since ? { since: new Date(since).toISOString() } : {}) })
   return (data.items || []).map(item => ({
     id: String(item.id || ''), text: String(item.text || ''), senderId: String(item.sender_id || ''), createdAt: timestamp(item.created_at),
-    attachment: attachment(item.attachment), replyTo: item.reply_to ? { id: String((item.reply_to as Record<string, unknown>).id || ''), text: String((item.reply_to as Record<string, unknown>).text || ''), senderId: String((item.reply_to as Record<string, unknown>).senderId || (item.reply_to as Record<string, unknown>).sender_id || '') } : null,
+    attachment: attachment(item.attachment), sneak: item.sneak ? { recipientId: String((item.sneak as Record<string, unknown>).recipient_id || (item.sneak as Record<string, unknown>).recipientId || ''), state: String((item.sneak as Record<string, unknown>).state || 'unopened') as 'unopened' | 'consumed' | 'expired', expiresAt: timestamp((item.sneak as Record<string, unknown>).expires_at || (item.sneak as Record<string, unknown>).expiresAt), consumedAt: timestamp((item.sneak as Record<string, unknown>).consumed_at || (item.sneak as Record<string, unknown>).consumedAt) } : undefined, replyTo: item.reply_to ? { id: String((item.reply_to as Record<string, unknown>).id || ''), text: String((item.reply_to as Record<string, unknown>).text || ''), senderId: String((item.reply_to as Record<string, unknown>).senderId || (item.reply_to as Record<string, unknown>).sender_id || '') } : null,
     seenBy: Array.isArray(item.seen_by) ? item.seen_by.map(String) : [], hiddenFor: Array.isArray(item.hidden_for) ? item.hidden_for.map(String) : [],
   })).filter(item => !item.hiddenFor?.includes(uid)).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0))
 }
@@ -169,6 +169,14 @@ export function watchMessages(conversationId: string, uid: string, callback: (it
 
 export async function sendMessage(conversationId: string, text: string, attachmentValue: ChatAttachment | null, replyTo?: ChatMessage | null) {
   return request({ action: 'send-message', conversationId, text, attachment: attachmentValue, replyTo: replyTo ? { id: replyTo.id, text: replyTo.text, senderId: replyTo.senderId } : null })
+}
+
+export async function sendSneak(conversationId: string, recipientId: string, attachmentValue: ChatAttachment) {
+  await request({ action: 'send-sneak', conversationId, recipientId, attachment: attachmentValue })
+}
+
+export async function consumeSneak(conversationId: string, messageId: string) {
+  return request<{ url: string; type: string }>({ action: 'consume-sneak', conversationId, messageId })
 }
 
 export async function createDirect(otherUid: string, name: string) {

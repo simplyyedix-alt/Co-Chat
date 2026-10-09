@@ -23,6 +23,7 @@ import {
 } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { StorageManager } from './storageManager'
+import { consumeSneak as consumeSupabaseSneak, sendSneak as sendSupabaseSneak } from './supabaseChat'
 import { addGroupMembers as addSupabaseGroupMembers, createDirect, createGroup as createSupabaseGroup, deleteConversation as deleteSupabaseConversation, deleteForMe as deleteSupabaseMessageForMe, getProfile as getSupabaseProfile, getStudyLeaderboard as getSupabaseStudyLeaderboard, getStudyStats as getSupabaseStudyStats, isSupabaseChatEnabled, leaveGroup as leaveSupabaseGroup, markRead as markSupabaseRead, removeGroupMember as removeSupabaseGroupMember, saveStudySession as saveSupabaseStudySession, sendMessage as sendSupabaseMessage, unsend as unsendSupabaseMessage, updateGroup as updateSupabaseGroup, updateStudyPresence as updateSupabaseStudyPresence, upsertProfile as upsertSupabaseProfile, watchConversations as watchSupabaseConversations, watchMessages as watchSupabaseMessages, type StudyLeaderboardEntry, type StudyStats } from './supabaseChat'
 export { isSupabaseChatEnabled } from './supabaseChat'
 
@@ -243,7 +244,7 @@ export function watchMessages(conversationId: string, uid: string, callback: (it
     if (active) callback(visible())
   }).catch(() => undefined)
   const q = query(collection(db, 'conversations', conversationId, 'messages'), orderBy('createdAt', 'desc'), limit(100))
-  const unsubscribe = onSnapshot(q, snapshot => { latest = snapshot.docs.map(item => { const data = item.data(); return { id: item.id, text: String(data.text || ''), senderId: String(data.senderId || ''), createdAt: asTimestamp(data.createdAt), attachment: data.attachment ? { name: String(data.attachment.name || 'file'), url: String(data.attachment.url || ''), type: String(data.attachment.type || ''), size: Number(data.attachment.size || 0) } : null, replyTo: data.replyTo ? { id: String(data.replyTo.id || ''), text: String(data.replyTo.text || ''), senderId: String(data.replyTo.senderId || '') } : null, seenBy: Array.isArray(data.seenBy) ? data.seenBy.map(String) : [], hiddenFor: Array.isArray(data.hiddenFor) ? data.hiddenFor.map(String) : [] } }).filter(item => !item.createdAt || Date.now() - item.createdAt.toMillis() <= 24 * 60 * 60 * 1000).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)); if (active) callback(visible()) }, error => { console.warn('[chat] message listener unavailable', error); if (active) callback(visible()) })
+  const unsubscribe = onSnapshot(q, snapshot => { latest = snapshot.docs.map(item => { const data = item.data(); const sneak = data.sneak as Record<string, unknown> | undefined; return { id: item.id, text: String(data.text || ''), senderId: String(data.senderId || ''), createdAt: asTimestamp(data.createdAt), attachment: data.attachment ? { name: String(data.attachment.name || 'file'), url: String(data.attachment.url || ''), type: String(data.attachment.type || ''), size: Number(data.attachment.size || 0) } : null, sneak: sneak ? { recipientId: String(sneak.recipientId || ''), state: (String(sneak.state || 'unopened') as SneakState), expiresAt: asTimestamp(sneak.expiresAt), consumedAt: asTimestamp(sneak.consumedAt) } : undefined, replyTo: data.replyTo ? { id: String(data.replyTo.id || ''), text: String(data.replyTo.text || ''), senderId: String(data.replyTo.senderId || '') } : null, seenBy: Array.isArray(data.seenBy) ? data.seenBy.map(String) : [], hiddenFor: Array.isArray(data.hiddenFor) ? data.hiddenFor.map(String) : [] } }).filter(item => !item.createdAt || Date.now() - item.createdAt.toMillis() <= 24 * 60 * 60 * 1000).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)); if (active) callback(visible()) }, error => { console.warn('[chat] message listener unavailable', error); if (active) callback(visible()) })
   return () => { active = false; unsubscribe() }
 }
 
@@ -294,7 +295,11 @@ export async function sendMessage(conversationId: string, senderId: string, text
 
 /** Creates a friend-only one-time photo message using the existing chat store. */
 export async function sendSneak(conversationId: string, senderId: string, recipientId: string, file: File) {
-  if (isSupabaseChatEnabled()) throw new Error('Sneaks are not available until the secure Supabase message transition is enabled.')
+  if (isSupabaseChatEnabled()) {
+    const stored = await StorageManager.upload(file, { ownerId: senderId, originalName: 'sneak.jpg', mimeType: file.type || 'image/jpeg', sizeBytes: file.size, conversationId })
+    await sendSupabaseSneak(conversationId, recipientId, { name: 'sneak.jpg', url: stored.url, type: stored.mimeType, size: stored.sizeBytes })
+    return
+  }
   if (!db) throw new Error('Chat is unavailable.')
   const conversationRef = doc(db, 'conversations', conversationId)
   const snapshot = await getDoc(conversationRef)
@@ -308,6 +313,7 @@ export async function sendSneak(conversationId: string, senderId: string, recipi
 
 /** Atomically consumes a Sneak so refreshes and concurrent opens cannot reopen it. */
 export async function consumeSneak(conversationId: string, messageId: string, recipientId: string) {
+  if (isSupabaseChatEnabled()) return consumeSupabaseSneak(conversationId, messageId)
   if (!db) throw new Error('Chat is unavailable.')
   const firestore = db
   return runTransaction(firestore, async (transaction) => {

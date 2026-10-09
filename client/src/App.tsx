@@ -44,6 +44,8 @@ import {
   saveTheme,
   sendFriendRequest,
   sendMessage,
+  sendSneak,
+  consumeSneak,
   deleteMessageForMe,
   unblockUser,
   unsendMessage,
@@ -1231,6 +1233,9 @@ export default function App() {
   const [text, setText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<ChatAttachment | null>(null);
+  const [sneakCameraOpen, setSneakCameraOpen] = useState(false);
+  const [sneakViewer, setSneakViewer] = useState<{ url: string; messageId: string } | null>(null);
+  const [sneakBusy, setSneakBusy] = useState(false);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [showNew, setShowNew] = useState(false);
@@ -1885,6 +1890,31 @@ export default function App() {
     setMessages([]);
     setSelected(conversation);
   };
+  const openSneakCamera = () => {
+    if (!selected || selected.type === "group" || selected.memberIds.length !== 2) { setError("Sneaks are only available in one-to-one friend chats."); return; }
+    setSneakCameraOpen(true);
+  };
+  const sendCapturedSneak = async (dataUrl: string) => {
+    if (!selected || selected.type === "group" || selected.memberIds.length !== 2 || sneakBusy) return;
+    const recipientId = selected.memberIds.find((id) => id !== liveUser.uid);
+    if (!recipientId) return;
+    setSneakBusy(true);
+    try {
+      const file = await cameraDataUrlToFile(dataUrl, "none", 1);
+      await sendSneak(selected.id, liveUser.uid, recipientId, file);
+      setSneakCameraOpen(false);
+    } catch (error) { setError(error instanceof Error ? error.message : "Could not send Sneak."); }
+    finally { setSneakBusy(false); }
+  };
+  const openSneak = async (message: ChatMessage) => {
+    if (!selected || !message.sneak || message.sneak.recipientId !== liveUser.uid || sneakBusy) return;
+    setSneakBusy(true);
+    try {
+      const result = await consumeSneak(selected.id, message.id, liveUser.uid);
+      setSneakViewer({ url: result.url, messageId: message.id });
+    } catch (error) { setError(error instanceof Error ? error.message : "This Sneak is no longer available."); }
+    finally { setSneakBusy(false); }
+  };
   const startConversation = async (profile: UserProfile) => {
     try {
       const id = await createConversation(liveUser.uid, profile);
@@ -2240,7 +2270,13 @@ export default function App() {
                     ↪ {item.replyTo.text || "Attachment"}
                   </div>
                 )}
-                {item.attachment &&
+                {item.sneak ? (
+                  <div className={`sneak-card ${item.sneak.state}`}>
+                    <strong>{item.sneak.state === "unopened" ? "Serving pixels" : item.sneak.state === "consumed" ? "Sneak opened" : "Sneak expired"}</strong>
+                    {item.sneak.state === "unopened" && item.sneak.recipientId === liveUser.uid && <button type="button" className="sneak-open-button" disabled={sneakBusy} onClick={() => void openSneak(item)}>Open Sneak</button>}
+                    <small>◉ One view · {formatTime(item.createdAt) || "now"}</small>
+                  </div>
+                ) : item.attachment &&
                   (item.attachment.type.startsWith("image/") ? (
                     <img
                       className="message-image"
@@ -2263,7 +2299,7 @@ export default function App() {
                   ))}
                     {selected.memberIds.length > 2 && (
                   <strong className="message-sender">{sender}{isModerator(item.senderId) && <VerifiedTick />}</strong>
-                )}
+                  )}
                 {item.text && <span>{item.text}</span>}
                 <small>
                   {formatTime(item.createdAt) || "now"}
@@ -2401,6 +2437,7 @@ export default function App() {
               onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
             />
           </label>
+          {selected?.type !== "group" && selected?.memberIds.length === 2 && <button className="sneak-compose-button" type="button" title="Send a Sneak" aria-label="Send a Sneak" onClick={openSneakCamera}>◈</button>}
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -2408,6 +2445,8 @@ export default function App() {
           />
           <button className="primary" disabled={sendingMessage}>{sendingMessage ? "Sending…" : "Send"}</button>
         </form>
+        <CameraStudio isOpen={sneakCameraOpen} onClose={() => setSneakCameraOpen(false)} onCapture={({ dataUrl }) => void sendCapturedSneak(dataUrl)} onSneak={({ dataUrl }) => void sendCapturedSneak(dataUrl)} onError={setError} />
+        {sneakViewer && <div className="sneak-viewer" role="dialog" aria-modal="true" aria-label="Sneak viewer"><button type="button" className="sneak-viewer-close" aria-label="Close Sneak" onClick={() => { URL.revokeObjectURL(sneakViewer.url); setSneakViewer(null); }}>×</button><img src={sneakViewer.url} alt="Sneak" /></div>}
         {incomingCall && (
           <IncomingCall
             name={incomingCall.groupId ? (incomingCall.groupName || "Group voice call") : incomingCallerName}

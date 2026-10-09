@@ -8,7 +8,8 @@ export type CameraFacing = "user" | "environment";
 // This is deliberately presentation-only. Browser video frames are always
 // captured from their source pixels, never from the CSS-mirrored preview.
 export function cameraMirroringPolicy(facing: CameraFacing, mirrorFrontPreview: boolean) {
-  return { mirrorPreview: facing === "user" && mirrorFrontPreview, mirrorSavedImage: false };
+  const mirror = facing === "user" && mirrorFrontPreview;
+  return { mirrorPreview: mirror, mirrorSavedImage: mirror };
 }
 
 export const cameraFilterOptions: Array<{ id: CameraFilter; label: string; icon: string; category: "Natural" | "Portrait" | "Cinematic" }> = [
@@ -86,7 +87,7 @@ async function loadImage(dataUrl: string) {
   return image;
 }
 
-export async function processCameraDataUrl(dataUrl: string, filter: CameraFilter, intensity = 1) {
+export async function processCameraDataUrl(dataUrl: string, filter: CameraFilter, intensity = 1, mirrorSavedImage = false) {
   const image = await loadImage(dataUrl);
   const canvas = document.createElement("canvas");
   canvas.width = image.naturalWidth || image.width;
@@ -94,9 +95,10 @@ export async function processCameraDataUrl(dataUrl: string, filter: CameraFilter
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Camera filters are unavailable on this device.");
   // The camera source is the single orientation authority. Do not use a
-  // preview preference here: final photos are always natural/unmirrored.
+  // Apply the explicit product policy exactly once to the saved render.
   context.save();
   context.setTransform(1, 0, 0, 1, 0, 0);
+  if (mirrorSavedImage) { context.translate(canvas.width, 0); context.scale(-1, 1); }
   context.filter = cameraFilterStyle(filter, intensity);
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
   context.restore();
@@ -148,8 +150,8 @@ export async function processCameraDataUrl(dataUrl: string, filter: CameraFilter
   return canvas.toDataURL("image/jpeg", .92);
 }
 
-export async function cameraDataUrlToFile(dataUrl: string, filter: CameraFilter, intensity = 1) {
-  const processed = await processCameraDataUrl(dataUrl, filter, intensity);
+export async function cameraDataUrlToFile(dataUrl: string, filter: CameraFilter, intensity = 1, mirrorSavedImage = false) {
+  const processed = await processCameraDataUrl(dataUrl, filter, intensity, mirrorSavedImage);
   const response = await fetch(processed);
   let blob = await response.blob();
   // Social uploads are capped at 5 MB. Keep the largest practical JPEG
@@ -173,7 +175,6 @@ export async function cameraDataUrlToFile(dataUrl: string, filter: CameraFilter,
 }
 
 type FaceBox = { x: number; y: number; width: number; height: number };
-type CameraDiagnostics = { canvas: string; capture: string; final: string; path: string };
 type FaceDetectorLike = { detect: (source: HTMLVideoElement) => Promise<Array<{ boundingBox: FaceBox }>> };
 type FaceDetectorConstructor = new (options?: { maxDetectedFaces?: number; fastMode?: boolean }) => FaceDetectorLike;
 
@@ -212,6 +213,8 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onSneak, onEr
   const [lens, setLens] = useState<CameraLens>("natural");
   const [timer, setTimer] = useState<0 | 3 | 10>(0);
   const [grid, setGrid] = useState(false);
+  // Co Chat uses one natural orientation everywhere, including the live
+  // preview. This prevents the preview from appearing to flip at capture.
   const [mirrorFrontPreview, setMirrorFrontPreview] = useState(true);
   const [torch, setTorch] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
@@ -226,11 +229,7 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onSneak, onEr
   const [retryToken, setRetryToken] = useState(0);
   const [face, setFace] = useState<FaceBox | null>(null);
   const [trackingAvailable, setTrackingAvailable] = useState(false);
-  const [showTools, setShowTools] = useState(false);
   const [dockCategory, setDockCategory] = useState<"popular" | "lenses" | "looks" | "fx">("popular");
-  const [diagnosticEnabled, setDiagnosticEnabled] = useState(false);
-  const [diagnosticReviewTransform, setDiagnosticReviewTransform] = useState(false);
-  const [diagnostics, setDiagnostics] = useState<CameraDiagnostics>({ canvas: "not captured", capture: "video.drawImage", final: "not captured", path: "raw video → crop canvas → filter canvas → data URL → Blob" });
   const selectedLens = useMemo(() => cameraLensOptions.find((option) => option.id === lens) || cameraLensOptions[0], [lens]);
   const popularLooks = cameraFilterOptions.slice(0, 5);
   const popularLenses = cameraLensOptions.slice(0, 5);
@@ -363,13 +362,9 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onSneak, onEr
   useEffect(() => {
     if (!captured) { setCapturedPreview(null); return; }
     let active = true;
-    processCameraDataUrl(captured, filter, intensity).then(async (result) => {
+    const { mirrorSavedImage } = cameraMirroringPolicy(activeFacing, mirrorFrontPreview);
+    processCameraDataUrl(captured, filter, intensity, mirrorSavedImage).then(async (result) => {
       if (active) setCapturedPreview(result);
-      if (import.meta.env.DEV) {
-        const image = await loadImage(result).catch(() => null);
-        const blob = await fetch(result).then((response) => response.blob()).catch(() => null);
-        if (active) setDiagnostics((value) => ({ ...value, final: `${image?.naturalWidth || "?"}×${image?.naturalHeight || "?"}, ${blob?.size || "?"} bytes`, path: "raw video → crop canvas → filter canvas (identity transform) → review data URL → Save/Post Blob" }));
-      }
     }).catch(() => { if (active) setCapturedPreview(captured); });
     return () => { active = false; };
   }, [captured, filter, intensity]);
@@ -409,7 +404,6 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onSneak, onEr
     else if (sourceRatio < targetRatio) { sh = Math.round(video.videoWidth / targetRatio); sy = Math.round((video.videoHeight - sh) / 2); }
     canvas.width = sw;
     canvas.height = sh;
-    if (import.meta.env.DEV) setDiagnostics((value) => ({ ...value, canvas: `${canvas.width}×${canvas.height}; transform: identity (1,0,0,1,0,0); source: video ${video.videoWidth}×${video.videoHeight}`, capture: "HTMLVideoElement → CanvasRenderingContext2D.drawImage (CSS is not captured)" }));
     const context = canvas.getContext("2d");
     if (!context) { setCameraMessage("Could not capture this photo."); return; }
     context.save();
@@ -462,15 +456,12 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onSneak, onEr
   if (!isOpen) return null;
   const { mirrorPreview } = cameraMirroringPolicy(activeFacing, mirrorFrontPreview);
   const finalCapture = capturedPreview || captured;
-  const previewTransform = videoRef.current && typeof window !== "undefined" ? window.getComputedStyle(videoRef.current).transform : "not rendered";
-  const reviewTransform = diagnosticReviewTransform ? "scaleX(-1) (diagnostic only)" : "none";
   const boxStyle = face && videoRef.current?.videoWidth ? { left: `${(face.x / videoRef.current.videoWidth) * 100}%`, top: `${(face.y / videoRef.current.videoHeight) * 100}%`, width: `${(face.width / videoRef.current.videoWidth) * 100}%`, height: `${(face.height / videoRef.current.videoHeight) * 100}%` } : undefined;
   return createPortal(<div className="camera-studio-shell" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="camera-studio-full" role="dialog" aria-modal="true" aria-label="Camera studio">
-      <header className="camera-studio-topbar"><button className="camera-studio-icon" type="button" aria-label="Close camera" onClick={onClose}>×</button><div><strong>Camera studio</strong><small>{captured ? "Review your capture" : "Create a moment"}</small></div><button className="camera-studio-icon" type="button" aria-label="Toggle tools" aria-expanded={showTools} onClick={() => setShowTools((value) => !value)}>⋯</button></header>
-      {import.meta.env.DEV && <div className="camera-tools-panel" style={{ display: "grid", gap: 4, fontSize: 11 }}><label><input type="checkbox" checked={diagnosticEnabled} onChange={(event) => setDiagnosticEnabled(event.target.checked)} /> Camera diagnostics</label>{diagnosticEnabled && <><span>Active camera: {activeFacing === "user" ? "front" : "rear"} · requested: {facing === "user" ? "front" : "rear"}</span><span>Video: {videoRef.current?.clientWidth || 0}×{videoRef.current?.clientHeight || 0} CSS · {videoRef.current?.videoWidth || 0}×{videoRef.current?.videoHeight || 0} source</span><span>Preview CSS transform: {previewTransform}</span><span>Capture API: {diagnostics.capture}</span><span>Canvas: {diagnostics.canvas}</span><span>Final Blob: {diagnostics.final}</span><span>Processing: {diagnostics.path}</span><span>Review CSS transform: {reviewTransform}</span>{captured && <button type="button" className="camera-tool-button" onClick={() => setDiagnosticReviewTransform((value) => !value)}>Toggle diagnostic review transform</button>}</>}</div>}
+      <header className="camera-studio-topbar"><button className="camera-studio-icon" type="button" aria-label="Close camera" onClick={onClose}>×</button><div><strong>Camera studio</strong><small>{captured ? "Review your capture" : "Create a moment"}</small></div></header>
       <div className={`camera-stage ${grid ? "with-grid" : ""} ${captured ? "is-captured" : ""}`}>
-        {captured ? <img className="camera-captured-image" src={finalCapture || undefined} alt="Captured preview" style={{ transform: diagnosticReviewTransform ? "scaleX(-1)" : "none" }} /> : <video ref={videoRef} className="camera-live-video" muted playsInline style={{ filter: cameraFilterStyle(filter, intensity), transform: mirrorPreview ? "scaleX(-1)" : "none" }} />}
+        {captured ? <img className="camera-captured-image" src={finalCapture || undefined} alt="Captured preview" /> : <video ref={videoRef} className="camera-live-video" muted playsInline style={{ filter: cameraFilterStyle(filter, intensity), transform: mirrorPreview ? "scaleX(-1)" : "none" }} />}
         {!captured && lens !== "natural" && <div className={`camera-lens-layer lens-${lens}`} style={{ transform: mirrorPreview ? "scaleX(-1)" : "none" }} aria-hidden="true">{face && boxStyle && (lens === "puppy" || lens === "cat") && <div className="face-lens-anchor" style={boxStyle}><span className="lens-ear left">{lens === "puppy" ? "🐶" : "🐱"}</span><span className="lens-ear right">{lens === "puppy" ? "🐶" : "🐱"}</span><span className="lens-nose">{lens === "puppy" ? "●" : "♡"}</span></div>}{face && boxStyle && lens === "eyes" && <div className="face-lens-anchor" style={boxStyle}><span className="lens-eye left" /><span className="lens-eye right" /></div>}{face && boxStyle && lens === "sunglasses" && <div className="face-lens-layer" style={boxStyle}><span className="lens-sunglasses">▰</span></div>}{face && boxStyle && lens === "crown" && <div className="face-lens-anchor" style={boxStyle}><span className="lens-crown">✦ ✦ ✦</span></div>}{face && boxStyle && lens === "hearts" && <div className="face-lens-anchor" style={boxStyle}><span className="lens-heart one">♥</span><span className="lens-heart two">♥</span><span className="lens-heart three">♥</span></div>}{(lens === "particles" || lens === "confetti") && <div className="ambient-particles"><i /><i /><i /><i /><i /><i /></div>}</div>}
         {grid && <div className="camera-grid-lines" aria-hidden="true"><i /><i /><i /><i /></div>}
         {cameraLoading && <div className="camera-status"><span className="loading-spinner" /> Starting camera…</div>}
@@ -480,9 +471,8 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onSneak, onEr
         {selectedLens.ar && !trackingAvailable && !cameraLoading && <div className="camera-tracking-note">Face tracking is unavailable here; choose a conventional lens or move to a supported browser.</div>}
       </div>
       {captured ? <div className="camera-review-actions"><button className="camera-studio-secondary" type="button" onClick={retake}>Retake</button><button className="camera-studio-secondary" type="button" onClick={() => onSave?.({ dataUrl: finalCapture || captured, filter: "none", intensity: 1 })}>Save</button><button className="camera-studio-secondary camera-sneak-action" type="button" onClick={() => onSneak?.({ dataUrl: finalCapture || captured, filter: "none", intensity: 1 })}>Send Sneak</button><button className="camera-studio-primary" type="button" onClick={() => { onCapture({ dataUrl: finalCapture || captured, filter: "none", intensity: 1 }); onClose(); }}>Post</button></div> : <>
-        <div className="camera-control-row" aria-label="Camera controls"><button className="camera-control" type="button" onClick={flip} aria-label="Switch front and rear camera">↺<small>Flip</small></button>{zoomRange.max > zoomRange.min && <label className="camera-zoom-control"><span>Zoom {zoom.toFixed(1)}×</span><input aria-label="Camera zoom" type="range" min={zoomRange.min} max={zoomRange.max} step={zoomRange.step} value={zoom} onChange={(event) => void changeZoom(Number(event.target.value))} /></label>}<button className={`camera-shutter-large ${countdown !== null ? "is-counting" : ""}`} type="button" aria-label={timer ? `Capture photo in ${timer} seconds` : "Capture photo"} onClick={capture}><i /></button><button className={`camera-control ${grid ? "active" : ""}`} type="button" aria-label="Toggle grid" onClick={() => setGrid((value) => !value)}>▦<small>Grid</small></button><button className={`camera-control ${showTools ? "active" : ""}`} type="button" aria-label="Open camera tools" onClick={() => setShowTools((value) => !value)}>⚙<small>Tools</small></button></div>
-        {showTools && <div className="camera-tools-panel"><label>Timer<select value={timer} onChange={(event) => setTimer(Number(event.target.value) as 0 | 3 | 10)}><option value={0}>Off</option><option value={3}>3 seconds</option><option value={10}>10 seconds</option></select></label><label>Filter intensity<input type="range" min="0" max="1" step=".05" value={intensity} onChange={(event) => setIntensity(Number(event.target.value))} /></label><label className="camera-toggle"><input type="checkbox" checked={mirrorFrontPreview} disabled={facing !== "user"} onChange={(event) => setMirrorFrontPreview(event.target.checked)} /> Mirror front preview</label><button type="button" className="camera-tool-button" disabled={!torchSupported} onClick={() => void changeTorch()}>{torch ? "Torch on" : "Torch off"}</button></div>}
-        <div className="camera-bottom-dock"><nav className="camera-dock-tabs" aria-label="Camera categories">{([["popular", "Popular", "✦"], ["lenses", "AR Lenses", "◉"], ["looks", "Color", "◌"], ["fx", "FX Party", "✧"]] as const).map(([id, label, icon]) => <button key={id} type="button" className={dockCategory === id ? "active" : ""} onClick={() => setDockCategory(id)}><span>{icon}</span>{label}</button>)}</nav><div className="camera-snap-carousel" aria-label={`${dockCategory} camera effects`}>{dockCategory === "popular" && <>{popularLooks.map((option) => <button key={`look-${option.id}`} className={filter === option.id ? "active" : ""} type="button" onClick={() => setFilter(option.id)}><span>{option.icon}</span><small>{option.label}</small></button>)}{popularLenses.map((option) => <button key={`lens-${option.id}`} className={lens === option.id ? "active" : ""} type="button" onClick={() => setLens(option.id)}><span>{option.icon}</span><small>{option.label}</small></button>)}</>}{dockCategory === "looks" && cameraFilterOptions.map((option) => <button key={option.id} className={filter === option.id ? "active" : ""} type="button" onClick={() => setFilter(option.id)}><span>{option.icon}</span><small>{option.label}</small></button>)}{dockCategory === "lenses" && cameraLensOptions.map((option) => <button key={option.id} className={lens === option.id ? "active" : ""} type="button" onClick={() => setLens(option.id)}><span>{option.icon}</span><small>{option.label}</small></button>)}{dockCategory === "fx" && cameraLensOptions.filter((option) => ["hearts", "crown", "particles", "confetti"].includes(option.id)).map((option) => <button key={option.id} className={lens === option.id ? "active" : ""} type="button" onClick={() => setLens(option.id)}><span>{option.icon}</span><small>{option.label}</small></button>)}</div><div className="camera-dock-capture"><span className="camera-cochat-mark">C</span><button className={`camera-shutter-dock ${countdown !== null ? "is-counting" : ""}`} type="button" aria-label="Capture photo" onClick={capture}><i /></button><button className="camera-dock-fx" type="button" aria-label="Open camera tools" onClick={() => setShowTools((value) => !value)}>✦<small>FX</small></button></div></div>
+        <div className="camera-control-row" aria-label="Camera controls"><button className="camera-control" type="button" onClick={flip} aria-label="Switch front and rear camera">↺<small>Flip</small></button>{zoomRange.max > zoomRange.min && <label className="camera-zoom-control"><span>Zoom {zoom.toFixed(1)}×</span><input aria-label="Camera zoom" type="range" min={zoomRange.min} max={zoomRange.max} step={zoomRange.step} value={zoom} onChange={(event) => void changeZoom(Number(event.target.value))} /></label>}<button className={`camera-shutter-large ${countdown !== null ? "is-counting" : ""}`} type="button" aria-label={timer ? `Capture photo in ${timer} seconds` : "Capture photo"} onClick={capture}><i /></button><button className={`camera-control ${grid ? "active" : ""}`} type="button" aria-label="Toggle grid" onClick={() => setGrid((value) => !value)}>▦<small>Grid</small></button></div>
+        <div className="camera-bottom-dock"><nav className="camera-dock-tabs" aria-label="Camera categories">{([["popular", "Popular", "✦"], ["lenses", "AR Lenses", "◉"], ["looks", "Color", "◌"]] as const).map(([id, label, icon]) => <button key={id} type="button" className={dockCategory === id ? "active" : ""} onClick={() => setDockCategory(id)}><span>{icon}</span>{label}</button>)}</nav><div className="camera-snap-carousel" aria-label={`${dockCategory} camera effects`}>{dockCategory === "popular" && <>{popularLooks.map((option) => <button key={`look-${option.id}`} className={filter === option.id ? "active" : ""} type="button" onClick={() => setFilter(option.id)}><span>{option.icon}</span><small>{option.label}</small></button>)}{popularLenses.map((option) => <button key={`lens-${option.id}`} className={lens === option.id ? "active" : ""} type="button" onClick={() => setLens(option.id)}><span>{option.icon}</span><small>{option.label}</small></button>)}</>}{dockCategory === "looks" && cameraFilterOptions.map((option) => <button key={option.id} className={filter === option.id ? "active" : ""} type="button" onClick={() => setFilter(option.id)}><span>{option.icon}</span><small>{option.label}</small></button>)}{dockCategory === "lenses" && cameraLensOptions.map((option) => <button key={option.id} className={lens === option.id ? "active" : ""} type="button" onClick={() => setLens(option.id)}><span>{option.icon}</span><small>{option.label}</small></button>)}</div><div className="camera-dock-capture"><span className="camera-cochat-mark">C</span><button className={`camera-shutter-dock ${countdown !== null ? "is-counting" : ""}`} type="button" aria-label="Capture photo" onClick={capture}><i /></button></div></div>
       </>}
     </section>
   </div>, document.body);

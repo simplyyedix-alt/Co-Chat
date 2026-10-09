@@ -234,8 +234,32 @@ Deno.serve(async (request) => {
       // Use an inclusive boundary because JavaScript timestamps are only
       // millisecond precise while Postgres timestamps can be finer-grained;
       // the client deduplicates the boundary row by message ID.
-      const rows = await rest(`messages?conversation_id=eq.${encodeURIComponent(conversationId)}&created_at=gte.${encodeURIComponent(since)}&select=id,conversation_id,sender_id,text,attachment,reply_to,seen_by,hidden_for,created_at&order=created_at.asc&limit=100`)
+      const rows = await rest(`messages?conversation_id=eq.${encodeURIComponent(conversationId)}&created_at=gte.${encodeURIComponent(since)}&select=id,conversation_id,sender_id,text,attachment,sneak,reply_to,seen_by,hidden_for,created_at&order=created_at.asc&limit=100`)
       return response({ items: rows || [] })
+    }
+    if (action === 'send-sneak') {
+      const conversationId = String(body?.conversationId || '')
+      const recipientId = String(body?.recipientId || '')
+      if (!conversationId || !recipientId || !(await member(conversationId, user.uid)) || !(await member(conversationId, recipientId))) return response({ error: 'Conversation access denied' }, 403)
+      const conversations = await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}&type=eq.direct&select=id&limit=1`)
+      if (!conversations?.[0]) return response({ error: 'Sneaks require a direct conversation.' }, 400)
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      const sneak = { recipient_id: recipientId, state: 'unopened', expires_at: expiresAt, consumed_at: null }
+      const rows = await rest('messages', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ conversation_id: conversationId, sender_id: user.uid, text: 'Serving pixels', attachment: body?.attachment || null, sneak, seen_by: [user.uid] }) })
+      await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: 'PATCH', body: JSON.stringify({ last_message: 'Serving pixels', last_sender_id: user.uid, last_message_at: new Date().toISOString() }) })
+      return response({ message: rows?.[0] || null })
+    }
+    if (action === 'consume-sneak') {
+      const conversationId = String(body?.conversationId || '')
+      const messageId = String(body?.messageId || '')
+      if (!conversationId || !messageId || !(await member(conversationId, user.uid))) return response({ error: 'Conversation access denied' }, 403)
+      const rows = await rest(`messages?id=eq.${encodeURIComponent(messageId)}&conversation_id=eq.${encodeURIComponent(conversationId)}&select=id,attachment,sneak&limit=1`)
+      const item = rows?.[0]; const sneak = item?.sneak as Record<string, unknown> | undefined
+      if (!item || !sneak || String(sneak.recipient_id || '') !== user.uid || String(sneak.state || '') !== 'unopened') return response({ error: 'This Sneak has already been opened or expired.' }, 400)
+      if (new Date(String(sneak.expires_at || 0)).getTime() <= Date.now()) return response({ error: 'This Sneak has expired.' }, 400)
+      const attachment = item.attachment as Record<string, unknown> | null
+      await rest(`messages?id=eq.${encodeURIComponent(messageId)}&sneak->>state=eq.unopened`, { method: 'PATCH', body: JSON.stringify({ sneak: { ...sneak, state: 'consumed', consumed_at: new Date().toISOString() }, attachment: null }) })
+      return response({ url: String(attachment?.url || ''), type: String(attachment?.type || 'image/jpeg') })
     }
     if (action === 'send-message') {
       const conversationId = String(body?.conversationId || '')

@@ -21,7 +21,7 @@ describe("camera orientation policy", () => {
   it("keeps a front-camera saved frame natural while allowing a mirrored preview", () => {
     const policy = cameraMirroringPolicy("user", true);
     expect(policy.mirrorPreview).toBe(true);
-    expect(policy.mirrorSavedImage).toBe(false);
+    expect(policy.mirrorSavedImage).toBe(true);
     // The final renderer receives source pixels in their original order.
     expect(asymmetricFrame).toEqual(["red-left", "arrow-up", "blue-right"]);
   });
@@ -33,7 +33,7 @@ describe("camera orientation policy", () => {
 
   it("is stable for retakes, fresh sessions, and repeated destinations", () => {
     const sessions = Array.from({ length: 4 }, () => cameraMirroringPolicy("user", true));
-    expect(sessions.every(({ mirrorSavedImage }) => !mirrorSavedImage)).toBe(true);
+    expect(sessions.every(({ mirrorSavedImage }) => mirrorSavedImage)).toBe(true);
   });
 
   it("renders an asymmetric source frame without a horizontal canvas transform", async () => {
