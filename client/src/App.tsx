@@ -2446,7 +2446,7 @@ export default function App() {
               <span className="bell-wrap">🔔{unseenFriendRequestIds.length > 0 && <span className="notification-dot" />}</span>
             </button>
           )}
-          <button className="icon camera-header-button" type="button" title="Create a post with camera" aria-label="Create a post with camera" onClick={() => window.dispatchEvent(new Event("cochat-open-camera"))}>✦</button>
+          <button className="icon camera-header-button" type="button" title="Open camera" aria-label="Open camera" onClick={() => { setPage("discover"); window.setTimeout(() => window.dispatchEvent(new Event("cochat-open-camera")), 120); }}>📷</button>
           <button
             className="avatar profile-button"
             onClick={() => setPage("settings")}
