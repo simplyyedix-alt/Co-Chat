@@ -1256,6 +1256,61 @@ export default function App() {
   const [blockedProfiles, setBlockedProfiles] = useState<UserProfile[]>([]);
   const [showBlocklist, setShowBlocklist] = useState(false);
   const [presenceNow, setPresenceNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!isNativeAndroid) return;
+
+    const handleAndroidBack = (event: Event) => {
+      if (showChatProfile) {
+        setShowChatProfile(false);
+        event.preventDefault();
+        return;
+      }
+      if (messageMenu) {
+        setMessageMenu(null);
+        event.preventDefault();
+        return;
+      }
+      if (emojiOpen) {
+        setEmojiOpen(false);
+        event.preventDefault();
+        return;
+      }
+      if (forwardingMessage) {
+        setForwardingMessage(null);
+        event.preventDefault();
+        return;
+      }
+      if (showNew) {
+        setShowNew(false);
+        event.preventDefault();
+        return;
+      }
+      if (showGroup) {
+        setShowGroup(false);
+        event.preventDefault();
+        return;
+      }
+      if (activeStory) {
+        setActiveStory(null);
+        event.preventDefault();
+        return;
+      }
+      if (selected) {
+        setSelected(null);
+        event.preventDefault();
+        return;
+      }
+      if (page !== "chats") {
+        setPage("chats");
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener("cochat:back", handleAndroidBack);
+    return () => window.removeEventListener("cochat:back", handleAndroidBack);
+  }, [activeStory, emojiOpen, forwardingMessage, isNativeAndroid, messageMenu, page, selected, showChatProfile, showGroup, showNew]);
+
   const liveUser = preview
     ? ({
         uid: "preview",
@@ -2339,7 +2394,6 @@ export default function App() {
       <header className="topbar">
         {page === "settings" ? (
           <div className="settings-topbar-title">
-            <button className="icon" type="button" title="Back" onClick={() => setPage("chats")}>←</button>
             <strong>Settings and Profile</strong>
           </div>
         ) : (

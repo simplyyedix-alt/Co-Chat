@@ -27,6 +27,23 @@ public class MainActivity extends BridgeActivity {
         new Handler(Looper.getMainLooper()).postDelayed(this::requestCoChatPermissions, 1400);
     }
 
+    @Override
+    public void onBackPressed() {
+        if (getBridge() == null || getBridge().getWebView() == null) {
+            super.onBackPressed();
+            return;
+        }
+
+        // Give the React app first chance to close overlays, leave a chat, or
+        // return to Chats. If it does not consume the event, Android exits.
+        getBridge().getWebView().evaluateJavascript(
+                "(function(){var e=new Event('cochat:back',{cancelable:true});window.dispatchEvent(e);return e.defaultPrevented;})()",
+                handled -> {
+                    if (!"true".equals(handled)) super.onBackPressed();
+                }
+        );
+    }
+
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
         NotificationManager manager = getSystemService(NotificationManager.class);
