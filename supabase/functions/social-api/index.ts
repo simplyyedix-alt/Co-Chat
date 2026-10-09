@@ -90,15 +90,15 @@ function validSocialAttachment(value: unknown) {
 }
 
 function containsRestrictedContent(value: string) {
-  // Conservative, text-only safety gate. Media remains limited to images/PDFs;
-  // the app should still use moderation tooling for anything more sophisticated.
-  return /\b(?:porn|pornography|xxx|nsfw|nude|nudity|naked|onlyfans|blowjob|handjob|deepfake|genitals|sexual|sexually|erotic|boobs|breasts|pussy|dickpic|cumshot|fetish|escort)\b/i.test(value)
+  // Check explicit terms only. Do not scan signed storage URLs: their opaque
+  // tokens can contain incidental words and wrongly reject normal photos.
+  return /\b(?:porn|pornography|pornographic|xxx|nsfw|nude|nudity|naked|onlyfans|blowjob|handjob|deepfake|genitals|pussy|dickpic|cumshot)\b|\bsex\s*(?:tape|video)\b/i.test(value)
 }
 
 function attachmentNameIsRestricted(value: unknown) {
   if (!value || typeof value !== 'object') return false
   const item = value as Record<string, unknown>
-  return containsRestrictedContent(`${String(item.name || '')} ${String(item.url || '')}`)
+  return containsRestrictedContent(String(item.name || ''))
 }
 
 Deno.serve(async (request) => {

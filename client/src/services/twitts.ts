@@ -52,14 +52,14 @@ export const MODERATOR_UID = 'uOP77Ck5blVeo8e9zquV5s2dFwQ2'
 export const isModerator = (uid?: string | null) => uid === MODERATOR_UID
 
 // Keep the Firebase fallback aligned with the server-side social safety gate.
-// This is a text/name check only; image moderation needs a dedicated vision
-// moderation service before attachments can be considered fully screened.
+// Only captions and the original filename are checked. Never scan generated
+// storage URLs: signed URLs contain opaque tokens and can cause false blocks.
 function containsRestrictedContent(value: string) {
-  return /\b(?:porn|pornography|xxx|nsfw|nude|nudity|naked|onlyfans|blowjob|handjob|deepfake|genitals|sexual|sexually|erotic|boobs|breasts|pussy|dickpic|cumshot|fetish|escort)\b/i.test(value)
+  return /\b(?:porn|pornography|pornographic|xxx|nsfw|nude|nudity|naked|onlyfans|blowjob|handjob|deepfake|genitals|pussy|dickpic|cumshot)\b|\bsex\s*(?:tape|video)\b/i.test(value)
 }
 
 function assertSafeTwittContent(text: string, attachment?: TwittAttachment | null) {
-  if (containsRestrictedContent(`${text} ${attachment?.name || ''} ${attachment?.url || ''}`)) {
+  if (containsRestrictedContent(`${text} ${attachment?.name || ''}`)) {
     throw new Error('Adult or explicit content is not allowed.')
   }
 }
