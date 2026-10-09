@@ -197,7 +197,7 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onSneak, onEr
   const [lens, setLens] = useState<CameraLens>("natural");
   const [timer, setTimer] = useState<0 | 3 | 10>(0);
   const [grid, setGrid] = useState(false);
-  const [mirror, setMirror] = useState(true);
+  const [mirror, setMirror] = useState(false);
   const [torch, setTorch] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -228,6 +228,7 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onSneak, onEr
     let active = true;
     setCameraLoading(true);
     setCameraMessage("");
+    setMirror(facing === "user");
     const open = async () => {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("This browser does not support live camera access. Use a current browser over HTTPS.");
       stopStream();
