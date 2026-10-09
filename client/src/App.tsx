@@ -75,6 +75,7 @@ import GroupVoiceCall from "./components/GroupVoiceCall";
 import Avatar from "./components/Avatar";
 import { Capacitor } from "@capacitor/core";
 import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
+import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 
 const initials = (name: string) =>
   name
@@ -83,6 +84,40 @@ const initials = (name: string) =>
     .join("")
     .slice(0, 2)
     .toUpperCase() || "U";
+
+type CameraFilter = "none" | "warm" | "cool" | "mono" | "party";
+
+async function cameraDataUrlToFile(dataUrl: string, filter: CameraFilter) {
+  const image = new Image();
+  image.src = dataUrl;
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("Could not process the camera photo."));
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = image.naturalWidth || image.width;
+  canvas.height = image.naturalHeight || image.height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Camera filters are unavailable on this device.");
+  const filters: Record<CameraFilter, string> = {
+    none: "none",
+    warm: "sepia(.32) saturate(1.35) contrast(1.04)",
+    cool: "hue-rotate(165deg) saturate(1.15)",
+    mono: "grayscale(1) contrast(1.08)",
+    party: "saturate(1.8) hue-rotate(22deg) contrast(1.08)",
+  };
+  context.filter = filters[filter];
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  if (filter === "party") {
+    context.globalAlpha = 0.16;
+    context.fillStyle = "#9a5cff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.globalAlpha = 1;
+  }
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.86));
+  if (!blob) throw new Error("Could not prepare the camera photo.");
+  return new File([blob], `cochat-camera-${Date.now()}.jpg`, { type: "image/jpeg" });
+}
 const VerifiedTick = () => <span className="verified-tick" title="Verified account" aria-label="Verified account"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="m4.2 9.2 3.1 3.1 6.6-7" /></svg></span>;
 const MediaIcon = () => <svg className="media-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8.5 12.5 5.8-5.8a3.2 3.2 0 0 1 4.5 4.5l-7.5 7.5a5 5 0 0 1-7.1-7.1l7.1-7.1" /><path d="m9.2 15.1 6.4-6.4" /></svg>;
 const formatTime = (value?: { toDate?: () => Date } | null) =>
@@ -711,6 +746,8 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
   const [publishError, setPublishError] = useState("");
   const [draftCommunity, setDraftCommunity] = useState("jee");
   const [draftFile, setDraftFile] = useState<File | null>(null);
+  const [cameraFilter, setCameraFilter] = useState<CameraFilter>("none");
+  const [cameraBusy, setCameraBusy] = useState(false);
   const [commenting, setCommenting] = useState<string | null>(null);
   const [postMenu, setPostMenu] = useState<string | null>(null);
   const [remoteCursor, setRemoteCursor] = useState<Awaited<ReturnType<typeof loadTwittPage>>["cursor"]>(null);
@@ -730,6 +767,30 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
   const [publishing, setPublishing] = useState(false);
   const [busyDeletes, setBusyDeletes] = useState<string[]>([]);
   const hiddenKey = `cochat-hidden-twitts-${auth?.currentUser?.uid || "preview"}`;
+  const captureCameraPhoto = async () => {
+    setCameraBusy(true);
+    setPublishError("");
+    try {
+      const photo = await Camera.getPhoto({
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Camera,
+        quality: 88,
+        width: 1800,
+        height: 1800,
+        promptLabelHeader: "Capture a moment",
+        promptLabelPhoto: "Choose from gallery",
+        promptLabelPicture: "Take photo",
+      });
+      if (!photo.dataUrl) throw new Error("No photo was captured.");
+      setDraftFile(await cameraDataUrlToFile(photo.dataUrl, cameraFilter));
+    } catch (error) {
+      if (!(error instanceof Error) || !/cancel|user denied|permission/i.test(error.message)) {
+        setPublishError(error instanceof Error ? error.message : "Could not open the camera.");
+      }
+    } finally {
+      setCameraBusy(false);
+    }
+  };
   const [hiddenPosts, setHiddenPosts] = useState<string[]>(() => { try { const saved = JSON.parse(localStorage.getItem(hiddenKey) || "[]"); return Array.isArray(saved) ? saved : []; } catch { return []; } });
   useEffect(() => { try { localStorage.setItem(reactionKey, JSON.stringify({ posts: likedPostIds, comments: likedCommentIds })); } catch { /* reaction cache is optional */ } }, [reactionKey, likedPostIds, likedCommentIds]);
   useEffect(() => { setCommunity(initialCommunity); setVisible(3); }, [initialCommunity]);
@@ -1008,7 +1069,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
   return <div className={`twitt-feed feed-type-${feedType}`}>
     <div className="discovery-mode-tabs" role="tablist" aria-label="Discovery mode"><button type="button" role="tab" aria-selected={feedType === "study"} className={feedType === "study" ? "active" : ""} onClick={() => { setFeedType("study"); setTab("recent"); setCommunity("all"); setVisible(20); }}>Study <small>Questions & answers</small></button><button type="button" role="tab" aria-selected={feedType === "social"} className={feedType === "social" ? "active" : ""} onClick={() => { setFeedType("social"); setTab("recent"); setCommunity("all"); setVisible(20); }}>Social <small>24-hour moments</small></button></div>
     <section className="discover-intro"><div><span className="kicker">CO-CHAT {feedType === "study" ? "STUDY" : "SOCIAL"}</span><h2>{feedType === "study" ? "Ask it. Solve it together." : "Share the moment."}</h2><p>{feedType === "study" ? "Post a doubt as text, photo, or PDF and get clear answers from your circle." : "Friends appear first. Once you see a post, it moves down so your feed stays fresh."}</p></div><button className="primary compact" type="button" onClick={() => setComposerOpen(true)}>＋ {feedType === "study" ? "Ask a doubt" : "Share a moment"}</button></section>
-    {composerOpen && <section className="twitt-composer"><div className="composer-heading"><strong>{feedType === "study" ? "Ask your study community" : "Share with friends"}</strong><button className="icon" type="button" disabled={publishing} onClick={() => setComposerOpen(false)}>×</button></div><textarea disabled={publishing} value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 280))} placeholder={feedType === "study" ? "Describe your doubt or study win…" : "What is happening today? (expires in 24 hours)"} autoFocus /><label className="twitt-media-picker"><MediaIcon /> Add photo/PDF (max 5 MB)<input disabled={publishing} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => setDraftFile(event.target.files?.[0] || null)} /></label><small className="twitt-safety-note">Adult or explicit content is not allowed.</small>{draftFile && <small className="twitt-file-name">{draftFile.name}</small>}{publishError && <p className="twitt-sync-error">{publishError}</p>}<div className="composer-footer">{feedType === "study" ? <div className="tag-input"><span>#</span><input disabled={publishing} list="twitt-tag-suggestions" value={draftCommunity} onChange={(event) => setDraftCommunity(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} placeholder="Add a study tag (required)" /><datalist id="twitt-tag-suggestions">{tagSuggestions.map((tag) => <option value={tag} key={tag} />)}</datalist></div> : <span className="social-expiry-note">Visible for 24 hours</span>}<span>{draft.length}/280</span><button className="primary compact" type="button" disabled={!draft.trim() || (feedType === "study" && !draftCommunity) || publishing} onClick={() => void createTwitt()}>{publishing ? "◌ Posting…" : "Post"}</button></div></section>}
+    {composerOpen && <section className="twitt-composer"><div className="composer-heading"><strong>{feedType === "study" ? "Ask your study community" : "Share with friends"}</strong><button className="icon" type="button" disabled={publishing || cameraBusy} onClick={() => setComposerOpen(false)}>×</button></div><textarea disabled={publishing || cameraBusy} value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 280))} placeholder={feedType === "study" ? "Describe your doubt or study win…" : "What is happening today? (expires in 24 hours)"} autoFocus /><div className="twitt-media-actions"><button className="twitt-camera-button" type="button" disabled={publishing || cameraBusy} onClick={() => void captureCameraPhoto()}>📸 {cameraBusy ? "Opening camera…" : "Camera"}</button><label className="twitt-media-picker"><MediaIcon /> Add photo/PDF (max 5 MB)<input disabled={publishing || cameraBusy} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => setDraftFile(event.target.files?.[0] || null)} /></label><label className="twitt-filter-picker">✨ Filter<select disabled={publishing || cameraBusy} value={cameraFilter} onChange={(event) => setCameraFilter(event.target.value as CameraFilter)}><option value="none">Original</option><option value="warm">Warm glow</option><option value="cool">Cool pop</option><option value="mono">Mono mood</option><option value="party">Party blast</option></select></label></div><small className="twitt-safety-note">Explicit porn content is not allowed. Normal photos are welcome.</small>{draftFile && <small className="twitt-file-name">{draftFile.name}</small>}{publishError && <p className="twitt-sync-error">{publishError}</p>}<div className="composer-footer">{feedType === "study" ? <div className="tag-input"><span>#</span><input disabled={publishing} list="twitt-tag-suggestions" value={draftCommunity} onChange={(event) => setDraftCommunity(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} placeholder="Add a study tag (required)" /><datalist id="twitt-tag-suggestions">{tagSuggestions.map((tag) => <option value={tag} key={tag} />)}</datalist></div> : <span className="social-expiry-note">Visible for 24 hours</span>}<span>{draft.length}/280</span><button className="primary compact" type="button" disabled={(!draft.trim() && !draftFile) || (feedType === "study" && !draftCommunity) || publishing || cameraBusy} onClick={() => void createTwitt()}>{publishing ? "◌ Posting…" : "Post"}</button></div></section>}
     {feedType === "study" && <div className="community-filter" aria-label="Twitt tag filter">{[["all", "All"], ...popularTags.map((tag) => [tag, `#${tag}`] as const)].map(([id, label]) => <button key={id} className={community === id ? "active" : ""} onClick={() => { setCommunity(id); setVisible(3); }}>{label}</button>)}</div>}
     {feedType === "study" && <div className="feed-tabs"><button className={tab === "recent" ? "active" : ""} onClick={() => setTab("recent")}>Recent <small>{communityLabel} · 24h</small></button><button className={tab === "trending" ? "active" : ""} onClick={() => setTab("trending")}>Trending <small>{communityLabel} · top 10</small></button></div>}
     {remoteError && <div className="notice twitt-sync-error">{remoteError}<button className="secondary compact" type="button" onClick={() => window.location.reload()}>Retry</button></div>}
