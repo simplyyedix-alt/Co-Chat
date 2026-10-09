@@ -141,8 +141,6 @@ Deno.serve(async (request) => {
         items.sort((a, b) => {
           const seenOrder = Number(a.seen) - Number(b.seen)
           if (seenOrder) return seenOrder
-          const friendOrder = Number(b.friend) - Number(a.friend)
-          if (friendOrder) return friendOrder
           return String(b['created_at'] || '').localeCompare(String(a['created_at'] || ''))
         })
       }

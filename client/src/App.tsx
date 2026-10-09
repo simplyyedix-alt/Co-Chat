@@ -450,11 +450,22 @@ function studyMinutes(seconds: number) {
   return `${Math.floor(seconds / 60)} min`;
 }
 
+function cameraErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  if (/device in use|notreadable|camera.*busy|already.*use/i.test(message)) return "Camera is already in use by another app or browser tab. Close it there and try again.";
+  if (/permission|denied|notallowed/i.test(message)) return "Camera permission is blocked. Allow camera access in your browser or Android settings, then try again.";
+  if (/cancel|dismiss/i.test(message)) return "";
+  return message || "Could not open the camera.";
+}
+
 function leaderboardHandle(entry: StudyLeaderboardEntry) {
   const username = entry.username.trim().replace(/^@/, "");
-  // Leaderboards must never expose generated IDs or display-name fallbacks.
+  // Prefer the saved username, but do not drop a real participant while a
+  // profile is still being repaired. A readable display-name slug is safer
+  // than exposing a generated UID.
   if (username && !/^user_[a-z0-9]{6,}$/i.test(username) && username.toLowerCase() !== "user") return username;
-  return "";
+  const fallback = entry.displayName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  return fallback || "member";
 }
 
 function LeaderboardPodiumCard({ entry, rank }: { entry?: StudyLeaderboardEntry; rank: 1 | 2 | 3 }) {
@@ -538,7 +549,7 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   const [studyZoneEntries, setStudyZoneEntries] = useState<StudyLeaderboardEntry[]>([]);
   const [viewerUsername, setViewerUsername] = useState("");
   const [studyFriendIds, setStudyFriendIds] = useState<string[]>([]);
-  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(true);
   const [leaderboardRefreshKey, setLeaderboardRefreshKey] = useState(0);
   const [journeyOpen, setJourneyOpen] = useState(false);
   const [timerStartedAt, setTimerStartedAt] = useState<number | null>(() => { try { return Number(JSON.parse(localStorage.getItem(studyKey) || "{}").timerStartedAt) || null; } catch { return null; } });
@@ -568,6 +579,10 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   }, [uid]);
   useEffect(() => {
     let cancelled = false;
+    if (!statsLoaded) {
+      if (leaderboardOpen) setLeaderboardLoading(true);
+      return () => { cancelled = true; };
+    }
     const refresh = async () => {
       if (leaderboardOpen) setLeaderboardLoading(true);
       const currentUser = auth?.currentUser;
@@ -609,7 +624,7 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
     };
     void refresh();
     return () => { cancelled = true; };
-  }, [uid, weekKey, studyFriendIds, viewerUsername, leaderboardMode, leaderboardOpen, leaderboardRefreshKey, weeklySeconds, totalSeconds, seconds, running]);
+  }, [uid, weekKey, studyFriendIds, viewerUsername, leaderboardMode, leaderboardOpen, leaderboardRefreshKey, weeklySeconds, totalSeconds, seconds, running, statsLoaded]);
   useEffect(() => {
     void updateStudyPresence(running, timerTaskId ? "Working on an active task" : "In a focus session").catch(() => undefined);
     const timer = window.setInterval(() => void updateStudyPresence(running, timerTaskId ? "Working on an active task" : "In a focus session").catch(() => undefined), 60000);
@@ -624,7 +639,9 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
       try { local = JSON.parse(localStorage.getItem(studyKey) || "{}"); } catch { /* local cache is optional */ }
       const localDays = Array.isArray(local.studyDays) ? local.studyDays.filter((day): day is string => typeof day === "string") : [];
       setTotalSeconds(Math.max(0, stats.totalSeconds, Number(local.totalSeconds || 0)));
-      setWeeklySeconds(Math.max(0, stats.weeklySeconds, local.weekKey === weekKey ? Number(local.weeklySeconds || 0) : 0));
+      // The server is authoritative for the current Monday-to-Sunday window;
+      // never resurrect a stale local weekly total after the reset.
+      setWeeklySeconds(Math.max(0, stats.weeklySeconds));
       setStudyDays([...new Set([...localDays, ...stats.studyDays])].sort().slice(-730));
     }).catch(() => undefined).finally(() => { if (!cancelled) setStatsLoaded(true); });
     return () => { cancelled = true; };
@@ -817,7 +834,20 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
   const openBrowserCamera = async (facing = cameraFacing) => {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error("This browser does not support camera access. Use a current browser over HTTPS.");
     stopBrowserCamera();
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1920 } }, audio: false });
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    } catch (firstError) {
+      // Some browsers reject ideal resolution/facing constraints with
+      // NotReadableError even when the camera is available. Retry once with
+      // the browser's safest camera defaults before showing an error.
+      try { stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); }
+      catch (secondError) {
+        const name = secondError instanceof DOMException ? secondError.name : "";
+        if (name === "NotReadableError" || name === "AbortError") throw new Error("Camera is already in use by another app or browser tab. Close it there and try again.");
+        throw firstError;
+      }
+    }
     cameraStreamRef.current = stream;
     setCameraOpen(true);
     requestAnimationFrame(() => {
@@ -852,6 +882,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
         await openBrowserCamera();
         return;
       }
+      stopBrowserCamera();
       const photo = await Camera.getPhoto({
         resultType: CameraResultType.DataUrl,
         source: CameraSource.Camera,
@@ -865,9 +896,8 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
       if (!photo.dataUrl) throw new Error("No photo was captured.");
       setCameraDataUrl(photo.dataUrl);
     } catch (error) {
-      if (!(error instanceof Error) || !/cancel|user denied|permission/i.test(error.message)) {
-        setPublishError(error instanceof Error ? error.message : "Could not open the camera.");
-      }
+      const message = cameraErrorMessage(error);
+      if (message) setPublishError(message);
     } finally {
       setCameraBusy(false);
     }
@@ -902,7 +932,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
         const now = Date.now();
         setAuthorLoading(true);
         setVisible(0);
-        setPosts(page.items.map((item) => ({ id: item.id, authorUid: item.uid, author: item.uid === viewerUid ? "You" : "Co-Chat member", handle: item.uid, avatar: item.uid === viewerUid ? "YO" : "CM", body: item.body, likes: Math.max(0, item.likes), liked: Boolean(item.liked), comments: Math.max(0, item.comments), views: String(item.views), attachment: item.attachment, age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community, feedType: item.feedType, expiresAt: item.expiresAt, seen: item.seen })));
+        setPosts(page.items.map((item) => ({ id: item.id, authorUid: item.uid, author: item.uid === viewerUid ? "You" : "Loading profile…", handle: "", avatar: item.uid === viewerUid ? "YO" : "CM", body: item.body, likes: Math.max(0, item.likes), liked: Boolean(item.liked), comments: Math.max(0, item.comments), views: String(item.views), attachment: item.attachment, age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community, feedType: item.feedType, expiresAt: item.expiresAt, seen: item.seen })));
         setVisible(20);
       }
       setRemoteCursor(page.cursor);
@@ -913,7 +943,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
   const list = useMemo(() => {
     const now = Date.now();
     const eligible = posts.filter((post) => post.feedType === feedType && (feedType === "social" ? now - post.createdAt <= 24 * 3_600_000 : now - post.createdAt <= (tab === "recent" ? 24 : 24 * 7) * 3_600_000));
-    if (feedType === "social") return eligible.sort((a, b) => Number(a.seen) - Number(b.seen) || Number(friendIds.includes(b.authorUid)) - Number(friendIds.includes(a.authorUid)) || b.createdAt - a.createdAt);
+    if (feedType === "social") return eligible.sort((a, b) => Number(a.seen) - Number(b.seen) || b.createdAt - a.createdAt);
     return (tab === "recent" ? eligible.sort((a, b) => b.createdAt - a.createdAt) : eligible.sort((a, b) => (b.likes + Number(b.views || 0)) - (a.likes + Number(a.views || 0)) || b.createdAt - a.createdAt).slice(0, 10));
   }, [posts, tab, feedType, friendIds]);
   const loadMore = async () => {
@@ -924,7 +954,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
         const page = await loadTwittPage("all", remoteCursor, { feedType, friendIds });
         const now = Date.now();
         setAuthorLoading(true);
-        setPosts((current) => [...current, ...page.items.map((item) => ({ id: item.id, authorUid: item.uid, author: item.uid === auth?.currentUser?.uid ? "You" : "Co-Chat member", handle: item.uid, avatar: item.uid === auth?.currentUser?.uid ? "YO" : "CM", body: item.body, likes: Math.max(0, item.likes), liked: Boolean(item.liked), comments: Math.max(0, item.comments), views: String(item.views), attachment: item.attachment, age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community, feedType: item.feedType, expiresAt: item.expiresAt, seen: item.seen }))]);
+        setPosts((current) => [...current, ...page.items.map((item) => ({ id: item.id, authorUid: item.uid, author: item.uid === auth?.currentUser?.uid ? "You" : "Loading profile…", handle: "", avatar: item.uid === auth?.currentUser?.uid ? "YO" : "CM", body: item.body, likes: Math.max(0, item.likes), liked: Boolean(item.liked), comments: Math.max(0, item.comments), views: String(item.views), attachment: item.attachment, age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community, feedType: item.feedType, expiresAt: item.expiresAt, seen: item.seen }))]);
         setRemoteCursor(page.cursor);
         setRemoteHasMore(page.hasMore);
         setVisible((current) => current + page.items.length);
@@ -935,13 +965,13 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
   };
   const filtered = list.filter((post) => !hiddenPosts.includes(post.id) && (community === "all" || post.community === community));
   useEffect(() => {
-    const ids = [...new Set(posts.map((post) => post.handle).filter((uid) => uid && !authorNames[uid]))];
+    const ids = [...new Set(posts.map((post) => post.authorUid).filter((uid) => uid && !authorNames[uid]))];
     if (!ids.length) { setAuthorLoading(false); return; }
     setAuthorLoading(true);
-    Promise.all(ids.map(async (uid) => [uid, await getUserProfile(uid === "member" ? "" : uid)] as const)).then((items) => {
+    Promise.all(ids.map(async (uid) => [uid, await getUserProfile(uid)] as const)).then((items) => {
       setAuthorNames((current) => {
         const next = { ...current };
-        items.forEach(([uid, profile]) => { if (profile?.username) { next[uid] = profile.username; next[profile.username] = profile.username; } else { next[uid] = "member"; next.member = "member"; } });
+        items.forEach(([uid, profile]) => { next[uid] = profile?.username || "__unavailable__"; if (profile?.username) next[profile.username] = profile.username; });
         return next;
       });
       setAuthorProfiles((current) => {
@@ -950,8 +980,8 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
         return next;
       });
       setPosts((current) => current.map((post) => {
-        const profile = items.find(([uid]) => uid === post.handle)?.[1];
-        return profile?.username ? { ...post, handle: profile.username, author: post.author === "You" ? "You" : (profile.displayName || post.author) } : { ...post, handle: post.author === "You" ? "You" : "member" };
+        const profile = items.find(([uid]) => uid === post.authorUid)?.[1];
+        return profile?.username ? { ...post, handle: profile.username, author: post.author === "You" ? "You" : (profile.displayName || "Profile unavailable") } : { ...post, handle: "", author: post.author === "You" ? "You" : "Profile unavailable" };
       }));
     }).finally(() => { setAuthorLoading(false); setVisible(20); });
   }, [posts, authorNames]);
@@ -1156,7 +1186,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
     setVisible(20);
     setPublishing(false);
   };
-  return <div className={`twitt-feed feed-type-${feedType}`}>
+  return <div className={`twitt-feed feed-type-${feedType}${authorLoading ? " authors-loading" : ""}`}>
     <div className="discovery-mode-tabs" role="tablist" aria-label="Discovery mode"><button type="button" role="tab" aria-selected={feedType === "study"} className={feedType === "study" ? "active" : ""} onClick={() => { setFeedType("study"); setTab("recent"); setCommunity("all"); setVisible(20); }}>Study <small>Questions & answers</small></button><button type="button" role="tab" aria-selected={feedType === "social"} className={feedType === "social" ? "active" : ""} onClick={() => { setFeedType("social"); setTab("recent"); setCommunity("all"); setVisible(20); }}>Social <small>24-hour moments</small></button></div>
     <section className="discover-intro"><div><span className="kicker">CO-CHAT {feedType === "study" ? "STUDY" : "SOCIAL"}</span><h2>{feedType === "study" ? "Ask it. Solve it together." : "Share the moment."}</h2><p>{feedType === "study" ? "Post a doubt as text, photo, or PDF and get clear answers from your circle." : "Friends appear first. Once you see a post, it moves down so your feed stays fresh."}</p></div><button className="primary compact" type="button" onClick={() => setComposerOpen(true)}>＋ {feedType === "study" ? "Ask a doubt" : "Share a moment"}</button></section>
     {composerOpen && <section className="twitt-composer"><div className="composer-heading"><strong>{feedType === "study" ? "Ask your study community" : "Share with friends"}</strong><button className="icon" type="button" disabled={publishing || cameraBusy} onClick={() => setComposerOpen(false)}>×</button></div><textarea disabled={publishing || cameraBusy} value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 280))} placeholder={feedType === "study" ? "Describe your doubt or study win…" : "What is happening today? (expires in 24 hours)"} autoFocus /><div className="twitt-media-actions"><button className="twitt-camera-button" type="button" disabled={publishing || cameraBusy} onClick={() => void captureCameraPhoto()}>📸 {cameraBusy ? "Opening camera…" : "Open camera"}</button><label className="twitt-media-picker"><MediaIcon /> Add photo/PDF (max 5 MB)<input disabled={publishing || cameraBusy} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => { setCameraDataUrl(null); setDraftFile(event.target.files?.[0] || null); }} /></label></div>{cameraDataUrl && <div className="camera-filter-picker"><div className="camera-filter-heading"><strong>Camera studio</strong><small>Normal first · choose a look before posting</small></div><div className="camera-filter-list">{cameraFilterOptions.map(({ id, label, icon }) => <button key={id} type="button" className={cameraFilter === id ? "active" : ""} disabled={publishing || cameraBusy} onClick={() => setCameraFilter(id)}><span>{icon}</span>{label}</button>)}</div><img className={`camera-capture-preview filter-${cameraFilter}`} style={{ filter: cameraFilterCss[cameraFilter] }} src={cameraDataUrl} alt="Captured moment preview" /></div>}<small className="twitt-safety-note">Explicit porn content is not allowed. Normal photos are welcome.</small>{draftFile && <small className="twitt-file-name">{draftFile.name}</small>}{publishError && <p className="twitt-sync-error">{publishError}</p>}<div className="composer-footer">{feedType === "study" ? <div className="tag-input"><span>#</span><input disabled={publishing} list="twitt-tag-suggestions" value={draftCommunity} onChange={(event) => setDraftCommunity(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} placeholder="Add a study tag (required)" /><datalist id="twitt-tag-suggestions">{tagSuggestions.map((tag) => <option value={tag} key={tag} />)}</datalist></div> : <span className="social-expiry-note">Visible for 24 hours</span>}<span>{draft.length}/280</span><button className="primary compact" type="button" disabled={(!draft.trim() && !draftFile) || (feedType === "study" && !draftCommunity) || publishing || cameraBusy} onClick={() => void createTwitt()}>{publishing ? "◌ Posting…" : "Post"}</button></div></section>}
@@ -1166,7 +1196,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
     {remoteError && <div className="notice twitt-sync-error">{remoteError}<button className="secondary compact" type="button" onClick={() => window.location.reload()}>Retry</button></div>}
     {commentError && <div className="notice twitt-sync-error">{commentError}<button className="icon" type="button" aria-label="Dismiss comment error" onClick={() => setCommentError("")}>×</button></div>}
     {(remoteLoading || authorLoading) && !posts.length && <div className="twitt-skeleton-list" aria-label="Loading Twitts"><article><span/><div><b/><i/></div></article><article><span/><div><b/><i/></div></article><article><span/><div><b/><i/></div></article></div>}
-    <div className="twitt-list">{filtered.slice(0, visible).map((post) => <article className="twitt-card" key={post.id}><div className="twitt-head"><span className="avatar">{authorProfiles[post.handle]?.photoURL ? <img src={authorProfiles[post.handle].photoURL} alt="" /> : post.avatar}</span><div><strong>{post.author}</strong>{isModerator(post.authorUid) && <VerifiedTick />}<small>@{post.handle} · {post.age} · {post.community.toUpperCase()}</small></div><div className="twitt-actions"><button className="icon" aria-label="Twitt options" aria-expanded={postMenu === post.id} onClick={() => setPostMenu(postMenu === post.id ? null : post.id)}>•••</button>{postMenu === post.id && <div className="twitt-menu">{post.authorUid === auth?.currentUser?.uid ? <button type="button" className="danger" onClick={() => void removePost(post)}>Delete Twitt</button> : <button type="button" onClick={() => void dismissPost(post)}>Not interested</button>}<button type="button" onClick={() => setPostMenu(null)}>Cancel</button></div>}</div></div><p>{post.body}</p>{post.attachment && (post.attachment.type.startsWith("image/") ? <a className="twitt-media-preview" href={post.attachment.url} target="_blank" rel="noreferrer" download={post.attachment.name}><img src={post.attachment.url} alt={post.attachment.name} /><span>Open / save image</span></a> : <a className="twitt-attachment" href={post.attachment.url} target="_blank" rel="noreferrer" download={post.attachment.name}>📄 {post.attachment.name} · Open / save</a>)}<div className="twitt-meta"><button className={post.liked ? "liked" : ""} aria-label={post.liked ? "Unlike Twitt" : "Like Twitt"} onClick={() => void handleLike(post)}><span className="like-icon" aria-hidden="true">♡</span> {post.likes}</button><button className="comment-action" aria-label="Open comments" onClick={() => void openComments(post.id)}><span className="comment-icon" aria-hidden="true" /> {post.comments}</button><span>◉ {post.views}</span><button className={following.includes(post.community) ? "followed" : ""} onClick={() => setFollowing((current) => current.includes(post.community) ? current.filter((id) => id !== post.community) : [...current, post.community])}>{following.includes(post.community) ? "Following" : `Follow ${post.community.toUpperCase()}`}</button></div></article>)}</div>
+    <div className="twitt-list">{filtered.slice(0, visible).map((post) => <article className="twitt-card" key={post.id}><div className="twitt-head"><span className="avatar">{authorProfiles[post.authorUid]?.photoURL ? <img src={authorProfiles[post.authorUid].photoURL} alt="" /> : post.avatar}</span><div><strong>{post.author}</strong>{isModerator(post.authorUid) && <VerifiedTick />}<small>{post.handle ? `@${post.handle} · ` : ""}{post.age} · {post.community.toUpperCase()}</small></div><div className="twitt-actions"><button className="icon" aria-label="Twitt options" aria-expanded={postMenu === post.id} onClick={() => setPostMenu(postMenu === post.id ? null : post.id)}>•••</button>{postMenu === post.id && <div className="twitt-menu">{post.authorUid === auth?.currentUser?.uid ? <button type="button" className="danger" onClick={() => void removePost(post)}>Delete Twitt</button> : <button type="button" onClick={() => void dismissPost(post)}>Not interested</button>}<button type="button" onClick={() => setPostMenu(null)}>Cancel</button></div>}</div></div><p>{post.body}</p>{post.attachment && (post.attachment.type.startsWith("image/") ? <a className="twitt-media-preview" href={post.attachment.url} target="_blank" rel="noreferrer" download={post.attachment.name}><img src={post.attachment.url} alt={post.attachment.name} /><span>Open / save image</span></a> : <a className="twitt-attachment" href={post.attachment.url} target="_blank" rel="noreferrer" download={post.attachment.name}>📄 {post.attachment.name} · Open / save</a>)}<div className="twitt-meta"><button className={post.liked ? "liked" : ""} aria-label={post.liked ? "Unlike Twitt" : "Like Twitt"} onClick={() => void handleLike(post)}><span className="like-icon" aria-hidden="true">♡</span> {post.likes}</button><button className="comment-action" aria-label="Open comments" onClick={() => void openComments(post.id)}><span className="comment-icon" aria-hidden="true" /> {post.comments}</button><span>◉ {post.views}</span><button className={following.includes(post.community) ? "followed" : ""} onClick={() => setFollowing((current) => current.includes(post.community) ? current.filter((id) => id !== post.community) : [...current, post.community])}>{following.includes(post.community) ? "Following" : `Follow ${post.community.toUpperCase()}`}</button></div></article>)}</div>
     {commenting && posts.find((post) => post.id === commenting) && <CommentSheet post={posts.find((post) => post.id === commenting)!} comments={commentsByPost[commenting] || []} loading={commentLoading === commenting} hasMore={Boolean(commentMore[commenting])} names={commentNames} currentUid={auth?.currentUser?.uid} onClose={() => setCommenting(null)} onLoadMore={() => void loadMoreComments(commenting)} onSubmit={(body, file) => void submitComment(posts.find((post) => post.id === commenting)!, body, file)} onLike={(comment) => void likeComment(commenting, comment)} onDelete={(comment) => void removeComment(posts.find((post) => post.id === commenting)!, comment)} />}
     {!remoteLoading && !remoteError && !filtered.length && <div className="empty-state">No Twitts in {communityLabel} yet. Be the first to share something useful.</div>}
     {(visible < filtered.length || remoteHasMore) && <button className="load-more" type="button" onClick={() => void loadMore()} disabled={remoteLoading}>{remoteLoading ? "Loading Twitts…" : "Load 20 more Twitts"}</button>}

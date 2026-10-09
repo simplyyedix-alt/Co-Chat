@@ -112,7 +112,10 @@ Deno.serve(async (request) => {
       const uids = mode === 'friends' ? [...new Set([user.uid, ...requested])] : []
       const filter = uids.length ? `&uid=in.(${uids.map((uid) => encodeURIComponent(uid)).join(',')})` : ''
       const weekKey = String(body?.weekKey || '')
-      const rows = await rest(`profiles?select=uid,display_name,username,photo_url,weekly_study_seconds,total_study_seconds,study_week_key,study_active_until,study_label${filter}&order=weekly_study_seconds.desc,total_study_seconds.desc&limit=50`)
+      // Apply the requested week before ranking. Fetch enough profiles first;
+      // ordering by the stored weekly value would otherwise let last week's
+      // leaders consume the limit and hide current-week participants.
+      const rows = await rest(`profiles?select=uid,display_name,username,photo_url,weekly_study_seconds,total_study_seconds,study_week_key,study_active_until,study_label${filter}&limit=500`)
       const items = (rows || []).map((item: Record<string, unknown>) => ({
         uid: String(item.uid || ''), displayName: String(item.display_name || 'Co-Chat member'), username: String(item.username || ''), photoURL: String(item.photo_url || ''),
         weeklySeconds: String(item.study_week_key || '') === weekKey ? Number(item.weekly_study_seconds || 0) : 0,
