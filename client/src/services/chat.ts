@@ -48,7 +48,8 @@ export type Conversation = {
 }
 
 export type ChatAttachment = { name: string; url: string; type: string; size: number }
-export type ChatMessage = { id: string; text: string; senderId: string; createdAt?: Timestamp | null; attachment?: ChatAttachment | null; replyTo?: { id: string; text: string; senderId: string } | null; seenBy?: string[]; hiddenFor?: string[] }
+export type SneakState = 'unopened' | 'consumed' | 'expired'
+export type ChatMessage = { id: string; text: string; senderId: string; createdAt?: Timestamp | null; attachment?: ChatAttachment | null; replyTo?: { id: string; text: string; senderId: string } | null; seenBy?: string[]; hiddenFor?: string[]; sneak?: { recipientId: string; state: SneakState; expiresAt?: Timestamp | null; consumedAt?: Timestamp | null } }
 export type Story = { id: string; uid: string; displayName: string; text: string; createdAt?: Timestamp | null; expiresAt?: Timestamp | null }
 export type CallRecord = { id: string; type: 'audio' | 'video'; status: string; memberIds: string[]; callerId?: string; calleeId?: string; groupId?: string; groupName?: string; joinedIds?: string[]; leftIds?: string[]; createdAt?: Timestamp | null }
 export type FriendRequest = { id: string; fromUid: string; toUid: string; status: 'pending' | 'accepted' | 'declined'; createdAt?: Timestamp | null }
@@ -289,6 +290,35 @@ export async function sendMessage(conversationId: string, senderId: string, text
       }).map((item) => deleteDoc(item.ref)))
     }),
   ])
+}
+
+/** Creates a friend-only one-time photo message using the existing chat store. */
+export async function sendSneak(conversationId: string, senderId: string, recipientId: string, file: File) {
+  if (isSupabaseChatEnabled()) throw new Error('Sneaks are not available until the secure Supabase message transition is enabled.')
+  if (!db) throw new Error('Chat is unavailable.')
+  const conversationRef = doc(db, 'conversations', conversationId)
+  const snapshot = await getDoc(conversationRef)
+  const data = snapshot.data()
+  if (!snapshot.exists() || data?.type !== 'direct' || !(data.memberIds || []).includes(senderId) || !(data.memberIds || []).includes(recipientId)) throw new Error('Sneaks can only be sent to a friend in a direct conversation.')
+  if (await isBlockedBetween(senderId, recipientId)) throw new Error('You cannot send a Sneak to this user.')
+  const stored = await StorageManager.upload(file, { ownerId: senderId, originalName: 'sneak.jpg', mimeType: file.type || 'image/jpeg', sizeBytes: file.size, conversationId })
+  const expiresAt = Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000)
+  await addDoc(collection(conversationRef, 'messages'), { text: 'Serving pixels', senderId, createdAt: serverTimestamp(), attachment: { name: 'sneak.jpg', url: stored.url, type: stored.mimeType, size: stored.sizeBytes }, sneak: { recipientId, state: 'unopened', expiresAt }, seenBy: [senderId] })
+}
+
+/** Atomically consumes a Sneak so refreshes and concurrent opens cannot reopen it. */
+export async function consumeSneak(conversationId: string, messageId: string, recipientId: string) {
+  if (!db) throw new Error('Chat is unavailable.')
+  const firestore = db
+  return runTransaction(firestore, async (transaction) => {
+    const ref = doc(firestore, 'conversations', conversationId, 'messages', messageId)
+    const snapshot = await transaction.get(ref)
+    const data = snapshot.data(); const sneak = data?.sneak
+    if (!snapshot.exists() || !sneak || sneak.recipientId !== recipientId || sneak.state !== 'unopened') throw new Error('This Sneak has already been opened or expired.')
+    if (sneak.expiresAt?.toMillis && sneak.expiresAt.toMillis() <= Date.now()) { transaction.update(ref, { 'sneak.state': 'expired', 'sneak.consumedAt': serverTimestamp() }); throw new Error('This Sneak has expired.') }
+    transaction.update(ref, { 'sneak.state': 'consumed', 'sneak.consumedAt': serverTimestamp(), attachment: null })
+    return { url: String(data.attachment?.url || ''), type: String(data.attachment?.type || 'image/jpeg') }
+  })
 }
 
 export async function unsendMessage(conversationId: string, messageId: string) {
