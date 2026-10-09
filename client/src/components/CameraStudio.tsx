@@ -232,7 +232,24 @@ export function CameraStudio({ isOpen, onClose, onCapture, onError, onNativeFall
   useEffect(() => {
     if (!isOpen || !videoRef.current) return undefined;
     const Detector = readFaceDetector();
-    if (!Detector || !selectedLens.ar) { setTrackingAvailable(false); setFace(null); return undefined; }
+    if (!selectedLens.ar) { setTrackingAvailable(false); setFace(null); return undefined; }
+    // FaceDetector is still unavailable in several Chromium/Android WebViews.
+    // Keep AR lenses functional there with a centered framing guide instead of
+    // hiding the lens or presenting a dead-end warning.
+    if (!Detector) {
+      const video = videoRef.current;
+      const applyFallback = () => {
+        const width = video?.videoWidth || 640;
+        const height = video?.videoHeight || 480;
+        const fallback = { x: width * .25, y: height * .14, width: width * .5, height: height * .68 };
+        faceRef.current = fallback;
+        setFace(fallback);
+      };
+      applyFallback();
+      video?.addEventListener("loadedmetadata", applyFallback, { once: true });
+      setTrackingAvailable(true);
+      return () => { video?.removeEventListener("loadedmetadata", applyFallback); faceRef.current = null; setFace(null); };
+    }
     let active = true;
     let detector: FaceDetectorLike;
     try { detector = new Detector({ maxDetectedFaces: 1, fastMode: true }); } catch { setTrackingAvailable(false); return undefined; }
