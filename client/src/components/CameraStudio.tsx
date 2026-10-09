@@ -270,6 +270,13 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onSneak, onEr
     };
     open().catch((error) => {
       if (!active) return;
+      if (facing === "environment" && error instanceof DOMException && error.name === "OverconstrainedError") {
+        setFacing("user");
+        setMirror(false);
+        setCameraLoading(false);
+        setCameraMessage("This device has no compatible rear camera, so Flip stays on the front camera.");
+        return;
+      }
       const message = error instanceof DOMException && (error.name === "NotReadableError" || error.name === "AbortError") ? "Camera is already in use by another app or browser tab." : error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "SecurityError") ? "Camera permission is blocked. Allow camera access, then try again." : error instanceof Error ? error.message : "Could not open the camera.";
       setCameraLoading(false);
       setCameraMessage(message);
