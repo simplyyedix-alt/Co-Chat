@@ -124,5 +124,6 @@ html:has(.camera-studio-shell),body:has(.camera-studio-shell){overflow:hidden!im
 @media(max-width:700px){.camera-studio-full{padding-top:max(10px,env(safe-area-inset-top))!important}.camera-stage{min-height:0!important;height:100%!important;max-height:none!important}}
 /* Review must use the same crop as the live preview. */
 .camera-captured-image{object-fit:cover!important;width:100%!important;height:100%!important}
+.camera-tools-panel .camera-toggle{display:none!important}
 .camera-snap-carousel{position:relative;scroll-snap-type:x mandatory}
 .camera-snap-carousel::after{content:"";position:absolute;left:50%;top:5px;width:56px;height:56px;border:3px solid #f4d84a;border-radius:50%;transform:translateX(-50%);pointer-events:none;box-shadow:0 0 0 2px #f4d84a44,0 0 18px #f4d84a66}

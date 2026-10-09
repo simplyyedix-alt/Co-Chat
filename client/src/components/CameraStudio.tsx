@@ -196,7 +196,7 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onError, onNa
   const [lens, setLens] = useState<CameraLens>("natural");
   const [timer, setTimer] = useState<0 | 3 | 10>(0);
   const [grid, setGrid] = useState(false);
-  const [mirror, setMirror] = useState(false);
+  const [mirror, setMirror] = useState(true);
   const [torch, setTorch] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -236,7 +236,7 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onError, onNa
       const track = stream.getVideoTracks()[0];
       const capabilities = track?.getCapabilities?.() as MediaTrackCapabilities & { torch?: boolean; zoom?: { min: number; max: number; step?: number } } | undefined;
       setTorchSupported(Boolean(capabilities?.torch));
-      if (capabilities?.zoom) { setZoomRange({ min: capabilities.zoom.min, max: capabilities.zoom.max, step: capabilities.zoom.step || .1 }); setZoom(capabilities.zoom.min); }
+      if (capabilities?.zoom) { setZoomRange({ min: capabilities.zoom.min, max: Math.min(4, capabilities.zoom.max), step: capabilities.zoom.step || .1 }); setZoom(capabilities.zoom.min); }
       else { setZoomRange({ min: 1, max: 1, step: .1 }); setZoom(1); }
       setTorch(false);
       if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play().catch(() => undefined); }
@@ -259,7 +259,8 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onError, onNa
     void videoRef.current.play().catch(() => undefined);
     setCameraMessage("");
     setCameraLoading(false);
-  }, [isOpen, captured]);
+    setMirror(facing === "user");
+  }, [isOpen, captured, facing]);
 
   useEffect(() => {
     if (!isOpen || !videoRef.current) return undefined;
@@ -329,7 +330,7 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onError, onNa
     setTorch(next);
   };
 
-  const changeZoom = async (value: number) => { setZoom(value); await applyTrackConstraints({ advanced: [{ zoom: value } as MediaTrackConstraintSet] } as MediaTrackConstraintSet); };
+  const changeZoom = async (value: number) => { const bounded = Math.min(4, Math.max(1, value)); setZoom(bounded); await applyTrackConstraints({ advanced: [{ zoom: bounded } as MediaTrackConstraintSet] } as MediaTrackConstraintSet); };
 
   const drawCapture = () => {
     const video = videoRef.current;
@@ -356,7 +357,8 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onError, onNa
     if (faceBox && lens === "hearts") { drawText("♥", faceBox.x - faceBox.width * .08, faceBox.y + faceBox.height * .15, Math.max(22, faceBox.width * .16), "#ff78ac"); drawText("♥", faceBox.x + faceBox.width * 1.08, faceBox.y + faceBox.height * .42, Math.max(22, faceBox.width * .16), "#ff78ac"); }
     if (lens === "particles" || lens === "confetti") { const particles = [[.15, .22], [.78, .27], [.24, .72], [.84, .76], [.52, .12], [.53, .86]]; particles.forEach(([x, y], index) => { context.fillStyle = index % 2 ? "#ff9fca" : "#b69cff"; context.beginPath(); context.arc(canvas.width * x, canvas.height * y, Math.max(4, canvas.width * .008), 0, Math.PI * 2); context.fill(); }); }
     context.restore();
-    setCaptured(canvas.toDataURL("image/jpeg", .94));
+    setCaptured(canvas.toDataURL("image/jpeg", .98));
+    setMirror(false);
     setFlash(true);
     window.setTimeout(() => setFlash(false), 140);
   };
@@ -370,7 +372,7 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onError, onNa
     timerRef.current = window.setTimeout(tick, 1000);
   };
 
-  const flip = () => { stopStream(); setFacing((value) => value === "environment" ? "user" : "environment"); setMirror(false); };
+  const flip = () => { stopStream(); setFacing((value) => { const next = value === "environment" ? "user" : "environment"; setMirror(next === "user"); return next; }); };
   const focusCameraOption = (event: MouseEvent<HTMLButtonElement>) => {
     event.currentTarget.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
   };
