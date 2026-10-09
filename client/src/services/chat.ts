@@ -215,6 +215,13 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
       const otherReadAt = otherId ? asTimestamp(readAt[otherId]) : null
       return { id: item.id, name, memberIds, type: data.type === 'group' ? ('group' as const) : ('direct' as const), adminId: data.adminId ? String(data.adminId) : undefined, lastMessage: String(data.lastMessage || ''), lastSenderId: data.lastSenderId ? String(data.lastSenderId) : undefined, lastMessageAt, lastMessageSeen: Boolean(lastMessageAt && otherReadAt && otherReadAt.toMillis() >= lastMessageAt.toMillis()), createdAt: asTimestamp(data.createdAt), hiddenFor: Array.isArray(data.hiddenFor) ? data.hiddenFor.map(String) : [], avatar: initials(name), photoURL: data.type === 'group' ? String(data.photoURL || '') : (other?.photoURL || ''), active: other?.activeStatus !== false && Date.now() - lastSeen < 90000, lastSeen: other?.lastSeen || null, unreadCount: Number(data.unreadCounts?.[uid] || 0) }
     })).then(items => callback(items.filter(item => !item.hiddenFor?.includes(uid)).sort((a, b) => ((b.lastMessageAt?.toMillis() || b.createdAt?.toMillis() || 0) - (a.lastMessageAt?.toMillis() || a.createdAt?.toMillis() || 0)))))
+  }, error => {
+    // A legacy Firestore listener must never become an unhandled rejection
+    // (for example while rules/auth are refreshing). Supabase remains the
+    // primary chat source when enabled, so keep the UI usable and retry on
+    // the next subscription instead of blanking the app.
+    console.warn('[chat] conversation listener unavailable', error)
+    callback([])
   })
 }
 
@@ -235,7 +242,7 @@ export function watchMessages(conversationId: string, uid: string, callback: (it
     if (active) callback(visible())
   }).catch(() => undefined)
   const q = query(collection(db, 'conversations', conversationId, 'messages'), orderBy('createdAt', 'desc'), limit(100))
-  const unsubscribe = onSnapshot(q, snapshot => { latest = snapshot.docs.map(item => { const data = item.data(); return { id: item.id, text: String(data.text || ''), senderId: String(data.senderId || ''), createdAt: asTimestamp(data.createdAt), attachment: data.attachment ? { name: String(data.attachment.name || 'file'), url: String(data.attachment.url || ''), type: String(data.attachment.type || ''), size: Number(data.attachment.size || 0) } : null, replyTo: data.replyTo ? { id: String(data.replyTo.id || ''), text: String(data.replyTo.text || ''), senderId: String(data.replyTo.senderId || '') } : null, seenBy: Array.isArray(data.seenBy) ? data.seenBy.map(String) : [], hiddenFor: Array.isArray(data.hiddenFor) ? data.hiddenFor.map(String) : [] } }).filter(item => !item.createdAt || Date.now() - item.createdAt.toMillis() <= 24 * 60 * 60 * 1000).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)); if (active) callback(visible()) })
+  const unsubscribe = onSnapshot(q, snapshot => { latest = snapshot.docs.map(item => { const data = item.data(); return { id: item.id, text: String(data.text || ''), senderId: String(data.senderId || ''), createdAt: asTimestamp(data.createdAt), attachment: data.attachment ? { name: String(data.attachment.name || 'file'), url: String(data.attachment.url || ''), type: String(data.attachment.type || ''), size: Number(data.attachment.size || 0) } : null, replyTo: data.replyTo ? { id: String(data.replyTo.id || ''), text: String(data.replyTo.text || ''), senderId: String(data.replyTo.senderId || '') } : null, seenBy: Array.isArray(data.seenBy) ? data.seenBy.map(String) : [], hiddenFor: Array.isArray(data.hiddenFor) ? data.hiddenFor.map(String) : [] } }).filter(item => !item.createdAt || Date.now() - item.createdAt.toMillis() <= 24 * 60 * 60 * 1000).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)); if (active) callback(visible()) }, error => { console.warn('[chat] message listener unavailable', error); if (active) callback(visible()) })
   return () => { active = false; unsubscribe() }
 }
 
@@ -401,8 +408,8 @@ export function watchFriendRequests(uid: string, callback: (items: FriendRequest
   if (!db) return undefined
   let incoming: FriendRequest[] = []; let outgoing: FriendRequest[] = []
   const emit = () => callback([...incoming, ...outgoing])
-  const incomingUnsub = onSnapshot(query(collection(db, 'friendRequests'), where('toUid', '==', uid), limit(50)), snapshot => { incoming = snapshot.docs.filter(item => item.data().status === 'pending').map(item => ({ id: item.id, fromUid: String(item.data().fromUid), toUid: String(item.data().toUid), status: 'pending', createdAt: asTimestamp(item.data().createdAt) })); emit() })
-  const outgoingUnsub = onSnapshot(query(collection(db, 'friendRequests'), where('fromUid', '==', uid), limit(50)), snapshot => { outgoing = snapshot.docs.filter(item => item.data().status === 'pending').map(item => ({ id: item.id, fromUid: String(item.data().fromUid), toUid: String(item.data().toUid), status: 'pending', createdAt: asTimestamp(item.data().createdAt) })); emit() })
+  const incomingUnsub = onSnapshot(query(collection(db, 'friendRequests'), where('toUid', '==', uid), limit(50)), snapshot => { incoming = snapshot.docs.filter(item => item.data().status === 'pending').map(item => ({ id: item.id, fromUid: String(item.data().fromUid), toUid: String(item.data().toUid), status: 'pending', createdAt: asTimestamp(item.data().createdAt) })); emit() }, error => console.warn('[chat] incoming friend-request listener unavailable', error))
+  const outgoingUnsub = onSnapshot(query(collection(db, 'friendRequests'), where('fromUid', '==', uid), limit(50)), snapshot => { outgoing = snapshot.docs.filter(item => item.data().status === 'pending').map(item => ({ id: item.id, fromUid: String(item.data().fromUid), toUid: String(item.data().toUid), status: 'pending', createdAt: asTimestamp(item.data().createdAt) })); emit() }, error => console.warn('[chat] outgoing friend-request listener unavailable', error))
   return () => { incomingUnsub(); outgoingUnsub() }
 }
 
@@ -495,7 +502,7 @@ export async function addGroupMembers(conversationId: string, uid: string, membe
 export function watchStories(callback: (items: Story[]) => void): Unsubscribe | undefined {
   if (!db) return undefined
   const q = query(collection(db, 'stories'), where('expiresAt', '>', Timestamp.now()), limit(50))
-  return onSnapshot(q, snapshot => callback(snapshot.docs.map(item => { const data = item.data(); return { id: item.id, uid: String(data.uid || ''), displayName: String(data.displayName || 'Co-Chat member'), text: String(data.text || ''), createdAt: asTimestamp(data.createdAt), expiresAt: asTimestamp(data.expiresAt) } }).sort((a, b) => (a.expiresAt?.toMillis() || 0) - (b.expiresAt?.toMillis() || 0))))
+  return onSnapshot(q, snapshot => callback(snapshot.docs.map(item => { const data = item.data(); return { id: item.id, uid: String(data.uid || ''), displayName: String(data.displayName || 'Co-Chat member'), text: String(data.text || ''), createdAt: asTimestamp(data.createdAt), expiresAt: asTimestamp(data.expiresAt) } }).sort((a, b) => (a.expiresAt?.toMillis() || 0) - (b.expiresAt?.toMillis() || 0))), error => console.warn('[social] story listener unavailable', error))
 }
 
 export async function createStory(uid: string, displayName: string, text: string) {
@@ -553,7 +560,7 @@ export async function saveProfile(uid: string, values: Pick<UserProfile, 'displa
 
 export function watchCalls(uid: string, callback: (items: CallRecord[]) => void): Unsubscribe | undefined {
   if (!db) return undefined
-  return onSnapshot(query(collection(db, 'calls'), where('memberIds', 'array-contains', uid), limit(50)), snapshot => callback(snapshot.docs.map(item => { const data = item.data(); const type: CallRecord['type'] = data.type === 'video' ? 'video' : 'audio'; return { id: item.id, type, status: String(data.status || 'completed'), memberIds: Array.isArray(data.memberIds) ? data.memberIds.map(String) : [], callerId: String(data.callerId || ''), calleeId: String(data.calleeId || ''), groupId: data.groupId ? String(data.groupId) : undefined, groupName: data.groupName ? String(data.groupName) : undefined, joinedIds: Array.isArray(data.joinedIds) ? data.joinedIds.map(String) : [], leftIds: Array.isArray(data.leftIds) ? data.leftIds.map(String) : [], createdAt: asTimestamp(data.createdAt) } }).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))))
+  return onSnapshot(query(collection(db, 'calls'), where('memberIds', 'array-contains', uid), limit(50)), snapshot => callback(snapshot.docs.map(item => { const data = item.data(); const type: CallRecord['type'] = data.type === 'video' ? 'video' : 'audio'; return { id: item.id, type, status: String(data.status || 'completed'), memberIds: Array.isArray(data.memberIds) ? data.memberIds.map(String) : [], callerId: String(data.callerId || ''), calleeId: String(data.calleeId || ''), groupId: data.groupId ? String(data.groupId) : undefined, groupName: data.groupName ? String(data.groupName) : undefined, joinedIds: Array.isArray(data.joinedIds) ? data.joinedIds.map(String) : [], leftIds: Array.isArray(data.leftIds) ? data.leftIds.map(String) : [], createdAt: asTimestamp(data.createdAt) } }).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))), error => console.warn('[calls] listener unavailable', error))
 }
 
 export async function createCall(memberIds: string[], type: 'audio' | 'video', initiatorId?: string, group?: { id: string; name: string }) {
