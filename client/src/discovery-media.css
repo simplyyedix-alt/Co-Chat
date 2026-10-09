@@ -95,3 +95,7 @@
   .camera-bottom-dock{position:relative!important;right:auto!important;bottom:auto!important;left:auto!important;grid-row:3!important;width:100%!important}
   .camera-control-row{top:70px!important;right:30px!important;max-height:calc(100dvh - 310px)!important;overflow-y:auto!important}
 }
+/* Viewport pinning prevents the dock from being pushed below the app content
+   when the host page has its own scroll container. */
+.camera-bottom-dock{position:fixed!important;z-index:120!important;bottom:0!important;left:50%!important;width:min(100%,980px)!important;transform:translateX(-50%)!important;visibility:visible!important;opacity:1!important}
+@media(min-width:701px){.camera-control-row{position:fixed!important;z-index:121!important;top:96px!important;right:max(28px,calc((100vw - 980px)/2 + 28px))!important}}
