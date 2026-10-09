@@ -254,6 +254,14 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onError, onNa
   }, [isOpen, facing, retryToken]);
 
   useEffect(() => {
+    if (!isOpen || captured || !streamRef.current || !videoRef.current) return;
+    videoRef.current.srcObject = streamRef.current;
+    void videoRef.current.play().catch(() => undefined);
+    setCameraMessage("");
+    setCameraLoading(false);
+  }, [isOpen, captured]);
+
+  useEffect(() => {
     if (!isOpen || !videoRef.current) return undefined;
     const Detector = readFaceDetector();
     if (!selectedLens.ar) { setTrackingAvailable(false); setFace(null); return undefined; }
