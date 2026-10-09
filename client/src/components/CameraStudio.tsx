@@ -236,7 +236,7 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onSneak, onEr
     const open = async () => {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("This browser does not support live camera access. Use a current browser over HTTPS.");
       stopStream();
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30, max: 60 } }, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: facing }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30, max: 60 } }, audio: false });
       if (!active) { stream.getTracks().forEach((track) => track.stop()); return; }
       streamRef.current = stream;
       const track = stream.getVideoTracks()[0];
