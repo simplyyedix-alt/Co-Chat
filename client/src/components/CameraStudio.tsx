@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 
 export type CameraFilter = "none" | "enhance" | "golden" | "cool" | "mono" | "retro" | "dreamy" | "cinematic" | "vivid" | "portrait" | "night" | "vhs" | "y2k" | "pastel" | "glow";
@@ -363,6 +363,19 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onError, onNa
   };
 
   const flip = () => { stopStream(); setFacing((value) => value === "environment" ? "user" : "environment"); setMirror(false); };
+  const focusCameraOption = (event: MouseEvent<HTMLButtonElement>) => {
+    event.currentTarget.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  };
+  useEffect(() => {
+    if (!isOpen) return;
+    const onCarouselClick = (event: Event) => {
+      const target = event.target as HTMLElement;
+      const button = target.closest<HTMLButtonElement>(".camera-snap-carousel button");
+      if (button) focusCameraOption({ currentTarget: button } as MouseEvent<HTMLButtonElement>);
+    };
+    document.addEventListener("click", onCarouselClick);
+    return () => document.removeEventListener("click", onCarouselClick);
+  }, [isOpen]);
 
   if (!isOpen) return null;
   const boxStyle = face && videoRef.current?.videoWidth ? { left: `${(face.x / videoRef.current.videoWidth) * 100}%`, top: `${(face.y / videoRef.current.videoHeight) * 100}%`, width: `${(face.width / videoRef.current.videoWidth) * 100}%`, height: `${(face.height / videoRef.current.videoHeight) * 100}%` } : undefined;
