@@ -1054,7 +1054,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
   const popularTags = Object.entries(posts.reduce<Record<string, number>>((counts, post) => ({ ...counts, [post.community]: (counts[post.community] || 0) + 1 }), {})).sort(([, a], [, b]) => b - a).slice(0, 6).map(([tag]) => tag);
   const communityLabel = community === "all" ? "All tags" : `#${community}`;
   const createTwitt = async () => {
-    if (!draft.trim() && !draftFile && !cameraDataUrl || publishing) return;
+    if (!draft.trim() || publishing) return;
     setPublishing(true);
     const body = draft.trim();
     setPublishError("");
