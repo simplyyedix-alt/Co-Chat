@@ -788,9 +788,22 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
     if (Capacitor.isNativePlatform()) { void captureNativeCamera(); return; }
     setPublishError("This browser does not support live camera access. Use a current browser over HTTPS.");
   };
-  const saveCameraCapture = ({ dataUrl }: { dataUrl: string }) => {
-    const link = document.createElement("a"); link.href = dataUrl; link.download = `co-chat-${Date.now()}.jpg`;
-    document.body.appendChild(link); link.click(); link.remove();
+  const saveCameraCapture = async ({ dataUrl }: { dataUrl: string }) => {
+    try {
+      const response = await fetch(dataUrl);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = `co-chat-${Date.now()}.jpg`;
+      link.rel = "noopener";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+    } catch {
+      setPublishError("Could not save the photo. Please try again.");
+    }
   };
   useEffect(() => {
     if (!cameraDataUrl) return;
