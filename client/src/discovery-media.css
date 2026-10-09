@@ -15,3 +15,15 @@
 .camera-studio-full{overflow-y:auto;scrollbar-width:thin}.camera-grid-lines{display:block;background:linear-gradient(90deg,transparent 33.15%,#fff5 33.2%,#fff5 33.35%,transparent 33.4%,transparent 66.55%,#fff5 66.6%,#fff5 66.75%,transparent 66.8%),linear-gradient(0deg,transparent 33.15%,#fff5 33.2%,#fff5 33.35%,transparent 33.4%,transparent 66.55%,#fff5 66.6%,#fff5 66.75%,transparent 66.8%)}.camera-grid-lines i{display:none}
 .camera-lens-layer .face-lens-layer{position:absolute;inset:auto;min-width:1px;min-height:1px;pointer-events:none}
 .camera-studio-shell{position:fixed!important;top:0!important;right:0!important;bottom:0!important;left:0!important;display:flex!important;align-items:stretch!important;justify-content:center!important;overflow:hidden!important}.camera-studio-full{position:relative!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;align-self:stretch!important;height:100%!important;min-height:100%!important;max-height:none!important;margin:0!important;transform:none!important}
+/* Keep the live preview from pushing the controls below the viewport. The
+   studio has five content bands (header, preview, shutter, looks, lenses),
+   so do not rely on implicit grid rows here. */
+.camera-studio-full{grid-template-rows:auto minmax(280px,1fr) auto auto auto!important;overflow-y:auto!important;overflow-x:hidden!important}
+.camera-stage{height:min(62dvh,620px)!important;min-height:280px!important;max-height:62dvh!important;flex:none!important}
+.camera-control-row,.camera-filter-strip,.camera-lens-strip{flex:none!important}
+@media(max-width:700px){
+  .camera-studio-full{grid-template-rows:auto minmax(240px,42dvh) auto auto auto!important;padding-top:max(10px,env(safe-area-inset-top))!important}
+  .camera-stage{height:42dvh!important;min-height:240px!important;max-height:42dvh!important}
+  .camera-control-row{padding-top:8px!important;padding-bottom:3px!important}
+  .camera-filter-strip,.camera-lens-strip{padding-top:4px!important}
+}
