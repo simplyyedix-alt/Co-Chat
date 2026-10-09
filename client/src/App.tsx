@@ -76,50 +76,6 @@ import Avatar from "./components/Avatar";
 import { Capacitor } from "@capacitor/core";
 import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 
-const starterChats: Conversation[] = [
-  {
-    id: "preview-maya",
-    name: "Maya Patel",
-    avatar: "MP",
-    memberIds: [],
-    lastMessage: "That sounds perfect — see you there!",
-  },
-  {
-    id: "preview-design",
-    name: "Design Crew",
-    avatar: "DC",
-    memberIds: [],
-    lastMessage: "Leo: I added the final screens.",
-  },
-  {
-    id: "preview-jordan",
-    name: "Jordan Kim",
-    avatar: "JK",
-    memberIds: [],
-    lastMessage: "Thanks for sharing that!",
-  },
-];
-const starterMessages: Record<string, ChatMessage[]> = {
-  "preview-maya": [
-    {
-      id: "1",
-      senderId: "them",
-      text: "Are we still on for coffee this afternoon?",
-    },
-    { id: "2", senderId: "me", text: "Absolutely! I’ll be there at 4." },
-    { id: "3", senderId: "them", text: "That sounds perfect — see you there!" },
-  ],
-  "preview-design": [
-    {
-      id: "4",
-      senderId: "them",
-      text: "I added the final screens. What do you think?",
-    },
-  ],
-  "preview-jordan": [
-    { id: "5", senderId: "them", text: "Thanks for sharing that!" },
-  ],
-};
 const initials = (name: string) =>
   name
     .split(/\s+/)
@@ -1148,9 +1104,10 @@ export default function App() {
   const [voiceTarget, setVoiceTarget] = useState<{ id: string; name: string; photoURL?: string; memberIds: string[] } | null>(null);
   const [page, setPage] = useState("chats");
   const [discoverCommunity, setDiscoverCommunity] = useState<"all" | "jee" | "neet" | "study" | "public">("all");
-  const [conversations, setConversations] =
-    useState<Conversation[]>(starterChats);
-  const [conversationsLoading, setConversationsLoading] = useState(false);
+  // Never seed the signed-in UI with demo conversations. Render skeletons
+  // while the backend is loading, then show the real empty state if needed.
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversationsLoading, setConversationsLoading] = useState(true);
   const notificationConversationSeen = useRef<Record<string, number>>({});
   const [selected, setSelected] = useState<Conversation | null>(null);
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
@@ -1362,7 +1319,10 @@ export default function App() {
       .catch(() => undefined);
   }, [liveUser?.uid, notificationsEnabled, isNativeAndroid]);
   useEffect(() => {
-    if (!liveUser || liveUser.uid === "preview") return;
+    if (!liveUser || liveUser.uid === "preview") {
+      setConversationsLoading(false);
+      return;
+    }
     const uid = liveUser.uid;
     setConversationsLoading(true);
     const loadingTimeout = window.setTimeout(() => setConversationsLoading(false), 8000);
@@ -1414,7 +1374,6 @@ export default function App() {
           ? JSON.parse(
               localStorage.getItem(`cochat-preview-${selected.id}`) || "null",
             ) ||
-              starterMessages[selected.id] ||
               []
           : [],
       );
@@ -2502,7 +2461,7 @@ export default function App() {
                   </span>
                 </button>
               ))}
-              {!visible.filter((item) =>
+              {!conversationsLoading && !visible.filter((item) =>
                 page === "communities" ? item.type === "group" : item.type !== "group",
               ).length && (
                 <div className="empty-state"><strong>No chats yet.</strong><span>Find someone from People and start the conversation.</span></div>
