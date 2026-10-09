@@ -18,11 +18,11 @@
 /* Keep the live preview from pushing the controls below the viewport. The
    studio has five content bands (header, preview, shutter, looks, lenses),
    so do not rely on implicit grid rows here. */
-.camera-studio-full{grid-template-rows:auto minmax(280px,1fr) auto auto auto!important;overflow-y:auto!important;overflow-x:hidden!important}
+.camera-studio-full{grid-template-rows:auto auto auto auto auto!important;align-content:start!important;overflow-y:auto!important;overflow-x:hidden!important}
 .camera-stage{height:min(62dvh,620px)!important;min-height:280px!important;max-height:62dvh!important;flex:none!important}
 .camera-control-row,.camera-filter-strip,.camera-lens-strip{flex:none!important}
 @media(max-width:700px){
-  .camera-studio-full{grid-template-rows:auto minmax(240px,42dvh) auto auto auto!important;padding-top:max(10px,env(safe-area-inset-top))!important}
+  .camera-studio-full{grid-template-rows:auto auto auto auto auto!important;padding-top:max(10px,env(safe-area-inset-top))!important}
   .camera-stage{height:42dvh!important;min-height:240px!important;max-height:42dvh!important}
   .camera-control-row{padding-top:8px!important;padding-bottom:3px!important}
   .camera-filter-strip,.camera-lens-strip{padding-top:4px!important}
