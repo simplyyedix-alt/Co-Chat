@@ -139,7 +139,24 @@ export async function processCameraDataUrl(dataUrl: string, filter: CameraFilter
 export async function cameraDataUrlToFile(dataUrl: string, filter: CameraFilter, intensity = 1, mirror = false) {
   const processed = await processCameraDataUrl(dataUrl, filter, intensity, mirror);
   const response = await fetch(processed);
-  const blob = await response.blob();
+  let blob = await response.blob();
+  // Social uploads are capped at 5 MB. Keep the largest practical JPEG
+  // quality, then step down only when the actual encoded bytes require it.
+  if (blob.size > 4.8 * 1024 * 1024) {
+    const image = await loadImage(processed);
+    const canvas = document.createElement("canvas");
+    const scale = Math.min(1, Math.sqrt((4.8 * 1024 * 1024) / blob.size));
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+    const context = canvas.getContext("2d");
+    if (context) {
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      for (const quality of [.9, .84, .78, .72]) {
+        blob = await new Promise<Blob>((resolve) => canvas.toBlob((value) => resolve(value || blob), "image/jpeg", quality));
+        if (blob.size <= 4.8 * 1024 * 1024) break;
+      }
+    }
+  }
   return new File([blob], "co-chat-camera.jpg", { type: "image/jpeg" });
 }
 
