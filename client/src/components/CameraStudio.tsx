@@ -235,6 +235,8 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onSneak, onEr
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30, max: 60 } }, audio: false });
       if (!active) { stream.getTracks().forEach((track) => track.stop()); return; }
       streamRef.current = stream;
+      const availableCameras = (await navigator.mediaDevices.enumerateDevices().catch(() => [] as MediaDeviceInfo[])).filter((device) => device.kind === "videoinput");
+      if (availableCameras.length < 2 && facing === "environment") { setFacing("user"); setMirror(true); }
       const track = stream.getVideoTracks()[0];
       const capabilities = track?.getCapabilities?.() as MediaTrackCapabilities & { torch?: boolean; zoom?: { min: number; max: number; step?: number } } | undefined;
       setTorchSupported(Boolean(capabilities?.torch));
