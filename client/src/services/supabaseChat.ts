@@ -98,8 +98,8 @@ export async function listConversations(uid: string): Promise<Conversation[]> {
   }).filter(item => item.id && !item.hiddenFor?.includes(uid)).sort((a, b) => (b.lastMessageAt?.toMillis() || b.createdAt?.toMillis() || 0) - (a.lastMessageAt?.toMillis() || a.createdAt?.toMillis() || 0)).filter((item, index, items) => item.type !== 'direct' || items.findIndex(candidate => candidate.type === 'direct' && [...candidate.memberIds].sort().join(':') === [...item.memberIds].sort().join(':')) === index)
 }
 
-export async function listMessages(conversationId: string, uid: string): Promise<ChatMessage[]> {
-  const data = await request<{ items?: Record<string, unknown>[] }>({ action: 'messages', conversationId })
+export async function listMessages(conversationId: string, uid: string, since?: number): Promise<ChatMessage[]> {
+  const data = await request<{ items?: Record<string, unknown>[] }>({ action: 'messages', conversationId, ...(since ? { since: new Date(since).toISOString() } : {}) })
   return (data.items || []).map(item => ({
     id: String(item.id || ''), text: String(item.text || ''), senderId: String(item.sender_id || ''), createdAt: timestamp(item.created_at),
     attachment: attachment(item.attachment), replyTo: item.reply_to ? { id: String((item.reply_to as Record<string, unknown>).id || ''), text: String((item.reply_to as Record<string, unknown>).text || ''), senderId: String((item.reply_to as Record<string, unknown>).senderId || (item.reply_to as Record<string, unknown>).sender_id || '') } : null,
@@ -110,45 +110,61 @@ export async function listMessages(conversationId: string, uid: string): Promise
 export function watchConversations(uid: string, callback: (items: Conversation[]) => void): Unsubscribe {
   let active = true
   let inFlight = false
+  let fallbackTimer: number | null = null
   const refresh = () => {
     if (!active || inFlight || document.visibilityState === 'hidden') return
     inFlight = true
     void listConversations(uid).then(items => { if (active) callback(items) }).catch(() => undefined).finally(() => { inFlight = false })
   }
   refresh()
-  // Broadcast is preferred, but a reconnect or a backgrounded tab can miss
-  // one. Keep the safety refresh short so the inbox never feels stale.
-  const timer = window.setInterval(refresh, 2500)
+  const startFallback = () => { if (fallbackTimer === null) fallbackTimer = window.setInterval(refresh, 10000) }
+  const stopFallback = () => { if (fallbackTimer !== null) { window.clearInterval(fallbackTimer); fallbackTimer = null } }
+  const fallbackStart = window.setTimeout(startFallback, 5000)
   const channel = supabase?.channel(`chat-conversations:${uid}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_members', filter: `uid=eq.${uid}` }, refresh)
-    .subscribe()
+    .subscribe((status) => { if (status === 'SUBSCRIBED') { window.clearTimeout(fallbackStart); stopFallback() } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') startFallback() })
   const onVisibilityChange = () => { if (document.visibilityState === 'visible') refresh() }
   document.addEventListener('visibilitychange', onVisibilityChange)
-  return () => { active = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisibilityChange); if (channel) void supabase?.removeChannel(channel) }
+  return () => { active = false; window.clearTimeout(fallbackStart); stopFallback(); document.removeEventListener('visibilitychange', onVisibilityChange); if (channel) void supabase?.removeChannel(channel) }
 }
 
 export function watchMessages(conversationId: string, uid: string, callback: (items: ChatMessage[]) => void): Unsubscribe {
   let active = true
   let inFlight = false
-  const refresh = () => {
+  let fallbackTimer: number | null = null
+  let latestSyncedAt = 0
+  const syncedMessages = new Map<string, ChatMessage>()
+  const refresh = (full = false) => {
     if (!active || inFlight || document.visibilityState === 'hidden') return
     inFlight = true
-    void listMessages(conversationId, uid).then(items => { if (active) callback(items) }).catch(() => undefined).finally(() => { inFlight = false })
+    const since = full ? undefined : latestSyncedAt || undefined
+    void listMessages(conversationId, uid, since).then(items => {
+      if (!active) return
+      if (!since) {
+        syncedMessages.clear()
+        items.forEach(item => syncedMessages.set(item.id, item))
+        latestSyncedAt = items.reduce((max, item) => Math.max(max, item.createdAt?.toMillis() || 0), 0)
+        callback([...syncedMessages.values()])
+        return
+      }
+      // Incremental responses are merged by ID so reconnects and duplicate
+      // realtime events cannot duplicate a message or change its ordering.
+      items.forEach(item => syncedMessages.set(item.id, item))
+      callback([...syncedMessages.values()].sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)))
+      latestSyncedAt = Math.max(latestSyncedAt, ...items.map(item => item.createdAt?.toMillis() || 0))
+    }).catch(() => undefined).finally(() => { inFlight = false })
   }
-  refresh()
-  // Realtime broadcasts deliver messages immediately. This is only a safety
-  // refresh for a missed broadcast, so keep it slow to avoid burning edge
-  // function/database quota while the chat remains open.
-  // Broadcast is preferred, but a reconnect can miss one. This short safety
-  // refresh keeps the open conversation responsive without a 30s delay.
-  const timer = window.setInterval(refresh, 2500)
+  refresh(true)
+  const startFallback = () => { if (fallbackTimer === null) fallbackTimer = window.setInterval(() => refresh(), 10000) }
+  const stopFallback = () => { if (fallbackTimer !== null) { window.clearInterval(fallbackTimer); fallbackTimer = null } }
+  const fallbackStart = window.setTimeout(startFallback, 5000)
   const channel = supabase?.channel(`chat-messages:${conversationId}`)
-    .on('broadcast', { event: 'message' }, refresh)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, refresh)
-    .subscribe()
+    .on('broadcast', { event: 'message' }, () => refresh())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, (payload) => refresh(payload.eventType === 'UPDATE'))
+    .subscribe((status) => { if (status === 'SUBSCRIBED') { window.clearTimeout(fallbackStart); stopFallback() } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') startFallback() })
   const onVisibilityChange = () => { if (document.visibilityState === 'visible') refresh() }
   document.addEventListener('visibilitychange', onVisibilityChange)
-  return () => { active = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisibilityChange); if (channel) void supabase?.removeChannel(channel) }
+  return () => { active = false; window.clearTimeout(fallbackStart); stopFallback(); document.removeEventListener('visibilitychange', onVisibilityChange); if (channel) void supabase?.removeChannel(channel) }
 }
 
 export async function sendMessage(conversationId: string, text: string, attachmentValue: ChatAttachment | null, replyTo?: ChatMessage | null) {

@@ -226,8 +226,13 @@ Deno.serve(async (request) => {
       const conversationId = String(body?.conversationId || '')
       if (!conversationId || !(await member(conversationId, user.uid))) return response({ error: 'Conversation access denied' }, 403)
       const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-      const rows = await rest(`messages?conversation_id=eq.${encodeURIComponent(conversationId)}&created_at=gte.${encodeURIComponent(cutoff)}&select=id,conversation_id,sender_id,text,attachment,reply_to,seen_by,hidden_for,created_at&order=created_at.desc&limit=50`)
-      return response({ items: (rows || []).reverse() })
+      const requestedSince = typeof body?.since === 'string' ? new Date(body.since) : null
+      const since = requestedSince && !Number.isNaN(requestedSince.getTime()) ? requestedSince.toISOString() : cutoff
+      // Use an inclusive boundary because JavaScript timestamps are only
+      // millisecond precise while Postgres timestamps can be finer-grained;
+      // the client deduplicates the boundary row by message ID.
+      const rows = await rest(`messages?conversation_id=eq.${encodeURIComponent(conversationId)}&created_at=gte.${encodeURIComponent(since)}&select=id,conversation_id,sender_id,text,attachment,reply_to,seen_by,hidden_for,created_at&order=created_at.asc&limit=100`)
+      return response({ items: rows || [] })
     }
     if (action === 'send-message') {
       const conversationId = String(body?.conversationId || '')
