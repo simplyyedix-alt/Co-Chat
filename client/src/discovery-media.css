@@ -25,6 +25,11 @@
 .camera-studio-icon,.camera-control,.camera-tools-panel,.camera-filter-scroll button{backdrop-filter:blur(16px)!important;-webkit-backdrop-filter:blur(16px)!important}
 .camera-control-row{margin:0 2px!important;border:1px solid #ffffff12!important;border-radius:22px!important;background:linear-gradient(180deg,#171a27e8,#0d0f17e8)!important;box-shadow:0 10px 30px #0005!important}
 .camera-filter-strip,.camera-lens-strip{margin-inline:2px!important;padding:10px 10px 5px!important;border:1px solid #ffffff0f!important;border-radius:18px!important;background:#121521cc!important}
+.camera-dock-tabs{display:flex;align-items:center;justify-content:center;gap:7px;padding:10px 8px 2px;overflow-x:auto;scrollbar-width:none}
+.camera-dock-tabs::-webkit-scrollbar{display:none}
+.camera-dock-tabs button{display:inline-flex;align-items:center;gap:5px;min-height:30px;padding:6px 11px;border:0;border-radius:999px;background:transparent;color:#9da5bb;font:inherit;font-size:11px;font-weight:800;white-space:nowrap;cursor:pointer}
+.camera-dock-tabs button.active{background:#ffffff18;color:#fff;box-shadow:0 4px 16px #0003}
+.camera-dock-tabs button span{color:#a895ff;font-size:13px}
 .camera-filter-scroll button.active{background:linear-gradient(135deg,#7066ff55,#b06cff33)!important;border-color:#a18cff!important}
 .camera-studio-primary{background:linear-gradient(135deg,#7066ff,#bd75ff)!important}
 /* Snapchat-like composition: actions float over the preview while the
