@@ -101,6 +101,45 @@ function attachmentNameIsRestricted(value: unknown) {
   return containsRestrictedContent(String(item.name || ''))
 }
 
+function toBase64(bytes: Uint8Array) {
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize))
+  }
+  return btoa(binary)
+}
+
+async function imageIsAdult(value: unknown) {
+  const visionKey = Deno.env.get('GOOGLE_VISION_API_KEY')?.trim()
+  if (!visionKey || !value || typeof value !== 'object') return false
+
+  const attachment = value as Record<string, unknown>
+  const mimeType = String(attachment.type || '')
+  const imageUrl = String(attachment.url || '')
+  if (!mimeType.startsWith('image/') || !imageUrl) return false
+
+  const imageResponse = await fetch(imageUrl)
+  if (!imageResponse.ok) throw new Error('Image moderation could not read the uploaded image.')
+  const bytes = new Uint8Array(await imageResponse.arrayBuffer())
+  if (bytes.length > socialMediaLimit) throw new Error('Image moderation received an oversized image.')
+
+  const visionResponse = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${encodeURIComponent(visionKey)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ requests: [{ image: { content: toBase64(bytes) }, features: [{ type: 'SAFE_SEARCH_DETECTION' }] }] }),
+  })
+  const payload = await visionResponse.json().catch(() => null) as { responses?: Array<{ safeSearchAnnotation?: { adult?: string } }> }
+  if (!visionResponse.ok) throw new Error('Image moderation is temporarily unavailable.')
+  const adult = payload.responses?.[0]?.safeSearchAnnotation?.adult || 'UNKNOWN'
+  return adult === 'LIKELY' || adult === 'VERY_LIKELY'
+}
+
+async function assertAttachmentAllowed(value: unknown) {
+  if (attachmentNameIsRestricted(value)) throw new Error('Adult or explicit content is not allowed.')
+  if (await imageIsAdult(value)) throw new Error('Adult or explicit content is not allowed.')
+}
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (request.method !== 'POST') return response({ error: 'POST required' }, 405)
@@ -143,7 +182,7 @@ Deno.serve(async (request) => {
           if (seenOrder) return seenOrder
           const friendOrder = Number(b.friend) - Number(a.friend)
           if (friendOrder) return friendOrder
-          return String(b.created_at || '').localeCompare(String(a.created_at || ''))
+          return String(b['created_at'] || '').localeCompare(String(a['created_at'] || ''))
         })
       }
       return response({ items })
@@ -164,7 +203,8 @@ Deno.serve(async (request) => {
       if (!text || text.length > 280 || !normalizedCommunity || (body.attachment !== undefined && !validSocialAttachment(body.attachment))) {
         return response({ error: 'Valid text and community are required' }, 400)
       }
-      if (containsRestrictedContent(text) || attachmentNameIsRestricted(body.attachment)) return response({ error: 'Adult or explicit content is not allowed.' }, 400)
+      if (containsRestrictedContent(text)) return response({ error: 'Adult or explicit content is not allowed.' }, 400)
+      await assertAttachmentAllowed(body.attachment)
       if (mode === 'social') await callRpc('purge_expired_social_twitts', {}).catch(() => undefined)
       const rows = await callRest('twitts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ author_id: uid, body: text, community: normalizedCommunity, feed_type: mode, expires_at: mode === 'social' ? new Date(Date.now() + 24 * 3_600_000).toISOString() : null, attachment: body.attachment || null }) })
       return response({ id: rows?.[0]?.id || null })
@@ -179,21 +219,22 @@ Deno.serve(async (request) => {
     if (body.action === 'comment') {
       const comment = body.text?.trim() || ''
       if (!comment || comment.length > 240 || (body.attachment !== undefined && !validSocialAttachment(body.attachment))) return response({ error: 'Comment must be 1–240 characters and the attachment must be a photo or PDF up to 5 MB' }, 400)
-      if (containsRestrictedContent(comment) || attachmentNameIsRestricted(body.attachment)) return response({ error: 'Adult or explicit content is not allowed.' }, 400)
+      if (containsRestrictedContent(comment)) return response({ error: 'Adult or explicit content is not allowed.' }, 400)
+      await assertAttachmentAllowed(body.attachment)
       const id = await callRpc('create_twitt_comment', { p_twitt_id: body.twittId, p_user_id: uid, p_body: comment })
       if (body.attachment) await callRest(`twitt_comments?id=eq.${encodeURIComponent(String(id))}&author_id=eq.${encodeURIComponent(uid)}`, { method: 'PATCH', body: JSON.stringify({ attachment: body.attachment }) })
       return response({ id })
     }
     if (body.action === 'attach') {
       if (!validSocialAttachment(body.attachment)) return response({ error: 'Attachment must be a photo or PDF up to 5 MB' }, 400)
-      if (attachmentNameIsRestricted(body.attachment)) return response({ error: 'Adult or explicit content is not allowed.' }, 400)
+      await assertAttachmentAllowed(body.attachment)
       const rows = await callRest(`twitts?id=eq.${encodeURIComponent(body.twittId)}&author_id=eq.${encodeURIComponent(uid)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ attachment: body.attachment }) })
       if (!Array.isArray(rows) || !rows.length) return response({ error: 'Only the author can attach media to this Twitt' }, 403)
       return response({ attached: true })
     }
     if (body.action === 'attach-comment') {
       if (!body.commentId || !validSocialAttachment(body.attachment)) return response({ error: 'Attachment must be a photo or PDF up to 5 MB' }, 400)
-      if (attachmentNameIsRestricted(body.attachment)) return response({ error: 'Adult or explicit content is not allowed.' }, 400)
+      await assertAttachmentAllowed(body.attachment)
       const rows = await callRest(`twitt_comments?id=eq.${encodeURIComponent(body.commentId)}&author_id=eq.${encodeURIComponent(uid)}&twitt_id=eq.${encodeURIComponent(body.twittId)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ attachment: body.attachment }) })
       if (!Array.isArray(rows) || !rows.length) return response({ error: 'Only the comment author can attach media' }, 403)
       return response({ attached: true })
