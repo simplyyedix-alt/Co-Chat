@@ -98,4 +98,6 @@
 /* Viewport pinning prevents the dock from being pushed below the app content
    when the host page has its own scroll container. */
 .camera-bottom-dock{position:fixed!important;z-index:120!important;bottom:0!important;left:50%!important;width:min(100%,980px)!important;transform:translateX(-50%)!important;visibility:visible!important;opacity:1!important}
+.camera-studio-shell{height:100dvh!important;min-height:100dvh!important;max-height:100dvh!important}
+.camera-studio-full{height:100dvh!important;min-height:100dvh!important;max-height:100dvh!important}
 @media(min-width:701px){.camera-control-row{position:fixed!important;z-index:121!important;top:96px!important;right:max(28px,calc((100vw - 980px)/2 + 28px))!important}}
