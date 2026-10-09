@@ -188,10 +188,13 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onSneak, onEr
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const activeDeviceIdRef = useRef<string | null>(null);
   const timerRef = useRef<number | null>(null);
   const inferenceRef = useRef<number | null>(null);
   const faceRef = useRef<FaceBox | null>(null);
-  const [facing, setFacing] = useState<"user" | "environment">("environment");
+  // Start with the front camera; Flip is reserved for switching to a real
+  // rear camera and never acts as a mirror toggle.
+  const [facing, setFacing] = useState<"user" | "environment">("user");
   const [filter, setFilter] = useState<CameraFilter>("none");
   const [intensity, setIntensity] = useState(0.85);
   const [lens, setLens] = useState<CameraLens>("natural");
@@ -235,9 +238,25 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onSneak, onEr
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30, max: 60 } }, audio: false });
       if (!active) { stream.getTracks().forEach((track) => track.stop()); return; }
       streamRef.current = stream;
+      const track = stream.getVideoTracks()[0];
+      const settings = track?.getSettings?.();
+      const deviceId = settings?.deviceId || null;
+      // Some desktop browsers expose multiple logical inputs but return the
+      // same physical webcam for both facingMode values. Never turn that into
+      // a mirror-only “flip”; keep the current front camera instead.
+      if (facing === "environment" && activeDeviceIdRef.current && deviceId && activeDeviceIdRef.current === deviceId) {
+        stream.getTracks().forEach((item) => item.stop());
+        streamRef.current = null;
+        setFacing("user");
+        setMirror(true);
+        setCameraMessage("This device has no separate rear camera, so Flip stays on the front camera.");
+        return;
+      }
+      activeDeviceIdRef.current = deviceId;
       const availableCameras = (await navigator.mediaDevices.enumerateDevices().catch(() => [] as MediaDeviceInfo[])).filter((device) => device.kind === "videoinput");
       if (availableCameras.length < 2 && facing === "environment") { setFacing("user"); setMirror(true); }
-      const track = stream.getVideoTracks()[0];
+      const actualFacing = settings?.facingMode;
+      setMirror(actualFacing ? actualFacing === "user" : facing === "user");
       const capabilities = track?.getCapabilities?.() as MediaTrackCapabilities & { torch?: boolean; zoom?: { min: number; max: number; step?: number } } | undefined;
       setTorchSupported(Boolean(capabilities?.torch));
       if (capabilities?.zoom) { setZoomRange({ min: capabilities.zoom.min, max: Math.min(4, capabilities.zoom.max), step: capabilities.zoom.step || .1 }); setZoom(capabilities.zoom.min); }
@@ -258,12 +277,16 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onSneak, onEr
   }, [isOpen, facing, retryToken]);
 
   useEffect(() => {
+    if (!isOpen) activeDeviceIdRef.current = null;
+  }, [isOpen]);
+
+  useEffect(() => {
     if (!isOpen || captured || !streamRef.current || !videoRef.current) return;
     videoRef.current.srcObject = streamRef.current;
     void videoRef.current.play().catch(() => undefined);
     setCameraMessage("");
     setCameraLoading(false);
-    setMirror(facing === "user");
+    // Mirroring is derived from the active camera, never from a Flip click.
   }, [isOpen, captured, facing]);
 
   useEffect(() => {
@@ -380,7 +403,7 @@ export function CameraStudio({ isOpen, onClose, onCapture, onSave, onSneak, onEr
     const cameras = (devices || []).filter((device) => device.kind === "videoinput");
     if (cameras.length < 2) { setCameraMessage("This device has one camera, so Flip is unavailable."); return; }
     stopStream();
-    setFacing((value) => { const next = value === "environment" ? "user" : "environment"; setMirror(next === "user"); return next; });
+    setFacing((value) => value === "environment" ? "user" : "environment");
   };
   const retake = () => { setCapturedPreview(null); setMirror(facing === "user"); setCaptured(null); };
   const focusCameraOption = (event: MouseEvent<HTMLButtonElement>) => {
