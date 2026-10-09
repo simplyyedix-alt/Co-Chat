@@ -326,12 +326,18 @@ export function CameraStudio({ isOpen, onClose, onCapture, onError, onNativeFall
     const video = videoRef.current;
     if (!video || !video.videoWidth || !video.videoHeight) { setCameraMessage("Your camera is still starting. Please try again in a moment."); return; }
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const stage = video.parentElement;
+    const targetRatio = stage && stage.clientWidth > 0 && stage.clientHeight > 0 ? stage.clientWidth / stage.clientHeight : video.videoWidth / video.videoHeight;
+    const sourceRatio = video.videoWidth / video.videoHeight;
+    let sx = 0; let sy = 0; let sw = video.videoWidth; let sh = video.videoHeight;
+    if (sourceRatio > targetRatio) { sw = Math.round(video.videoHeight * targetRatio); sx = Math.round((video.videoWidth - sw) / 2); }
+    else if (sourceRatio < targetRatio) { sh = Math.round(video.videoWidth / targetRatio); sy = Math.round((video.videoHeight - sh) / 2); }
+    canvas.width = sw;
+    canvas.height = sh;
     const context = canvas.getContext("2d");
     if (!context) { setCameraMessage("Could not capture this photo."); return; }
     context.save();
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    context.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
     const faceBox = faceRef.current;
     const drawText = (text: string, x: number, y: number, size: number, color: string) => { context.font = `${size}px system-ui, sans-serif`; context.textAlign = "center"; context.textBaseline = "middle"; context.fillStyle = color; context.shadowColor = "rgba(0,0,0,.55)"; context.shadowBlur = Math.max(2, size * .12); context.fillText(text, x, y); context.shadowBlur = 0; };
     if (faceBox && (lens === "puppy" || lens === "cat")) { drawText(lens === "puppy" ? "🐶" : "🐱", faceBox.x + faceBox.width * .15, faceBox.y - faceBox.height * .2, Math.max(28, faceBox.width * .28), "#fff"); drawText(lens === "puppy" ? "🐶" : "🐱", faceBox.x + faceBox.width * .85, faceBox.y - faceBox.height * .2, Math.max(28, faceBox.width * .28), "#fff"); drawText(lens === "puppy" ? "●" : "♡", faceBox.x + faceBox.width * .5, faceBox.y + faceBox.height * .58, Math.max(18, faceBox.width * .13), "#ff91ae"); }
