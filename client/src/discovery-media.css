@@ -48,6 +48,23 @@
   .camera-control-row .camera-control:nth-last-child(2){order:5}
   .camera-filter-strip,.camera-lens-strip{position:relative!important;z-index:5!important;margin-top:10px!important}
 }
+/* Final camera shell: preview-led vertical layout with one Snapchat-style dock. */
+.camera-bottom-dock{position:relative;z-index:7;display:grid;gap:5px;padding:8px 8px 12px;background:linear-gradient(0deg,#07080df8 70%,#07080d00);border-radius:22px 22px 0 0}
+.camera-snap-carousel{display:flex;align-items:center;gap:14px;min-height:88px;overflow-x:auto;padding:5px calc(50% - 32px) 8px;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;overscroll-behavior-x:contain}
+.camera-snap-carousel::-webkit-scrollbar{display:none}
+.camera-snap-carousel button{display:grid;flex:0 0 64px;place-items:center;gap:4px;padding:0;border:0;background:transparent;color:#c8ccdb;font:inherit;cursor:pointer;scroll-snap-align:center}
+.camera-snap-carousel button span{display:grid;place-items:center;width:56px;height:56px;border:2px solid #ffffff22;border-radius:50%;background:linear-gradient(135deg,#2e254b,#171b2c);box-shadow:0 6px 18px #0007;font-size:24px;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.camera-snap-carousel button small{max-width:72px;overflow:hidden;font-size:10px;font-weight:800;text-overflow:ellipsis;white-space:nowrap}
+.camera-snap-carousel button.active span{border-color:#a58cff;background:linear-gradient(135deg,#735cff,#b66dff);box-shadow:0 0 0 3px #a58cff55,0 0 24px #8565ff99;transform:scale(1.1)}
+.camera-bottom-dock~.camera-filter-strip,.camera-bottom-dock~.camera-lens-strip{display:none!important}
+@media(min-width:701px){
+  .camera-studio-full{display:flex!important;flex-direction:column!important;height:100dvh!important;min-height:0!important;padding:10px 18px 0!important}
+  .camera-studio-topbar{flex:0 0 48px!important}
+  .camera-stage{height:auto!important;min-height:0!important;max-height:none!important;flex:1 1 auto!important;border-radius:24px!important}
+  .camera-bottom-dock{flex:0 0 auto!important;margin-top:0!important}
+  .camera-control-row{top:72px!important;right:30px!important}
+}
+@media(max-width:700px){.camera-bottom-dock{margin-inline:-2px}.camera-snap-carousel{min-height:78px}.camera-snap-carousel button{flex-basis:60px}.camera-snap-carousel button span{width:52px;height:52px}}
 @media(max-width:700px){
   .camera-studio-full{grid-template-rows:auto auto auto auto auto!important;padding-top:max(10px,env(safe-area-inset-top))!important}
   .camera-stage{height:42dvh!important;min-height:240px!important;max-height:42dvh!important}
