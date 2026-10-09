@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-export type CameraFilter = "none" | "enhance" | "golden" | "cool" | "mono" | "retro" | "dreamy" | "cinematic" | "vivid" | "portrait" | "night";
+export type CameraFilter = "none" | "enhance" | "golden" | "cool" | "mono" | "retro" | "dreamy" | "cinematic" | "vivid" | "portrait" | "night" | "vhs" | "y2k" | "pastel" | "glow";
 export type CameraLens = "natural" | "puppy" | "cat" | "eyes" | "hearts" | "sunglasses" | "crown" | "particles" | "confetti";
 
 export const cameraFilterOptions: Array<{ id: CameraFilter; label: string; icon: string; category: "Natural" | "Portrait" | "Cinematic" }> = [
@@ -15,6 +15,10 @@ export const cameraFilterOptions: Array<{ id: CameraFilter; label: string; icon:
   { id: "vivid", label: "Vivid", icon: "◆", category: "Natural" },
   { id: "portrait", label: "Soft portrait", icon: "●", category: "Portrait" },
   { id: "night", label: "Night", icon: "☾", category: "Cinematic" },
+  { id: "vhs", label: "VHS", icon: "▤", category: "Cinematic" },
+  { id: "y2k", label: "Y2K", icon: "✺", category: "Natural" },
+  { id: "pastel", label: "Pastel glow", icon: "❀", category: "Portrait" },
+  { id: "glow", label: "Soft glow", icon: "✧", category: "Portrait" },
 ];
 
 export const cameraFilterCss: Record<CameraFilter, string> = {
@@ -29,6 +33,10 @@ export const cameraFilterCss: Record<CameraFilter, string> = {
   vivid: "saturate(1.42) contrast(1.08)",
   portrait: "brightness(1.03) saturate(1.06) contrast(.96)",
   night: "brightness(1.16) contrast(1.06) saturate(.9) hue-rotate(8deg)",
+  vhs: "contrast(1.08) saturate(.82) sepia(.18) hue-rotate(342deg)",
+  y2k: "brightness(1.08) saturate(1.35) contrast(.96) hue-rotate(320deg)",
+  pastel: "brightness(1.08) saturate(.82) contrast(.9) sepia(.08)",
+  glow: "brightness(1.07) saturate(1.08) contrast(.9)",
 };
 
 export const cameraLensOptions: Array<{ id: CameraLens; label: string; icon: string; description: string; ar: boolean }> = [
@@ -62,6 +70,10 @@ export function cameraFilterStyle(filter: CameraFilter, intensity: number) {
     case "vivid": return `saturate(${scale(1.42)}) contrast(${scale(1.08)})`;
     case "portrait": return `brightness(${scale(1.03)}) saturate(${scale(1.06)}) contrast(${1 - .04 * amount})`;
     case "night": return `brightness(${scale(1.16)}) contrast(${scale(1.06)}) saturate(${1 - .1 * amount}) hue-rotate(${Math.round(8 * amount)}deg)`;
+    case "vhs": return `contrast(${scale(1.08)}) saturate(${1 - .18 * amount}) sepia(${(.18 * amount).toFixed(2)}) hue-rotate(${Math.round(-18 * amount)}deg)`;
+    case "y2k": return `brightness(${scale(1.08)}) saturate(${scale(1.35)}) contrast(${1 - .04 * amount}) hue-rotate(${Math.round(320 * amount)}deg)`;
+    case "pastel": return `brightness(${scale(1.08)}) saturate(${1 - .18 * amount}) contrast(${1 - .1 * amount}) sepia(${(.08 * amount).toFixed(2)})`;
+    case "glow": return `brightness(${scale(1.07)}) saturate(${scale(1.08)}) contrast(${1 - .1 * amount})`;
     default: return base;
   }
 }
