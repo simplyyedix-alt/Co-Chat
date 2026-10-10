@@ -821,7 +821,14 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
       await Promise.race([sendWork, new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("Sneak sending timed out. Check your connection and Supabase function logs.")), 30000))]);
       setFeedSneakOpen(false); setFeedSneakDataUrl(null); setFeedSneakSelected([]);
     } catch (error) { setPublishError(error instanceof Error ? error.message : "Could not send Sneak."); }
-    finally { setFeedSneakBusy(false); }
+    finally {
+      setFeedSneakBusy(false);
+      // Always dismiss the picker after the send attempt so a completed send
+      // cannot leave the Android WebView looking frozen.
+      setFeedSneakOpen(false);
+      setFeedSneakDataUrl(null);
+      setFeedSneakSelected([]);
+    }
   };
   const saveCameraCapture = async ({ dataUrl }: { dataUrl: string }) => {
     try {
@@ -2024,7 +2031,14 @@ export default function App() {
       setSneakRecipientIds([]);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Could not send Sneak.");
-    } finally { setSneakBusy(false); }
+    } finally {
+      setSneakBusy(false);
+      // Always dismiss the picker after the send attempt so a completed send
+      // cannot leave the Android WebView looking frozen.
+      setSneakPickerOpen(false);
+      setSneakDraftDataUrl(null);
+      setSneakRecipientIds([]);
+    }
   };
   const openSneak = async (message: ChatMessage) => {
     if (!selected || !message.sneak || message.sneak.recipientId !== liveUser.uid || sneakBusy) return;

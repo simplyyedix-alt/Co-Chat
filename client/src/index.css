@@ -480,6 +480,7 @@ button:disabled{cursor:not-allowed;opacity:.55;transform:none!important}
 .sneak-picker-preview{display:block;width:100%;height:auto;max-height:240px;aspect-ratio:16/9;object-fit:contain;background:#050507}
 .sneak-picker-preview{display:none}
 .sneak-picker{width:min(560px,calc(100vw - 28px));max-height:82vh}.sneak-picker-list{max-height:48vh}.sneak-friend-row{padding:6px 8px;min-height:52px}.sneak-friend-row>.avatar{width:32px!important;height:32px!important;min-width:32px;min-height:32px;flex-basis:32px;border-radius:50%;font-size:11px}
+.sneak-picker-backdrop{padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right))}.sneak-picker{margin-inline:auto;transform:translateX(0)}
 .sneak-compose-button{background:linear-gradient(145deg,#7568ff,#5548d9);border-color:#9c91ff;box-shadow:0 5px 16px #6356e94d}.sneak-compose-glyph{display:grid;place-items:center;width:21px;height:21px;border:1.5px solid #fff;border-radius:6px;color:#fff;font-size:12px;line-height:1;transform:rotate(45deg)}.sneak-compose-glyph::first-letter{transform:rotate(-45deg)}
 .sneak-compose-glyph{width:auto;height:auto;border:0;border-radius:0;background:none;font-size:18px;line-height:1;transform:none;text-align:center;display:block}
 .sneak-list-glyph{display:inline-grid;place-items:center;width:19px;height:19px;border-radius:6px;background:linear-gradient(135deg,#ff79c6,#8d7bff 55%,#5ee7ff);color:#fff;font-size:11px;box-shadow:0 2px 8px #8d7bff66}
