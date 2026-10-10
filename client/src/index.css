@@ -497,3 +497,4 @@ button:disabled{cursor:not-allowed;opacity:.55;transform:none!important}
 .twitt-card,.chat-row{content-visibility:auto;contain-intrinsic-size:0 116px}
 .chat-screen .bubble{max-width:min(82%,420px);overflow:visible;overflow-wrap:anywhere;word-break:break-word}
 .chat-screen .bubble>span{display:block;max-width:100%;overflow-wrap:anywhere;word-break:break-word;white-space:pre-wrap}
+:root.dark .auth{background:radial-gradient(circle at 20% 20%,#30285f,transparent 34%),#11131b;color:var(--cc-text)}:root.dark .auth-card{background:#1b1e27;border:1px solid #30353c;box-shadow:0 20px 60px #0008}:root.dark .auth h1{color:#f5f5ff}:root.dark .auth label{color:#e8e8f0}:root.dark .auth input{background:#15181f;border-color:#3a4050;color:#f5f5ff}:root.dark .auth input::placeholder{color:#8e95a8}:root.dark .auth p{color:#b6bbca}
