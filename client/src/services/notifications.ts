@@ -8,6 +8,7 @@ import { app, auth, db } from '../firebase'
 let notificationRegistration: ServiceWorkerRegistration | null = null
 let nativeListenersReady = false
 let nativeActionsReady = false
+let webMessageListenerReady = false
 let localNotificationId = 10_000
 let nativeRegistrationPromise: Promise<boolean> | null = null
 const recentNotificationKeys = new Map<string, number>()
@@ -121,7 +122,10 @@ function displayOnce(key: string) {
 export function notifyIncomingMessage(title: string, body: string, dedupeKey = `${title}:${body}`) {
   if (!displayOnce(dedupeKey)) return
   if (isNativeAndroid()) { void showNativeNotification(title, body, { tag: `cochat-message-${dedupeKey}`, data: { type: 'message' } }); return }
-  void showWebNotification(title, { body, icon: assetUrl('icon-192.png'), tag: 'cochat-message' })
+  // Each message gets its own tag. Reusing one tag makes browsers replace the
+  // previous notification, which looked like missed messages to users.
+  const tag = `cochat-message-${dedupeKey}`.slice(0, 180)
+  void showWebNotification(title, { body, icon: assetUrl('icon-192.png'), tag })
 }
 export function notifyIncomingCall(name: string, callId: string, group = false) {
   const title = group ? 'Incoming group call' : 'Incoming call'; const body = `${name} is calling you`
@@ -178,6 +182,14 @@ export async function registerFcmNotifications(enabled = true) {
   if (!registration) return false
   const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: registration })
   if (!token || !(await saveToken(token, 'web'))) return false
-  onMessage(messaging, (payload) => { if (document.visibilityState !== 'visible' && payload.notification?.title) void showWebNotification(payload.notification.title, { body: payload.notification.body || '', icon: assetUrl('icon-192.png') }) })
+  if (!webMessageListenerReady) {
+    webMessageListenerReady = true
+    onMessage(messaging, (payload) => {
+      if (document.visibilityState !== 'visible' && payload.notification?.title) {
+        const messageId = typeof payload.data?.messageId === 'string' ? payload.data.messageId : `${Date.now()}`
+        void showWebNotification(payload.notification.title, { body: payload.notification.body || '', icon: assetUrl('icon-192.png'), tag: `cochat-message-${messageId}` })
+      }
+    })
+  }
   return true
 }

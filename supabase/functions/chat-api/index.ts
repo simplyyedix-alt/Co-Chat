@@ -246,7 +246,12 @@ Deno.serve(async (request) => {
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
       const sneak = { recipient_id: recipientId, state: 'unopened', expires_at: expiresAt, consumed_at: null }
       const rows = await rest('messages', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ conversation_id: conversationId, sender_id: user.uid, text: 'Serving pixels', attachment: body?.attachment || null, sneak, seen_by: [user.uid] }) })
-      await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: 'PATCH', body: JSON.stringify({ last_message: 'Sneak', last_sender_id: user.uid, last_message_at: new Date().toISOString() }) })
+      const messageAt = new Date().toISOString()
+      await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: 'PATCH', body: JSON.stringify({ last_message: 'Sneak', last_sender_id: user.uid, last_message_at: messageAt }) })
+      await Promise.race([
+        notifyMessageRecipients([recipientId], user.displayName, 'Sent you a Sneak', conversationId, String(rows?.[0]?.id || ''), messageAt).catch(() => undefined),
+        new Promise<void>((resolve) => setTimeout(resolve, 2500)),
+      ])
       return response({ message: rows?.[0] || null })
     }
     if (action === 'consume-sneak') {

@@ -121,6 +121,10 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
   const stopFallback = () => { if (fallbackTimer !== null) { window.clearInterval(fallbackTimer); fallbackTimer = null } }
   const fallbackStart = window.setTimeout(startFallback, 5000)
   const channel = supabase?.channel(`chat-conversations:${uid}`)
+    // Message sends update the conversation row. Listening to it directly
+    // avoids waiting for a secondary membership update and keeps previews and
+    // notifications close to real time.
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, refresh)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_members', filter: `uid=eq.${uid}` }, refresh)
     .subscribe((status) => { if (status === 'SUBSCRIBED') { window.clearTimeout(fallbackStart); stopFallback() } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') startFallback() })
   const onVisibilityChange = () => { if (document.visibilityState === 'visible') refresh() }
