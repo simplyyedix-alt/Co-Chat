@@ -44,7 +44,7 @@
   .camera-stage{height:calc(100dvh - 390px)!important;max-height:620px!important}
   .camera-control-row{position:absolute!important;z-index:6!important;top:86px!important;right:28px!important;display:flex!important;flex-direction:column!important;gap:8px!important;width:58px!important;padding:9px 5px!important;margin:0!important;border-radius:22px!important;background:#10131bcc!important;box-shadow:0 10px 28px #0007!important}
   .camera-control-row .camera-control{min-width:46px!important}
-  .camera-control-row .camera-shutter-large{width:58px!important;height:58px!important;order:2}
+.camera-control-row .camera-shutter-large{display:none!important}
   .camera-control-row .camera-shutter-large i{width:44px!important;height:44px!important}
   .camera-control-row .camera-zoom-control{width:44px!important;order:4}
   .camera-control-row .camera-control:first-child{order:1}
