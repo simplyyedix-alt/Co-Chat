@@ -15,6 +15,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "883596884512-subf4vk3fcpdl0lq307k2ov8ifre5nri.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cochat.app",
+            "certificate_hash": "526272b9ee706f3cc436bf12ca1a39245f094b56"
+          }
+        },
+        {
           "client_id": "883596884512-rpb3j19eqvjkb1uo13b8l2fld4knataf.apps.googleusercontent.com",
           "client_type": 3
         }
