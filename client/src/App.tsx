@@ -96,6 +96,14 @@ const formatTime = (value?: { toDate?: () => Date } | null) =>
         .toDate()
         .toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : "";
+const relativeMessageAge = (value?: { toMillis?: () => number } | null) => {
+  const elapsed = Math.max(0, Date.now() - (value?.toMillis?.() || Date.now()));
+  const minutes = Math.floor(elapsed / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours} hr ago`;
+};
 const presenceLabel = (
   active?: boolean,
   lastSeen?: { toMillis?: () => number } | null,
@@ -710,7 +718,7 @@ function CommentSheet({ post, comments, loading, hasMore, names, currentUid, onC
       <div className="comment-sheet-list">
         {loading && !comments.length && <p className="comment-loading">Loading comments…</p>}
         {!loading && !comments.length && <div className="comment-empty"><strong>Start the conversation</strong><span>Be the first to leave a helpful comment.</span></div>}
-        {comments.map((comment) => { const name = names[comment.uid] || "Profile unavailable"; return <article className="sheet-comment" key={comment.id}><div className="comment-avatar">{name.slice(0, 2).toUpperCase()}</div><div className="sheet-comment-body"><div><strong>{name === "Profile unavailable" ? name : `@${name}`}</strong>{comment.uid === currentUid && <button className="comment-delete" type="button" onClick={() => onDelete(comment)}>Delete</button>}</div><p>{comment.body}</p>{comment.attachment && (comment.attachment.type.startsWith("image/") ? <a className="twitt-media-preview" href={comment.attachment.url} target="_blank" rel="noreferrer" download={comment.attachment.name}><img src={comment.attachment.url} alt={comment.attachment.name} /><span>Open / save image</span></a> : <a className="twitt-attachment" href={comment.attachment.url} target="_blank" rel="noreferrer" download={comment.attachment.name}>📄 {comment.attachment.name} · Open / save</a>)}<button className={comment.liked ? "comment-like liked" : "comment-like"} type="button" onClick={() => onLike(comment)}>♡ {comment.likes || 0}</button></div></article>; })}
+        {comments.map((comment) => { const name = names[comment.uid] || "Profile unavailable"; return <article className="sheet-comment" key={comment.id}><div className="comment-avatar">{name.slice(0, 2).toUpperCase()}</div><div className="sheet-comment-body"><div><strong>{name === "Profile unavailable" ? name : `@${name}`}</strong>{comment.uid === currentUid && <button className="comment-delete" type="button" onClick={() => onDelete(comment)}>Delete</button>}</div><p>{comment.body}</p>{comment.attachment && (comment.attachment.type.startsWith("image/") ? <a className="twitt-media-preview" href={comment.attachment.url} target="_blank" rel="noreferrer" download={comment.attachment.name}><img loading="lazy" decoding="async" src={comment.attachment.url} alt={comment.attachment.name} /><span>Open / save image</span></a> : <a className="twitt-attachment" href={comment.attachment.url} target="_blank" rel="noreferrer" download={comment.attachment.name}>📄 {comment.attachment.name} · Open / save</a>)}<button className={comment.liked ? "comment-like liked" : "comment-like"} type="button" onClick={() => onLike(comment)}>♡ {comment.likes || 0}</button></div></article>; })}
         {hasMore && <button className="load-comments" type="button" disabled={loading} onClick={onLoadMore}>{loading ? "Loading…" : "Load more comments"}</button>}
       </div>
       <form className="comment-sheet-compose" onSubmit={submit}><input value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 240))} placeholder="Add a thoughtful comment" autoFocus /><label className="comment-media-picker" title="Photo or PDF, max 5 MB"><MediaIcon /><input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label>{file && <small className="comment-file-name" title={file.name}>{file.name}</small>}<button className="primary compact" type="submit" disabled={!draft.trim() && !file}>Send</button></form>
@@ -738,6 +746,12 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
   const [cameraIntensity, setCameraIntensity] = useState(0.85);
   const [cameraBusy, setCameraBusy] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [feedSneakOpen, setFeedSneakOpen] = useState(false);
+  const [feedSneakDataUrl, setFeedSneakDataUrl] = useState<string | null>(null);
+  const [feedSneakFriends, setFeedSneakFriends] = useState<UserProfile[]>([]);
+  const [feedSneakSelected, setFeedSneakSelected] = useState<string[]>([]);
+  const [feedSneakSearch, setFeedSneakSearch] = useState("");
+  const [feedSneakBusy, setFeedSneakBusy] = useState(false);
   const [commenting, setCommenting] = useState<string | null>(null);
   const [postMenu, setPostMenu] = useState<string | null>(null);
   const [remoteCursor, setRemoteCursor] = useState<Awaited<ReturnType<typeof loadTwittPage>>["cursor"]>(null);
@@ -787,6 +801,26 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
     if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === "function") { setCameraOpen(true); return; }
     if (Capacitor.isNativePlatform()) { void captureNativeCamera(); return; }
     setPublishError("This browser does not support live camera access. Use a current browser over HTTPS.");
+  };
+  const prepareFeedSneak = async (dataUrl: string) => {
+    setCameraOpen(false);
+    setFeedSneakDataUrl(dataUrl);
+    setFeedSneakSelected([]);
+    setFeedSneakSearch("");
+    try { setFeedSneakFriends(await listFriends(auth?.currentUser?.uid || "")); setFeedSneakOpen(true); }
+    catch { setPublishError("Could not load your friends."); }
+  };
+  const sendFeedSneak = async () => {
+    const uid = auth?.currentUser?.uid;
+    if (!uid || !feedSneakDataUrl || !feedSneakSelected.length || feedSneakBusy) return;
+    setFeedSneakBusy(true);
+    try {
+      const file = await cameraDataUrlToFile(feedSneakDataUrl, "none", 1);
+      const sendWork = Promise.all(feedSneakSelected.map(async (recipientId) => { const profile = feedSneakFriends.find((item) => item.uid === recipientId); if (!profile) return; const conversationId = await createConversation(uid, profile); await sendSneak(conversationId, uid, recipientId, file); }));
+      await Promise.race([sendWork, new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("Sneak sending timed out. Check your connection and Supabase function logs.")), 30000))]);
+      setFeedSneakOpen(false); setFeedSneakDataUrl(null); setFeedSneakSelected([]);
+    } catch (error) { setPublishError(error instanceof Error ? error.message : "Could not send Sneak."); }
+    finally { setFeedSneakBusy(false); }
   };
   const saveCameraCapture = async ({ dataUrl }: { dataUrl: string }) => {
     try {
@@ -1103,7 +1137,8 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
     <div className="discovery-mode-tabs" role="tablist" aria-label="Discovery mode"><button type="button" role="tab" aria-selected={feedType === "study"} className={feedType === "study" ? "active" : ""} onClick={() => { setFeedType("study"); setTab("recent"); setCommunity("all"); setVisible(20); }}>Study <small>Questions & answers</small></button><button type="button" role="tab" aria-selected={feedType === "social"} className={feedType === "social" ? "active" : ""} onClick={() => { setFeedType("social"); setTab("recent"); setCommunity("all"); setVisible(20); }}>Social <small>24-hour moments</small></button></div>
     <section className="discover-intro"><div><span className="kicker">CO-CHAT {feedType === "study" ? "STUDY" : "SOCIAL"}</span><h2>{feedType === "study" ? "Ask it. Solve it together." : "Share the moment."}</h2><p>{feedType === "study" ? "Post a doubt as text, photo, or PDF and get clear answers from your circle." : "Friends appear first. Once you see a post, it moves down so your feed stays fresh."}</p></div><button className="primary compact" type="button" onClick={() => setComposerOpen(true)}>＋ {feedType === "study" ? "Ask a doubt" : "Share a moment"}</button></section>
     {composerOpen && <section className="twitt-composer"><div className="composer-heading"><strong>{feedType === "study" ? "Ask your study community" : "Share with friends"}</strong><button className="icon" type="button" disabled={publishing || cameraBusy} onClick={() => setComposerOpen(false)}>×</button></div><textarea disabled={publishing || cameraBusy} value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 280))} placeholder={feedType === "study" ? "Describe your doubt or study win…" : "What is happening today? (expires in 24 hours)"} autoFocus /><div className="twitt-media-actions"><button className="twitt-camera-button" type="button" disabled={publishing || cameraBusy} onClick={() => void captureCameraPhoto()}>📸 {cameraBusy ? "Opening camera…" : "Open camera"}</button><label className="twitt-media-picker"><MediaIcon /> Add photo/PDF (max 5 MB)<input disabled={publishing || cameraBusy} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => { setCameraDataUrl(null); setDraftFile(event.target.files?.[0] || null); }} /></label></div>{cameraDataUrl && <div className="camera-filter-picker"><div className="camera-filter-heading"><strong>Camera studio</strong><small>Normal first · choose a look before posting</small></div><div className="camera-filter-list">{cameraFilterOptions.map(({ id, label, icon }) => <button key={id} type="button" className={cameraFilter === id ? "active" : ""} disabled={publishing || cameraBusy} onClick={() => setCameraFilter(id)}><span>{icon}</span>{label}</button>)}</div><img className={`camera-capture-preview filter-${cameraFilter}`} style={{ filter: cameraFilterCss[cameraFilter] }} src={cameraDataUrl} alt="Captured moment preview" /></div>}<small className="twitt-safety-note">Explicit porn content is not allowed. Normal photos are welcome.</small>{draftFile && <small className="twitt-file-name">{draftFile.name}</small>}{publishError && <p className="twitt-sync-error">{publishError}</p>}<div className="composer-footer">{feedType === "study" ? <div className="tag-input"><span>#</span><input disabled={publishing} list="twitt-tag-suggestions" value={draftCommunity} onChange={(event) => setDraftCommunity(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} placeholder="Add a study tag (required)" /><datalist id="twitt-tag-suggestions">{tagSuggestions.map((tag) => <option value={tag} key={tag} />)}</datalist></div> : <span className="social-expiry-note">Visible for 24 hours</span>}<span>{draft.length}/280</span><button className="primary compact" type="button" disabled={(!draft.trim() && !draftFile) || (feedType === "study" && !draftCommunity) || publishing || cameraBusy} onClick={() => void createTwitt()}>{publishing ? "◌ Posting…" : "Post"}</button></div></section>}
-    <CameraStudio isOpen={cameraOpen} onClose={() => setCameraOpen(false)} onSave={saveCameraCapture} onCapture={({ dataUrl, filter, intensity }) => { setCameraDataUrl(dataUrl); setCameraFilter(filter); setCameraIntensity(intensity); setFeedType("social"); setComposerOpen(true); }} onError={setPublishError} onNativeFallback={() => void captureNativeCamera()} />
+    <CameraStudio isOpen={cameraOpen} onClose={() => setCameraOpen(false)} onSave={saveCameraCapture} onCapture={({ dataUrl, filter, intensity }) => { setCameraDataUrl(dataUrl); setCameraFilter(filter); setCameraIntensity(intensity); setFeedType("social"); setComposerOpen(true); }} onSneak={({ dataUrl }) => void prepareFeedSneak(dataUrl)} onError={setPublishError} onNativeFallback={() => void captureNativeCamera()} />
+    {feedSneakOpen && <div className="sneak-picker-backdrop" role="presentation"><section className="sneak-picker" role="dialog" aria-modal="true" aria-label="Choose friends for Sneak"><header><div><strong>Send Sneak</strong><small>Choose one or more friends</small></div><button type="button" className="sneak-picker-close" onClick={() => setFeedSneakOpen(false)}>×</button></header><img className="sneak-picker-preview" src={feedSneakDataUrl || undefined} alt="Sneak preview" /><input className="sneak-picker-search" value={feedSneakSearch} onChange={(event) => setFeedSneakSearch(event.target.value)} placeholder="Search friends" autoFocus /><div className="sneak-picker-list">{feedSneakFriends.filter((friend) => `${friend.displayName} ${friend.username}`.toLowerCase().includes(feedSneakSearch.toLowerCase())).map((friend) => { const checked = feedSneakSelected.includes(friend.uid); return <button type="button" className={`sneak-friend-row ${checked ? "selected" : ""}`} key={friend.uid} onClick={() => setFeedSneakSelected((items) => checked ? items.filter((id) => id !== friend.uid) : [...items, friend.uid])}><Avatar name={friend.displayName} photoURL={friend.photoURL} className="avatar" /><span><b>{friend.displayName}</b><small>@{friend.username || "friend"}</small></span><i>{checked ? "✓" : ""}</i></button>; })}{!feedSneakFriends.length && <small className="sneak-picker-empty">No accepted friends yet.</small>}</div><footer><span>{feedSneakSelected.length} selected</span><button type="button" className="camera-studio-primary" disabled={!feedSneakSelected.length || feedSneakBusy} onClick={() => void sendFeedSneak()}>{feedSneakBusy ? "Sending…" : "Send Sneak"}</button></footer></section></div>}
     {feedType === "study" && <div className="community-filter" aria-label="Twitt tag filter">{[["all", "All"], ...popularTags.map((tag) => [tag, `#${tag}`] as const)].map(([id, label]) => <button key={id} className={community === id ? "active" : ""} onClick={() => { setCommunity(id); setVisible(3); }}>{label}</button>)}</div>}
     {feedType === "study" && <div className="feed-tabs"><button className={tab === "recent" ? "active" : ""} onClick={() => setTab("recent")}>Recent <small>{communityLabel} · 24h</small></button><button className={tab === "trending" ? "active" : ""} onClick={() => setTab("trending")}>Trending <small>{communityLabel} · top 10</small></button></div>}
     {remoteError && <div className="notice twitt-sync-error">{remoteError}<button className="secondary compact" type="button" onClick={() => window.location.reload()}>Retry</button></div>}
@@ -1234,12 +1269,17 @@ export default function App() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<ChatAttachment | null>(null);
   const [sneakCameraOpen, setSneakCameraOpen] = useState(false);
+  const [sneakPickerOpen, setSneakPickerOpen] = useState(false);
+  const [sneakDraftDataUrl, setSneakDraftDataUrl] = useState<string | null>(null);
+  const [sneakRecipientIds, setSneakRecipientIds] = useState<string[]>([]);
+  const [sneakFriendSearch, setSneakFriendSearch] = useState("");
   const [sneakViewer, setSneakViewer] = useState<{ url: string; messageId: string } | null>(null);
   const [sneakBusy, setSneakBusy] = useState(false);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
+  const [, setVerificationRefresh] = useState(0);
   const [verificationCooldown, setVerificationCooldown] = useState(0);
   const [showGroup, setShowGroup] = useState(false);
   const [needsUsername, setNeedsUsername] = useState(false);
@@ -1255,6 +1295,7 @@ export default function App() {
   const [profileName, setProfileName] = useState("");
   const [profileUsername, setProfileUsername] = useState("");
   const [profileBio, setProfileBio] = useState("");
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState("");
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [discoverable, setDiscoverable] = useState(true);
   const [profileSaved, setProfileSaved] = useState(false);
@@ -1384,6 +1425,20 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [verificationCooldown]);
   useEffect(() => {
+    if (!user || user.emailVerified) return;
+    let active = true;
+    const refreshVerification = async () => {
+      try {
+        await user.reload();
+        if (active && auth?.currentUser) setVerificationRefresh((value) => value + 1);
+      } catch { /* keep the notice until Auth can be refreshed */ }
+    };
+    const timer = window.setInterval(() => void refreshVerification(), 5000);
+    const onVisible = () => { if (document.visibilityState === "visible") void refreshVerification(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { active = false; window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
+  }, [user?.uid, user?.emailVerified]);
+  useEffect(() => {
     if (!auth) {
       setLoading(false);
       return;
@@ -1447,6 +1502,7 @@ export default function App() {
         setProfileName(profile?.displayName || liveUser.displayName || "");
         setProfileUsername(profile?.username || "");
         setProfileBio(profile?.bio || "");
+        setProfilePhotoUrl(profile?.photoURL || liveUser.photoURL || "");
         if (profile?.theme) setDarkMode(profile.theme === "dark");
         setThemeLoaded(true);
         setThemeLoadedUid(uid);
@@ -1906,6 +1962,32 @@ export default function App() {
     } catch (error) { setSneakCameraOpen(false); setError(error instanceof Error ? error.message : "Could not send Sneak."); }
     finally { setSneakBusy(false); }
   };
+  const prepareSneakForFriends = (dataUrl: string) => {
+    setSneakCameraOpen(false);
+    setSneakDraftDataUrl(dataUrl);
+    setSneakRecipientIds([]);
+    setSneakFriendSearch("");
+    setSneakPickerOpen(true);
+  };
+  const sendSneakToFriends = async () => {
+    if (!sneakDraftDataUrl || !sneakRecipientIds.length || sneakBusy) return;
+    setSneakBusy(true);
+    try {
+      const file = await cameraDataUrlToFile(sneakDraftDataUrl, "none", 1);
+      const sendWork = Promise.all(sneakRecipientIds.map(async (recipientId) => {
+        const profile = friendProfiles.find((item) => item.uid === recipientId);
+        if (!profile) return;
+        const conversationId = await createConversation(liveUser.uid, profile);
+        await sendSneak(conversationId, liveUser.uid, recipientId, file);
+      }));
+      await Promise.race([sendWork, new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("Sneak sending timed out. Check your connection and Supabase function logs.")), 30000))]);
+      setSneakPickerOpen(false);
+      setSneakDraftDataUrl(null);
+      setSneakRecipientIds([]);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Could not send Sneak.");
+    } finally { setSneakBusy(false); }
+  };
   const openSneak = async (message: ChatMessage) => {
     if (!selected || !message.sneak || message.sneak.recipientId !== liveUser.uid || sneakBusy) return;
     setSneakBusy(true);
@@ -1965,7 +2047,10 @@ export default function App() {
         notificationsEnabled,
         discoverable,
         activeStatus,
+        photoURL: profilePhotoUrl,
       });
+      // Profile photos are stored in the profile service; Firebase Auth's
+      // photoURL field has a small URL limit and must not receive a data URL.
       await updateProfile(liveUser, { displayName: profileName });
       localStorage.setItem(`cochat-username-${liveUser.uid}`, profileUsername.trim().toLowerCase());
       setProfileName(profileName.trim());
@@ -2272,9 +2357,9 @@ export default function App() {
                 )}
                 {item.sneak ? (
                   <div className={`sneak-card ${item.sneak.state}`}>
-                    <strong>{item.sneak.state === "unopened" ? "Serving pixels" : item.sneak.state === "consumed" ? "Sneak opened" : "Sneak expired"}</strong>
+                    <div className="sneak-card-title"><span className="sneak-glyph">◈</span><strong>{mine ? "Sent" : "Received"} {relativeMessageAge(item.createdAt)}</strong></div>
                     {item.sneak.state === "unopened" && item.sneak.recipientId === liveUser.uid && <button type="button" className="sneak-open-button" disabled={sneakBusy} onClick={() => void openSneak(item)}>Open Sneak</button>}
-                    <small>◉ One view · {formatTime(item.createdAt) || "now"}</small>
+                    <small>One-time Sneak · one view</small>
                   </div>
                 ) : item.attachment &&
                   (item.attachment.type.startsWith("image/") ? (
@@ -2300,7 +2385,7 @@ export default function App() {
                     {selected.memberIds.length > 2 && (
                   <strong className="message-sender">{sender}{isModerator(item.senderId) && <VerifiedTick />}</strong>
                   )}
-                {item.text && <span>{item.text}</span>}
+                {!item.sneak && item.text && <span>{item.text}</span>}
                 <small>
                   {formatTime(item.createdAt) || "now"}
                   <button
@@ -2437,15 +2522,19 @@ export default function App() {
               onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
             />
           </label>
-          {selected?.type !== "group" && selected?.memberIds.length === 2 && <button className="sneak-compose-button" type="button" title="Send a Sneak" aria-label="Send a Sneak" onClick={openSneakCamera}>◈</button>}
-          <input
+          {selected?.type !== "group" && selected?.memberIds.length === 2 && <button className="sneak-compose-button" type="button" title="Send a Sneak" aria-label="Send a Sneak" onClick={openSneakCamera}><span className="sneak-compose-glyph" aria-hidden="true">✦</span></button>}
+          <textarea
+            className="message-composer-input"
+            rows={1}
             value={text}
             onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
             placeholder={selectedFile ? selectedFile.name : "Write a message"}
           />
           <button className="primary" disabled={sendingMessage}>{sendingMessage ? "Sending…" : "Send"}</button>
         </form>
-        <CameraStudio isOpen={sneakCameraOpen} onClose={() => setSneakCameraOpen(false)} onCapture={({ dataUrl }) => void sendCapturedSneak(dataUrl)} onSneak={({ dataUrl }) => void sendCapturedSneak(dataUrl)} onError={setError} />
+        <CameraStudio isOpen={sneakCameraOpen} onClose={() => setSneakCameraOpen(false)} onCapture={({ dataUrl }) => void sendCapturedSneak(dataUrl)} onSneak={({ dataUrl }) => prepareSneakForFriends(dataUrl)} onError={setError} />
+        {sneakPickerOpen && <div className="sneak-picker-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !sneakBusy) setSneakPickerOpen(false); }}><section className="sneak-picker" role="dialog" aria-modal="true" aria-label="Choose friends for Sneak"><header><div><strong>Send Sneak</strong><small>Choose one or more friends</small></div><button type="button" className="sneak-picker-close" disabled={sneakBusy} onClick={() => setSneakPickerOpen(false)}>×</button></header><img className="sneak-picker-preview" src={sneakDraftDataUrl || undefined} alt="Sneak preview" /><input className="sneak-picker-search" value={sneakFriendSearch} onChange={(event) => setSneakFriendSearch(event.target.value)} placeholder="Search friends" autoFocus /><div className="sneak-picker-list">{friendProfiles.filter((friend) => `${friend.displayName} ${friend.username}`.toLowerCase().includes(sneakFriendSearch.trim().toLowerCase())).map((friend) => { const checked = sneakRecipientIds.includes(friend.uid); return <button type="button" className={`sneak-friend-row ${checked ? "selected" : ""}`} key={friend.uid} onClick={() => setSneakRecipientIds((items) => checked ? items.filter((id) => id !== friend.uid) : [...items, friend.uid])}><Avatar name={friend.displayName} photoURL={friend.photoURL} className="avatar" /><span><b>{friend.displayName}</b><small>@{friend.username || "friend"}</small></span><i aria-hidden="true">{checked ? "✓" : ""}</i></button>; })}{!friendProfiles.length && <small className="sneak-picker-empty">No accepted friends yet.</small>}</div><footer><span>{sneakRecipientIds.length} selected</span><button type="button" className="camera-studio-primary" disabled={!sneakRecipientIds.length || sneakBusy} onClick={() => void sendSneakToFriends()}>{sneakBusy ? "Sending…" : "Send Sneak"}</button></footer></section></div>}
         {sneakViewer && <div className="sneak-viewer" role="dialog" aria-modal="true" aria-label="Sneak viewer"><button type="button" className="sneak-viewer-close" aria-label="Close Sneak" onClick={() => { URL.revokeObjectURL(sneakViewer.url); setSneakViewer(null); }}>×</button><img src={sneakViewer.url} alt="Sneak" /></div>}
         {incomingCall && (
           <IncomingCall
@@ -2555,12 +2644,12 @@ export default function App() {
                 </div>
               </section>
             )}
-            <input
+            {page === "chats" && <input
               className="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Vibe search"
-            />
+              placeholder="Search friends or users"
+            />}
             {page === "chats" && search.trim() && (
               <SearchPanel uid={liveUser.uid} onSelect={startConversation} externalTerm={search} onTermChange={setSearch} embedded />
             )}
@@ -2636,7 +2725,9 @@ export default function App() {
                   <span className="chat-copy">
                     <strong>{item.name}</strong>
                     <span className={item.unreadCount ? "unread-preview" : ""}>
-                      {item.lastSenderId === liveUser.uid
+                      {(item.lastMessage === "Sneak" || item.lastMessage === "Serving pixels")
+                        ? <><span className="sneak-list-glyph">✦</span> {item.lastSenderId === liveUser.uid ? "Sneak a sneak" : "Sent you a Sneak"}</>
+                        : item.lastSenderId === liveUser.uid
                         ? item.lastMessageSeen
                           ? `Seen ${relativeMessageTime(item.lastMessageAt)}`
                           : `Sent ${relativeMessageTime(item.lastMessageAt)}`
@@ -2760,7 +2851,7 @@ export default function App() {
             </div>
             <form className="profile-card settings-profile-card" onSubmit={save}>
               <div className="settings-card-kicker">PROFILE & IDENTITY <span>Changes sync across devices</span></div>
-              <div className="settings-profile-heading"><div className="settings-avatar-wrap"><Avatar name={profileName || liveUser.email || "U"} photoURL={liveUser.photoURL || undefined} className="avatar large" /><span className={`settings-presence ${activeStatus ? "online" : ""}`} /></div><div><span className="settings-eyebrow">PROFILE</span><h2>{profileName || "Co Chat member"}</h2><p>{liveUser.email}</p></div></div>
+              <div className="settings-profile-heading"><button type="button" className="settings-avatar-upload" title="Change profile photo" onClick={() => document.getElementById("profile-photo-input")?.click()}><div className="settings-avatar-wrap"><Avatar name={profileName || liveUser.email || "U"} photoURL={profilePhotoUrl || undefined} className="avatar large" /><span className={`settings-presence ${activeStatus ? "online" : ""}`} /></div><span className="settings-avatar-camera">📷</span></button><input id="profile-photo-input" className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (!file) return; if (file.size > 5 * 1024 * 1024) { setError("Profile photos must be smaller than 5 MB."); return; } const reader = new FileReader(); reader.onload = () => setProfilePhotoUrl(String(reader.result || "")); reader.readAsDataURL(file); }} /><div><span className="settings-eyebrow">PROFILE</span><h2>{profileName || "Co Chat member"}</h2><p>{liveUser.email}</p></div></div>
               <div className="profile-details" aria-label="Profile details">
                 {isModerator(liveUser.uid) && <span className="verified-profile-label"><VerifiedTick />Verified account</span>}
                 <span><b>@</b>{profileUsername || "choose a username"}</span>
@@ -2795,7 +2886,7 @@ export default function App() {
                 <span className="settings-row-icon">⌁</span><span className="settings-option-copy"><b>Notifications</b><small>Get updates about messages and study activity</small></span><span className={`settings-toggle ${notificationsEnabled ? "on" : ""}`} aria-label={notificationsEnabled ? "Notifications on" : "Notifications off"}><span /></span>
               </button>
               <button type="button" onClick={() => void updatePreference("discoverable", !discoverable)}>
-                <span className="settings-row-icon">◎</span><span className="settings-option-copy"><b>Discoverability</b><small>Let friends find you in People and Discover</small></span><span className={`settings-toggle ${discoverable ? "on" : ""}`} aria-label={discoverable ? "Discoverability on" : "Discoverability off"}><span /></span>
+                <span className="settings-row-icon">◎</span><span className="settings-option-copy"><b>Discoverability</b><small>{discoverable ? "Let friends find you in People and Discover" : "Hidden from browsing; exact username searches still work"}</small></span><span className={`settings-toggle ${discoverable ? "on" : ""}`} aria-label={discoverable ? "Discoverability on" : "Discoverability off"}><span /></span>
               </button>
               <button
                 type="button"

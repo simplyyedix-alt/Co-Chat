@@ -296,8 +296,11 @@ export async function sendMessage(conversationId: string, senderId: string, text
 /** Creates a friend-only one-time photo message using the existing chat store. */
 export async function sendSneak(conversationId: string, senderId: string, recipientId: string, file: File) {
   if (isSupabaseChatEnabled()) {
-    const stored = await StorageManager.upload(file, { ownerId: senderId, originalName: 'sneak.jpg', mimeType: file.type || 'image/jpeg', sizeBytes: file.size, conversationId })
-    await sendSupabaseSneak(conversationId, recipientId, { name: 'sneak.jpg', url: stored.url, type: stored.mimeType, size: stored.sizeBytes })
+    // Sneaks are small, one-time images. Keep this path independent from the
+    // optional media uploader so a missing storage service cannot leave Send
+    // Sneak stuck indefinitely.
+    const url = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || '')); reader.onerror = () => reject(new Error('Could not read the Sneak image.')); reader.readAsDataURL(file) })
+    await sendSupabaseSneak(conversationId, recipientId, { name: 'sneak.jpg', url, type: file.type || 'image/jpeg', size: file.size })
     return
   }
   if (!db) throw new Error('Chat is unavailable.')
@@ -309,6 +312,7 @@ export async function sendSneak(conversationId: string, senderId: string, recipi
   const stored = await StorageManager.upload(file, { ownerId: senderId, originalName: 'sneak.jpg', mimeType: file.type || 'image/jpeg', sizeBytes: file.size, conversationId })
   const expiresAt = Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000)
   await addDoc(collection(conversationRef, 'messages'), { text: 'Serving pixels', senderId, createdAt: serverTimestamp(), attachment: { name: 'sneak.jpg', url: stored.url, type: stored.mimeType, size: stored.sizeBytes }, sneak: { recipientId, state: 'unopened', expiresAt }, seenBy: [senderId] })
+  await updateDoc(conversationRef, { lastMessage: 'Sneak', lastSenderId: senderId, lastMessageAt: serverTimestamp(), hiddenFor: [] })
 }
 
 /** Atomically consumes a Sneak so refreshes and concurrent opens cannot reopen it. */
@@ -386,7 +390,13 @@ export async function findUsers(search: string, currentUid: string): Promise<Use
   const snapshot = await getDocs(query(collection(db, 'users'), where('username', '>=', term), where('username', '<=', `${term}\uf8ff`), limit(12)))
   const blocked = await listBlockedUsers(currentUid)
   const blockedIds = new Set(blocked.map(item => item.blockedId))
-  return snapshot.docs.filter(item => item.id !== currentUid && !blockedIds.has(item.id) && item.data().discoverable !== false).map(item => profileFromDoc(item.id, item.data()))
+  return snapshot.docs.filter(item => {
+    if (item.id === currentUid || blockedIds.has(item.id)) return false
+    // Turning Discoverability off removes the profile from broad People/Discover
+    // results, but an exact username search still allows a friend request.
+    const username = String(item.data().username || '').toLowerCase()
+    return item.data().discoverable !== false || username === term
+  }).map(item => profileFromDoc(item.id, item.data()))
 }
 
 export async function getFriendship(uid: string, otherUid: string): Promise<'friends' | 'requested' | 'incoming' | 'none'> {
@@ -547,12 +557,12 @@ export async function createStory(uid: string, displayName: string, text: string
   await addDoc(collection(db, 'stories'), { uid, displayName, text, createdAt: serverTimestamp(), expiresAt: expires })
 }
 
-export async function saveProfile(uid: string, values: Pick<UserProfile, 'displayName' | 'username' | 'bio' | 'notificationsEnabled' | 'discoverable'> & { activeStatus?: boolean }) {
+export async function saveProfile(uid: string, values: Pick<UserProfile, 'displayName' | 'username' | 'bio' | 'notificationsEnabled' | 'discoverable'> & { activeStatus?: boolean; photoURL?: string }) {
   if (isSupabaseChatEnabled()) {
     const current = await getSupabaseProfile(uid)
     const username = normalizeUsername(values.username)
     if (username.length < 3) throw new Error('Username must be at least 3 characters.')
-    await upsertSupabaseProfile(uid, { ...values, username, email: current?.email || auth?.currentUser?.email || '', photoURL: current?.photoURL || auth?.currentUser?.photoURL || '' })
+    await upsertSupabaseProfile(uid, { ...values, username, email: current?.email || auth?.currentUser?.email || '', photoURL: values.photoURL || current?.photoURL || auth?.currentUser?.photoURL || '' })
     // Keep the legacy profile document aligned as well. It is still used as
     // the fallback for profile display and may contain the user's chosen
     // username from before the Supabase migration.
@@ -562,7 +572,7 @@ export async function saveProfile(uid: string, values: Pick<UserProfile, 'displa
           displayName: values.displayName.trim(),
           email: current?.email || auth?.currentUser?.email || '',
           username,
-          photoURL: current?.photoURL || auth?.currentUser?.photoURL || '',
+          photoURL: values.photoURL || current?.photoURL || auth?.currentUser?.photoURL || '',
           bio: String(values.bio || '').trim().slice(0, 280),
           notificationsEnabled: values.notificationsEnabled,
           discoverable: values.discoverable,
@@ -586,7 +596,7 @@ export async function saveProfile(uid: string, values: Pick<UserProfile, 'displa
   await reserveUsername(uid, username, uid)
   // Upsert so a fresh Android/WebView session can finish setup even if the
   // initial profile write was interrupted or the document does not exist yet.
-  await setDoc(userRef, { displayName: values.displayName.trim(), email: current.exists() ? String(current.data().email || '') : (auth?.currentUser?.email || ''), username, photoURL: current.exists() ? String(current.data().photoURL || auth?.currentUser?.photoURL || '') : (auth?.currentUser?.photoURL || ''), bio: String(values.bio || '').trim().slice(0, 280), notificationsEnabled: values.notificationsEnabled, discoverable: values.discoverable, activeStatus: values.activeStatus !== false, profileComplete: true, updatedAt: serverTimestamp() }, { merge: true })
+  await setDoc(userRef, { displayName: values.displayName.trim(), email: current.exists() ? String(current.data().email || '') : (auth?.currentUser?.email || ''), username, photoURL: values.photoURL || (current.exists() ? String(current.data().photoURL || auth?.currentUser?.photoURL || '') : (auth?.currentUser?.photoURL || '')), bio: String(values.bio || '').trim().slice(0, 280), notificationsEnabled: values.notificationsEnabled, discoverable: values.discoverable, activeStatus: values.activeStatus !== false, profileComplete: true, updatedAt: serverTimestamp() }, { merge: true })
   if (oldUsername && oldUsername !== username) {
     const oldRef = doc(db, 'usernames', oldUsername)
     const old = await getDoc(oldRef)
