@@ -67,6 +67,13 @@ jobs:
       - name: Include app in website
         run: |
           cp -r client/dist website/app
+      - name: Prepare Gradle temporary directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/gradle-tmp"
+          echo "JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=$RUNNER_TEMP/gradle-tmp" >> "$GITHUB_ENV"
+          echo "TMPDIR=$RUNNER_TEMP/gradle-tmp" >> "$GITHUB_ENV"
+          echo "TMP=$RUNNER_TEMP/gradle-tmp" >> "$GITHUB_ENV"
+          echo "TEMP=$RUNNER_TEMP/gradle-tmp" >> "$GITHUB_ENV"
       - name: Build Android test APK
         working-directory: client
         run: |
