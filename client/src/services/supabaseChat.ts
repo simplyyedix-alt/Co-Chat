@@ -158,11 +158,21 @@ export function watchIncomingConversationEvents(uid: string, callback: (event: I
 export function watchMessages(conversationId: string, uid: string, callback: (items: ChatMessage[]) => void): Unsubscribe {
   let active = true
   let inFlight = false
+  let refreshQueued = false
+  let queuedFullRefresh = false
   let fallbackTimer: number | null = null
   let latestSyncedAt = 0
   const syncedMessages = new Map<string, ChatMessage>()
   const refresh = (full = false) => {
-    if (!active || inFlight || document.visibilityState === 'hidden') return
+    if (!active || document.visibilityState === 'hidden') return
+    // Realtime can arrive while the initial/incremental request is still
+    // running. Do not drop that event; replay one coalesced refresh after the
+    // current request completes.
+    if (inFlight) {
+      refreshQueued = true
+      queuedFullRefresh = queuedFullRefresh || full
+      return
+    }
     inFlight = true
     const since = full ? undefined : latestSyncedAt || undefined
     void listMessages(conversationId, uid, since).then(items => {
@@ -179,7 +189,15 @@ export function watchMessages(conversationId: string, uid: string, callback: (it
       items.forEach(item => syncedMessages.set(item.id, item))
       callback([...syncedMessages.values()].sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)))
       latestSyncedAt = Math.max(latestSyncedAt, ...items.map(item => item.createdAt?.toMillis() || 0))
-    }).catch(() => undefined).finally(() => { inFlight = false })
+    }).catch(() => undefined).finally(() => {
+      inFlight = false
+      if (active && refreshQueued && document.visibilityState !== 'hidden') {
+        const fullRefresh = queuedFullRefresh
+        refreshQueued = false
+        queuedFullRefresh = false
+        refresh(fullRefresh)
+      }
+    })
   }
   refresh(true)
   const startFallback = () => { if (fallbackTimer === null) fallbackTimer = window.setInterval(() => refresh(), 10000) }

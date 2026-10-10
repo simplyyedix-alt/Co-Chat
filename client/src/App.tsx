@@ -1562,7 +1562,8 @@ export default function App() {
         const previous = seen[item.id];
         seen[item.id] = messageAt;
         if (!previous || messageAt <= previous || item.lastSenderId === uid || !item.lastMessage) continue;
-        notifyIncomingMessage(item.name || "New Co-Chat message", item.lastMessage, `${item.id}:${messageAt}`);
+        const body = item.lastMessage === "Sneak" ? "Sent you a Sneak" : item.lastMessage;
+        notifyIncomingMessage(item.name || "New Co-Chat message", body, `${item.id}:${messageAt}`);
       }
     });
     return () => { window.clearTimeout(loadingTimeout); stopWatching?.(); };
