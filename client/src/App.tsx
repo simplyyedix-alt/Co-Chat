@@ -2348,6 +2348,11 @@ export default function App() {
             const sender = mine
               ? profileName || "You"
               : senderNames[item.senderId] || "Loading…";
+            // Older Sneak rows may not have the newer `sneak` metadata after
+            // a schema refresh, but their legacy text is still identifiable.
+            // Treat those rows as Sneaks so internal status text never leaks
+            // into the conversation transcript.
+            const isSneakMessage = Boolean(item.sneak) || item.text === "Serving pixels";
             return (
               <div className={`bubble ${mine ? "me" : ""}`} key={item.id}>
                 {item.replyTo && (
@@ -2355,10 +2360,10 @@ export default function App() {
                     ↪ {item.replyTo.text || "Attachment"}
                   </div>
                 )}
-                {item.sneak ? (
-                  <div className={`sneak-card ${item.sneak.state}`}>
+                {isSneakMessage ? (
+                  <div className={`sneak-card ${item.sneak?.state || "consumed"}`}>
                     <div className="sneak-card-title"><span className="sneak-glyph">◈</span><strong>{mine ? "Sent" : "Received"} {relativeMessageAge(item.createdAt)}</strong></div>
-                    {item.sneak.state === "unopened" && item.sneak.recipientId === liveUser.uid && <button type="button" className="sneak-open-button" disabled={sneakBusy} onClick={() => void openSneak(item)}>Open Sneak</button>}
+                    {item.sneak?.state === "unopened" && item.sneak.recipientId === liveUser.uid && <button type="button" className="sneak-open-button" disabled={sneakBusy} onClick={() => void openSneak(item)}>Open Sneak</button>}
                     <small>One-time Sneak · one view</small>
                   </div>
                 ) : item.attachment &&
@@ -2387,7 +2392,7 @@ export default function App() {
                     {selected.memberIds.length > 2 && (
                   <strong className="message-sender">{sender}{isModerator(item.senderId) && <VerifiedTick />}</strong>
                   )}
-                {!item.sneak && item.text && <span>{item.text}</span>}
+                {!isSneakMessage && item.text && <span>{item.text}</span>}
                 <small>
                   {formatTime(item.createdAt) || "now"}
                   <button

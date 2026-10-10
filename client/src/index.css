@@ -496,3 +496,5 @@ button:disabled{cursor:not-allowed;opacity:.55;transform:none!important}
    client-only and does not change realtime polling or Edge Function usage. */
 .twitt-card,.chat-row{content-visibility:auto;contain-intrinsic-size:0 116px}
 .chat-screen .messages>.bubble{content-visibility:auto;contain-intrinsic-size:0 72px}
+.chat-screen .bubble{max-width:min(82%,420px);overflow:hidden;overflow-wrap:anywhere;word-break:break-word}
+.chat-screen .bubble>span{display:block;max-width:100%;overflow-wrap:anywhere;word-break:break-word;white-space:pre-wrap}
