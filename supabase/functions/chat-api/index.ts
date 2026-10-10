@@ -250,7 +250,9 @@ Deno.serve(async (request) => {
       await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: 'PATCH', body: JSON.stringify({ last_message: 'Sneak', last_sender_id: user.uid, last_message_at: messageAt }) })
       await Promise.race([
         notifyMessageRecipients([recipientId], user.displayName, 'Sent you a Sneak', conversationId, String(rows?.[0]?.id || ''), messageAt).catch(() => undefined),
-        new Promise<void>((resolve) => setTimeout(resolve, 2500)),
+        // Allow the first FCM request to obtain its OAuth token before the
+        // function returns; otherwise the runtime can tear down the delivery.
+        new Promise<void>((resolve) => setTimeout(resolve, 8000)),
       ])
       return response({ message: rows?.[0] || null })
     }
@@ -284,8 +286,8 @@ Deno.serve(async (request) => {
       // be cancelled when an Edge Function tears down after its response,
       // which previously caused intermittent missing message notifications.
       await Promise.race([
-        notifyMessageRecipients(targets, user.displayName, text || '📎 Attachment', conversationId, String(rows?.[0]?.id || ''), String(rows?.[0]?.created_at || '')).catch(() => undefined),
-        new Promise<void>((resolve) => setTimeout(resolve, 2500)),
+        notifyMessageRecipients(targets, user.displayName, text || '📎 Attachment', conversationId, String(rows?.[0]?.id || ''), String(rows?.[0]?.created_at || new Date().toISOString())).catch(() => undefined),
+        new Promise<void>((resolve) => setTimeout(resolve, 8000)),
       ])
       return response({ message: rows?.[0] || null })
     }

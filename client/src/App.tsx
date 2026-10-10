@@ -54,6 +54,7 @@ import {
   updateStudyPresence,
   watchCalls,
   watchConversations,
+  watchIncomingConversationEvents,
   watchFriendRequests,
   watchMessages,
   watchStories,
@@ -1238,8 +1239,10 @@ export default function App() {
   // Never seed the signed-in UI with demo conversations. Render skeletons
   // while the backend is loading, then show the real empty state if needed.
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const conversationsRef = useRef<Conversation[]>([]);
   const [conversationsLoading, setConversationsLoading] = useState(true);
   const notificationConversationSeen = useRef<Record<string, number>>({});
+  useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
   const [selected, setSelected] = useState<Conversation | null>(null);
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const handleChatTouchStart = (event: ReactTouchEvent<HTMLElement>) => {
@@ -1522,11 +1525,24 @@ export default function App() {
   }, [liveUser?.uid]);
   useEffect(() => {
     if (!liveUser || liveUser.uid === "preview") return;
-    void registerFcmNotifications(notificationsEnabled)
-      // Registration can be unavailable temporarily (for example while the
-      // Android WebView is restoring). Do not turn that transient state into
-      // a warning on every app launch; the user preference remains enabled.
-      .catch(() => undefined);
+    let active = true;
+    let retryTimer: number | null = null;
+    const canRetry = isNativeAndroid || Boolean(import.meta.env.VITE_FIREBASE_VAPID_KEY);
+    const register = () => {
+      void registerFcmNotifications(notificationsEnabled)
+        .then((ready) => {
+          // Registration can be unavailable temporarily while a WebView or
+          // service worker is restoring. Retry locally; this does not call an
+          // Edge Function and avoids requiring a full app restart.
+          const permissionDenied = typeof Notification !== "undefined" && Notification.permission === "denied";
+          if (active && canRetry && !ready && !permissionDenied) retryTimer = window.setTimeout(register, 15000);
+        })
+        .catch(() => {
+          if (active && canRetry) retryTimer = window.setTimeout(register, 15000);
+        });
+    };
+    register();
+    return () => { active = false; if (retryTimer !== null) window.clearTimeout(retryTimer); };
   }, [liveUser?.uid, notificationsEnabled, isNativeAndroid]);
   useEffect(() => {
     if (!liveUser || liveUser.uid === "preview") {
@@ -1550,6 +1566,19 @@ export default function App() {
       }
     });
     return () => { window.clearTimeout(loadingTimeout); stopWatching?.(); };
+  }, [liveUser?.uid, notificationsEnabled]);
+  useEffect(() => {
+    if (!liveUser || liveUser.uid === "preview" || !notificationsEnabled) return;
+    // Supabase Realtime delivers the conversation summary as soon as a send
+    // commits. Notify from that event directly instead of waiting for the
+    // conversation-list API refresh (the list watcher remains responsible for
+    // unread counts and previews). This adds no Edge Function request.
+    return watchIncomingConversationEvents(liveUser.uid, (event) => {
+      const body = event.message === "Sneak" ? "Sent you a Sneak" : event.message;
+      if (!body) return;
+      const conversation = conversationsRef.current.find((item) => item.id === event.conversationId);
+      notifyIncomingMessage(conversation?.name || "New Co-Chat message", body, `${event.conversationId}:${event.messageAt}`);
+    });
   }, [liveUser?.uid, notificationsEnabled]);
   useEffect(() => {
     if (!liveUser || liveUser.uid === "preview") return;

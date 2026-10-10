@@ -121,15 +121,38 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
   const stopFallback = () => { if (fallbackTimer !== null) { window.clearInterval(fallbackTimer); fallbackTimer = null } }
   const fallbackStart = window.setTimeout(startFallback, 5000)
   const channel = supabase?.channel(`chat-conversations:${uid}`)
-    // Message sends update the conversation row. Listening to it directly
-    // avoids waiting for a secondary membership update and keeps previews and
-    // notifications close to real time.
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, refresh)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_members', filter: `uid=eq.${uid}` }, refresh)
     .subscribe((status) => { if (status === 'SUBSCRIBED') { window.clearTimeout(fallbackStart); stopFallback() } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') startFallback() })
   const onVisibilityChange = () => { if (document.visibilityState === 'visible') refresh() }
   document.addEventListener('visibilitychange', onVisibilityChange)
   return () => { active = false; window.clearTimeout(fallbackStart); stopFallback(); document.removeEventListener('visibilitychange', onVisibilityChange); if (channel) void supabase?.removeChannel(channel) }
+}
+
+/**
+ * Listens to conversation summary changes without making another Edge
+ * Function request. This is used for prompt in-app notifications; the normal
+ * conversation watcher still refreshes the list for unread counts and text.
+ */
+export type IncomingConversationEvent = {
+  conversationId: string
+  senderId: string
+  message: string
+  messageAt: string
+}
+
+export function watchIncomingConversationEvents(uid: string, callback: (event: IncomingConversationEvent) => void): Unsubscribe {
+  if (!enabled || !supabase) return () => undefined
+  const channel = supabase.channel(`chat-notifications:${uid}`)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, (payload) => {
+      const row = payload.new as Record<string, unknown>
+      const senderId = String(row.last_sender_id || '')
+      const conversationId = String(row.id || '')
+      const messageAt = String(row.last_message_at || '')
+      if (!conversationId || !senderId || senderId === uid || !messageAt) return
+      callback({ conversationId, senderId, message: String(row.last_message || ''), messageAt })
+    })
+    .subscribe()
+  return () => { void supabase?.removeChannel(channel) }
 }
 
 export function watchMessages(conversationId: string, uid: string, callback: (items: ChatMessage[]) => void): Unsubscribe {
