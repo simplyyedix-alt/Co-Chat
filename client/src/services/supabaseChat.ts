@@ -161,6 +161,8 @@ export function watchMessages(conversationId: string, uid: string, callback: (it
   let refreshQueued = false
   let queuedFullRefresh = false
   let fallbackTimer: number | null = null
+  let initialRetryTimer: number | null = null
+  let initialRetryDelay = 1000
   let latestSyncedAt = 0
   const syncedMessages = new Map<string, ChatMessage>()
   const refresh = (full = false) => {
@@ -178,6 +180,8 @@ export function watchMessages(conversationId: string, uid: string, callback: (it
     void listMessages(conversationId, uid, since).then(items => {
       if (!active) return
       if (!since) {
+        if (initialRetryTimer !== null) { window.clearTimeout(initialRetryTimer); initialRetryTimer = null }
+        initialRetryDelay = 1000
         syncedMessages.clear()
         items.forEach(item => syncedMessages.set(item.id, item))
         latestSyncedAt = items.reduce((max, item) => Math.max(max, item.createdAt?.toMillis() || 0), 0)
@@ -189,7 +193,16 @@ export function watchMessages(conversationId: string, uid: string, callback: (it
       items.forEach(item => syncedMessages.set(item.id, item))
       callback([...syncedMessages.values()].sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0)))
       latestSyncedAt = Math.max(latestSyncedAt, ...items.map(item => item.createdAt?.toMillis() || 0))
-    }).catch(() => undefined).finally(() => {
+    }).catch(() => {
+      // A healthy realtime subscription does not guarantee that the initial
+      // Edge request succeeded. Retry only failed initial loads, with backoff,
+      // so a transient auth/network hiccup does not become a false empty chat.
+      if (active && !since && initialRetryTimer === null) {
+        const delay = initialRetryDelay
+        initialRetryDelay = Math.min(initialRetryDelay * 2, 10000)
+        initialRetryTimer = window.setTimeout(() => { initialRetryTimer = null; refresh(true) }, delay)
+      }
+    }).finally(() => {
       inFlight = false
       if (active && refreshQueued && document.visibilityState !== 'hidden') {
         const fullRefresh = queuedFullRefresh
@@ -209,7 +222,7 @@ export function watchMessages(conversationId: string, uid: string, callback: (it
     .subscribe((status) => { if (status === 'SUBSCRIBED') { window.clearTimeout(fallbackStart); stopFallback() } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') startFallback() })
   const onVisibilityChange = () => { if (document.visibilityState === 'visible') refresh() }
   document.addEventListener('visibilitychange', onVisibilityChange)
-  return () => { active = false; window.clearTimeout(fallbackStart); stopFallback(); document.removeEventListener('visibilitychange', onVisibilityChange); if (channel) void supabase?.removeChannel(channel) }
+  return () => { active = false; window.clearTimeout(fallbackStart); stopFallback(); if (initialRetryTimer !== null) window.clearTimeout(initialRetryTimer); document.removeEventListener('visibilitychange', onVisibilityChange); if (channel) void supabase?.removeChannel(channel) }
 }
 
 export async function sendMessage(conversationId: string, text: string, attachmentValue: ChatAttachment | null, replyTo?: ChatMessage | null) {

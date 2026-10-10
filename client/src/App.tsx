@@ -1623,7 +1623,11 @@ export default function App() {
       );
       return () => window.clearTimeout(readyTimer);
     }
-    const fallbackTimer = window.setTimeout(() => setConversationOpening(false), 3000);
+    // Give the message request a short window to complete without leaving the
+    // user stuck behind a long security screen. The watcher retries transient
+    // initial-load failures; this is only the final escape hatch for a slow or
+    // offline conversation.
+    const fallbackTimer = window.setTimeout(() => setConversationOpening(false), 5000);
     const stopWatching = watchMessages(selected.id, liveUser.uid, (items) => {
       const pending = Object.values(pendingMessages.current).filter((item) => !items.some((saved) => saved.senderId === item.senderId && saved.text === item.text));
       pendingMessages.current = Object.fromEntries(pending.map((item) => [item.id, item]));
