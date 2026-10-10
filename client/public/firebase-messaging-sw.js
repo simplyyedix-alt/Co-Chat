@@ -11,7 +11,7 @@ try {
     firebase.messaging().onBackgroundMessage((payload) => {
       const title = payload.notification?.title || 'Co-Chat'
       const type = payload.data?.type
-      const options = { body: payload.notification?.body || 'You have a new update.', icon: './icon-192.png', data: payload.data || {} }
+      const options = { body: payload.notification?.body || 'You have a new update.', icon: './assets/logo.svg', badge: './assets/logo.svg', data: payload.data || {} }
       if (type === 'call') options.actions = [{ action: 'answer-call', title: 'Answer' }, { action: 'decline-call', title: 'Decline' }]
       if (type === 'study-timer') options.actions = payload.data?.running === 'true'
         ? [{ action: 'pause-timer', title: 'Pause' }, { action: 'finish-timer', title: 'Finish & save' }]

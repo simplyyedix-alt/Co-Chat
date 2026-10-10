@@ -5,6 +5,7 @@ import type { ChatAttachment, ChatMessage, Conversation } from './chat'
 import type { UserProfile } from './chat'
 
 const enabled = import.meta.env.VITE_CHAT_BACKEND === 'supabase' && supabaseReady
+const remoteNotificationsEnabled = supabaseReady
 const endpoint = `${supabaseProjectUrl.replace(/\/$/, '')}/functions/v1/chat-api`
 
 const timestamp = (value: unknown) => {
@@ -231,6 +232,11 @@ export async function sendMessage(conversationId: string, text: string, attachme
 
 export async function sendSneak(conversationId: string, recipientId: string, attachmentValue: ChatAttachment) {
   await request({ action: 'send-sneak', conversationId, recipientId, attachment: attachmentValue })
+}
+
+export async function notifyRemoteEvent(kind: 'call' | 'friend-request', targetUids: string[], data: Record<string, unknown> = {}) {
+  if (!remoteNotificationsEnabled || !targetUids.length) return
+  await request({ action: 'notify-event', kind, targetUids, data })
 }
 
 export async function consumeSneak(conversationId: string, messageId: string) {

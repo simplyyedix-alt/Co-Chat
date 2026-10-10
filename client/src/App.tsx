@@ -1868,6 +1868,10 @@ export default function App() {
       if (event.action === "answer-call") void acceptIncomingCall();
       if (event.action === "decline-call") void declineIncomingCall();
     }
+    if (event.data?.type === "friend-request") {
+      setPage("chats");
+      setShowFriendRequests(true);
+    }
   }), [incomingCall, liveUser, incomingCallerName]);
   if (loading)
     return (

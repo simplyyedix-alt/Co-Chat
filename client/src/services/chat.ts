@@ -23,7 +23,7 @@ import {
 } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { StorageManager } from './storageManager'
-import { consumeSneak as consumeSupabaseSneak, sendSneak as sendSupabaseSneak } from './supabaseChat'
+import { consumeSneak as consumeSupabaseSneak, notifyRemoteEvent as notifySupabaseRemoteEvent, sendSneak as sendSupabaseSneak } from './supabaseChat'
 import { addGroupMembers as addSupabaseGroupMembers, createDirect, createGroup as createSupabaseGroup, deleteConversation as deleteSupabaseConversation, deleteForMe as deleteSupabaseMessageForMe, getProfile as getSupabaseProfile, getStudyLeaderboard as getSupabaseStudyLeaderboard, getStudyStats as getSupabaseStudyStats, isSupabaseChatEnabled, leaveGroup as leaveSupabaseGroup, markRead as markSupabaseRead, removeGroupMember as removeSupabaseGroupMember, saveStudySession as saveSupabaseStudySession, sendMessage as sendSupabaseMessage, unsend as unsendSupabaseMessage, updateGroup as updateSupabaseGroup, updateStudyPresence as updateSupabaseStudyPresence, upsertProfile as upsertSupabaseProfile, watchConversations as watchSupabaseConversations, watchIncomingConversationEvents as watchSupabaseIncomingConversationEvents, watchMessages as watchSupabaseMessages, type IncomingConversationEvent, type StudyLeaderboardEntry, type StudyStats } from './supabaseChat'
 export { isSupabaseChatEnabled } from './supabaseChat'
 
@@ -431,6 +431,7 @@ export async function sendFriendRequest(fromUid: string, toUid: string) {
   if (relationship === 'requested') throw new Error('Friend request already sent.')
   if (relationship === 'incoming') throw new Error('This user already sent you a request. Open your requests to accept it.')
   await setDoc(doc(db, 'friendRequests', `${fromUid}_${toUid}`), { fromUid, toUid, status: 'pending', createdAt: serverTimestamp() })
+  void notifySupabaseRemoteEvent('friend-request', [toUid], { requestId: `${fromUid}_${toUid}` }).catch(() => undefined)
 }
 
 export async function cancelFriendRequest(fromUid: string, toUid: string) {
@@ -623,6 +624,7 @@ export async function createCall(memberIds: string[], type: 'audio' | 'video', i
     const callId = `group_${group.id}_${Date.now()}_${initiatorId}`
     const callRef = doc(db, 'calls', callId)
     await setDoc(callRef, { type, callerId: initiatorId, memberIds: unique, groupId: group.id, groupName: group.name, joinedIds: [initiatorId], status: 'ringing', createdAt: serverTimestamp() })
+    void notifySupabaseRemoteEvent('call', unique.filter((uid) => uid !== initiatorId), { callId, callType: type, groupId: group.id, groupName: group.name }).catch(() => undefined)
     return callId
   }
   if (unique.length !== 2) throw new Error('Calls are available between two people only.')
@@ -638,6 +640,7 @@ export async function createCall(memberIds: string[], type: 'audio' | 'video', i
     }
     transaction.set(callRef, { memberIds: unique, callerId, calleeId, type, status: 'ringing', createdAt: serverTimestamp(), callerCandidates: [], calleeCandidates: [] })
   })
+  void notifySupabaseRemoteEvent('call', [calleeId], { callId, callType: type }).catch(() => undefined)
   return callId
 }
 

@@ -10,6 +10,8 @@ let nativeListenersReady = false
 let nativeActionsReady = false
 let webMessageListenerReady = false
 let localNotificationId = 10_000
+const studyTimerNotificationId = 10_001
+const studyCompletionNotificationId = 10_002
 let nativeRegistrationPromise: Promise<boolean> | null = null
 const recentNotificationKeys = new Map<string, number>()
 type NotificationAction = { action: string; tag?: string; data?: Record<string, unknown> }
@@ -101,8 +103,14 @@ async function ensureNativeNotifications() {
 }
 async function showNativeNotification(title: string, body: string, options: { tag: string; data?: NativeNotificationData; actionTypeId?: string; ongoing?: boolean }) {
   if (!(await ensureNativeNotifications())) return false
-  const id = options.tag === 'cochat-study-timer' ? 10_001 : localNotificationId++
-  await LocalNotifications.schedule({ notifications: [{ id, title, body, largeBody: body, channelId: 'cochat-general', smallIcon: 'ic_stat_cochat', actionTypeId: options.actionTypeId, ongoing: options.ongoing, autoCancel: !options.ongoing, extra: { ...options.data, tag: options.tag } }] })
+  const id = options.tag === 'cochat-study-timer' ? studyTimerNotificationId : localNotificationId++
+  await LocalNotifications.schedule({ notifications: [{ id, title, body, largeBody: body, channelId: 'cochat-general', smallIcon: 'ic_stat_cochat', largeIcon: 'ic_launcher', actionTypeId: options.actionTypeId, ongoing: options.ongoing, autoCancel: !options.ongoing, extra: { ...options.data, tag: options.tag } }] })
+  return true
+}
+async function scheduleNativeStudyCompletion(remainingSeconds: number) {
+  if (!(await ensureNativeNotifications())) return false
+  await LocalNotifications.cancel({ notifications: [{ id: studyCompletionNotificationId }] })
+  await LocalNotifications.schedule({ notifications: [{ id: studyCompletionNotificationId, title: 'Focus session complete', body: 'Your Co-Chat study session is complete.', channelId: 'cochat-general', smallIcon: 'ic_stat_cochat', largeIcon: 'ic_launcher', schedule: { at: new Date(Date.now() + Math.max(1, remainingSeconds) * 1000) }, extra: { type: 'study-timer', tag: 'cochat-study-timer-complete' } }] })
   return true
 }
 export function listenNotificationActions(listener: (event: NotificationAction) => void) {
@@ -125,22 +133,31 @@ export function notifyIncomingMessage(title: string, body: string, dedupeKey = `
   // Each message gets its own tag. Reusing one tag makes browsers replace the
   // previous notification, which looked like missed messages to users.
   const tag = `cochat-message-${dedupeKey}`.slice(0, 180)
-  void showWebNotification(title, { body, icon: assetUrl('icon-192.png'), tag })
+  void showWebNotification(title, { body, icon: assetUrl('assets/logo.svg'), tag })
 }
 export function notifyIncomingCall(name: string, callId: string, group = false) {
   const title = group ? 'Incoming group call' : 'Incoming call'; const body = `${name} is calling you`
+  if (!displayOnce(`call:${callId}`)) return
   if (isNativeAndroid()) { void showNativeNotification(title, body, { tag: `cochat-call-${callId}`, data: { type: 'call', callId }, actionTypeId: 'cochat-call-actions', ongoing: true }); return }
-  void showWebNotification(title, { body, icon: assetUrl('icon-192.png'), tag: `cochat-call-${callId}`, requireInteraction: true, data: { type: 'call', callId }, actions: [{ action: 'answer-call', title: 'Answer' }, { action: 'decline-call', title: 'Decline' }] })
+  void showWebNotification(title, { body, icon: assetUrl('assets/logo.svg'), tag: `cochat-call-${callId}`, requireInteraction: true, data: { type: 'call', callId }, actions: [{ action: 'answer-call', title: 'Answer' }, { action: 'decline-call', title: 'Decline' }] })
+}
+export function notifyIncomingFriendRequest(name = 'Someone') {
+  const title = 'New friend request'
+  const body = `${name} sent you a friend request`
+  if (!displayOnce(`friend-request:${name}:${body}`)) return
+  if (isNativeAndroid()) { void showNativeNotification(title, body, { tag: 'cochat-friend-request', data: { type: 'friend-request' } }); return }
+  void showWebNotification(title, { body, icon: assetUrl('assets/logo.svg'), tag: 'cochat-friend-request', data: { type: 'friend-request' } })
 }
 export function notifyStudyTimer(remainingSeconds: number, running: boolean) {
   const mins = Math.max(0, Math.ceil(remainingSeconds / 60)); const title = running ? 'Focus timer running' : 'Focus timer paused'; const body = running ? `${mins} minute${mins === 1 ? '' : 's'} left` : 'Your session is paused'
-  if (isNativeAndroid()) { void showNativeNotification(title, body, { tag: 'cochat-study-timer', data: { type: 'study-timer' }, actionTypeId: running ? 'cochat-timer-running-actions' : 'cochat-timer-paused-actions', ongoing: running }); return }
-  void showWebNotification(title, { body, icon: assetUrl('icon-192.png'), tag: 'cochat-study-timer', requireInteraction: running, data: { type: 'study-timer' }, actions: running ? [{ action: 'pause-timer', title: 'Pause' }, { action: 'finish-timer', title: 'Finish & save' }] : [{ action: 'resume-timer', title: 'Resume' }, { action: 'finish-timer', title: 'Finish & save' }] })
+  if (isNativeAndroid()) { if (running) void scheduleNativeStudyCompletion(remainingSeconds); else void LocalNotifications.cancel({ notifications: [{ id: studyCompletionNotificationId }] }).catch(() => undefined); void showNativeNotification(title, body, { tag: 'cochat-study-timer', data: { type: 'study-timer' }, actionTypeId: running ? 'cochat-timer-running-actions' : 'cochat-timer-paused-actions', ongoing: running }); return }
+  void showWebNotification(title, { body, icon: assetUrl('assets/logo.svg'), tag: 'cochat-study-timer', requireInteraction: running, data: { type: 'study-timer' }, actions: running ? [{ action: 'pause-timer', title: 'Pause' }, { action: 'finish-timer', title: 'Finish & save' }] : [{ action: 'resume-timer', title: 'Resume' }, { action: 'finish-timer', title: 'Finish & save' }] })
 }
 export function clearStudyTimerNotification() {
   if (isNativeAndroid()) {
+    void LocalNotifications.cancel({ notifications: [{ id: studyCompletionNotificationId }] }).catch(() => undefined)
     void LocalNotifications.getDeliveredNotifications()
-      .then(({ notifications }) => LocalNotifications.removeDeliveredNotifications({ notifications: notifications.filter((item) => item.id === 10_001) }))
+      .then(({ notifications }) => LocalNotifications.removeDeliveredNotifications({ notifications: notifications.filter((item) => item.id === studyTimerNotificationId || item.id === studyCompletionNotificationId) }))
       .catch(() => undefined)
     return
   }
@@ -185,9 +202,23 @@ export async function registerFcmNotifications(enabled = true) {
   if (!webMessageListenerReady) {
     webMessageListenerReady = true
     onMessage(messaging, (payload) => {
-      if (document.visibilityState !== 'visible' && payload.notification?.title) {
+      if (!payload.notification?.title) return
+      const type = typeof payload.data?.type === 'string' ? payload.data.type : 'message'
+      if (type === 'friend-request') {
+        notifyIncomingFriendRequest(payload.notification.title === 'Co-Chat' ? 'Someone' : payload.notification.title)
+        return
+      }
+      if (type === 'call') {
+        const callId = typeof payload.data?.callId === 'string' ? payload.data.callId : `${Date.now()}`
+        if (!displayOnce(`call:${callId}`)) return
+        void showWebNotification(payload.notification.title, { body: payload.notification.body || 'Incoming Co-Chat call', icon: assetUrl('assets/logo.svg'), tag: `cochat-call-${callId}`, requireInteraction: true, data: payload.data || {}, actions: [{ action: 'answer-call', title: 'Answer' }, { action: 'decline-call', title: 'Decline' }] })
+        return
+      }
+      // Realtime listeners own foreground message/call UI. The service worker
+      // owns closed/background delivery; this branch fills the hidden-tab gap.
+      if (document.visibilityState !== 'visible') {
         const messageId = typeof payload.data?.messageId === 'string' ? payload.data.messageId : `${Date.now()}`
-        void showWebNotification(payload.notification.title, { body: payload.notification.body || '', icon: assetUrl('icon-192.png'), tag: `cochat-message-${messageId}` })
+        void showWebNotification(payload.notification.title, { body: payload.notification.body || '', icon: assetUrl('assets/logo.svg'), tag: `cochat-${type}-${messageId}`, data: payload.data || {} })
       }
     })
   }

@@ -56,7 +56,7 @@ async function member(conversationId: string, uid: string) {
   return Array.isArray(rows) && rows.length > 0
 }
 
-async function notifyMessageRecipients(targetUids: string[], senderName: string, message: string, conversationId: string, messageId: string, messageAt: string) {
+async function notifyMessageRecipients(targetUids: string[], senderName: string, message: string, conversationId: string, messageId: string, messageAt: string, extraData: Record<string, string> = {}) {
   const base = Deno.env.get('SUPABASE_URL') || ''
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
   const secret = Deno.env.get('INTERNAL_NOTIFICATIONS_SECRET') || ''
@@ -64,7 +64,7 @@ async function notifyMessageRecipients(targetUids: string[], senderName: string,
   await fetch(`${base}/functions/v1/fcm-notifications`, {
     method: 'POST',
     headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json', 'x-internal-notifications-secret': secret },
-    body: JSON.stringify({ targetUids, title: senderName || 'New Co-Chat message', body: message || '📎 Attachment', data: { type: 'message', conversationId, messageId, messageAt } }),
+    body: JSON.stringify({ targetUids, title: senderName || 'New Co-Chat message', body: message || '📎 Attachment', data: { type: 'message', conversationId, messageId, messageAt, ...extraData } }),
   })
 }
 
@@ -276,6 +276,21 @@ Deno.serve(async (request) => {
       const attachment = item.attachment as Record<string, unknown> | null
       await rest(`messages?id=eq.${encodeURIComponent(messageId)}&sneak->>state=eq.unopened`, { method: 'PATCH', body: JSON.stringify({ sneak: { ...sneak, state: 'consumed', consumed_at: new Date().toISOString() }, attachment: null }) })
       return response({ url: String(attachment?.url || ''), type: String(attachment?.type || 'image/jpeg') })
+    }
+    if (action === 'notify-event') {
+      const kind = String(body?.kind || '')
+      if (kind !== 'call' && kind !== 'friend-request') return response({ error: 'Unsupported notification event' }, 400)
+      const targetUids = [...new Set(Array.isArray(body?.targetUids) ? body.targetUids.map(String).filter(Boolean).slice(0, 100) : [])]
+      if (!targetUids.length) return response({ queued: true })
+      const rawData = body?.data && typeof body.data === 'object' ? body.data as Record<string, unknown> : {}
+      const data = Object.fromEntries(Object.entries(rawData).slice(0, 12).map(([key, value]) => [key.slice(0, 64), String(value).slice(0, 256)]))
+      const message = kind === 'call'
+        ? `${data.callType === 'video' ? 'Video' : 'Voice'} call from ${user.displayName || 'a Co-Chat member'}`
+        : 'Sent you a friend request'
+      const eventId = String(data.callId || data.requestId || crypto.randomUUID())
+      const eventAt = new Date().toISOString()
+      runInBackground(notifyMessageRecipients(targetUids, user.displayName, message, '', eventId, eventAt, { ...data, type: kind }))
+      return response({ queued: true })
     }
     if (action === 'send-message') {
       const conversationId = String(body?.conversationId || '')
