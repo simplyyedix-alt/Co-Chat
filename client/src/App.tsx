@@ -2771,7 +2771,7 @@ export default function App() {
                     <strong>{item.name}</strong>
                     <span className={item.unreadCount ? "unread-preview" : ""}>
                       {(item.lastMessage === "Sneak" || item.lastMessage === "Serving pixels")
-                        ? <><span className="sneak-list-glyph">✦</span> {item.lastSenderId === liveUser.uid ? "Sneak a sneak" : "Sent you a Sneak"}</>
+? <><span className="sneak-list-glyph">✦</span> {item.lastSenderId === liveUser.uid ? "Sent a Sneak" : "Sent you a Sneak"}</>
                         : item.lastSenderId === liveUser.uid
                         ? item.lastMessageSeen
                           ? `Seen ${relativeMessageTime(item.lastMessageAt)}`

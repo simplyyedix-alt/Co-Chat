@@ -22,6 +22,9 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            getBridge().getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
+        }
         createNotificationChannel();
         // Wait until the first frame is visible. Android will then show each
         // permission sheet above Co-Chat instead of behind the launch screen.
