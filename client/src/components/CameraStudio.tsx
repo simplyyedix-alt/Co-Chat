@@ -153,6 +153,7 @@ export async function processCameraDataUrl(dataUrl: string, filter: CameraFilter
 export async function cameraDataUrlToFile(dataUrl: string, filter: CameraFilter, intensity = 1, mirrorSavedImage = false) {
   const processed = await processCameraDataUrl(dataUrl, filter, intensity, mirrorSavedImage);
   const image = await loadImage(processed);
+  const sourceBlob = await (await fetch(processed)).blob();
   const canvas = document.createElement("canvas");
   // Sneaks are sent inline through the chat API. A bounded render keeps the
   // request responsive on mobile and avoids spending extra function time on
@@ -164,7 +165,7 @@ export async function cameraDataUrlToFile(dataUrl: string, filter: CameraFilter,
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Could not prepare the camera image.");
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
-  let blob = await new Promise<Blob>((resolve) => canvas.toBlob((value) => resolve(value || new Blob()), "image/jpeg", .84));
+  const blob = await new Promise<Blob>((resolve) => canvas.toBlob((value) => resolve(value || sourceBlob), "image/jpeg", .84));
   return new File([blob], "co-chat-camera.jpg", { type: "image/jpeg" });
 }
 
