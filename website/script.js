@@ -29,7 +29,8 @@ nav?.querySelectorAll('a').forEach(link => link.addEventListener('click', () => 
 const year = document.querySelector('#year')
 if (year) year.textContent = String(new Date().getFullYear())
 const androidVersion = document.querySelector('.download-note')
-if (androidVersion) androidVersion.textContent = 'Android 8.0+ · Free download · Version 1.0.4'
+if (androidVersion) androidVersion.textContent = 'Android 8.0+ · Free download · Version 1.0.5 · Updated October 2026'
+document.querySelectorAll('a[href="downloads/co-chat-android.apk"]').forEach(link => link.setAttribute('href', 'downloads/co-chat-android.apk?v=1.0.5-20261010'))
 const form = document.querySelector('#join-form')
 const note = document.querySelector('#form-note')
 form?.addEventListener('submit', event => {
