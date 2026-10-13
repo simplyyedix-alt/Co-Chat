@@ -214,7 +214,10 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
     void Promise.all(items.map(async (item) => {
       if (item.type !== 'direct') return item
       const otherUid = item.memberIds.find(memberId => memberId !== uid)
-      const profile = otherUid ? await getFirestoreUserProfile(otherUid) : null
+      // Supabase is the primary profile store for chat. Fall back to Firestore
+      // inside getUserProfile so avatars/names saved on either side appear in
+      // the conversation list and chat header.
+      const profile = otherUid ? await getUserProfile(otherUid) : null
       if (!profile) return item
       const lastSeen = profile.lastSeen || item.lastSeen
       const lastSeenMs = lastSeen?.toMillis() || 0

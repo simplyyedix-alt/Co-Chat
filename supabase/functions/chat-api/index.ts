@@ -329,7 +329,12 @@ Deno.serve(async (request) => {
           broadcastChatMessage(conversationId, { messageId, messageAt }),
         ])
         const members = await membersPromise
-        await Promise.all((members || []).filter((item: Record<string, unknown>) => String(item.uid || '') !== user.uid).map((item: Record<string, unknown>) => rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(String(item.uid || ''))}`, { method: 'PATCH', body: JSON.stringify({ unread_count: Number(item.unread_count || 0) + 1, hidden_at: null }) })))
+        await Promise.all((members || []).map((item: Record<string, unknown>) => {
+          const memberUid = String(item.uid || '')
+          if (!memberUid) return Promise.resolve()
+          const unreadCount = memberUid === user.uid ? Number(item.unread_count || 0) : Number(item.unread_count || 0) + 1
+          return rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(memberUid)}`, { method: 'PATCH', body: JSON.stringify({ unread_count: unreadCount, hidden_at: null }) })
+        }))
       })())
       return response({ message: rows?.[0] || null })
     }
