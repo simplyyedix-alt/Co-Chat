@@ -1636,7 +1636,7 @@ export default function App() {
       );
       const readyTimer = window.setTimeout(
         () => setConversationOpening(false),
-        Math.max(0, 650 - (Date.now() - conversationOpeningAt.current)),
+        Math.max(0, 300 - (Date.now() - conversationOpeningAt.current)),
       );
       return () => window.clearTimeout(readyTimer);
     }
@@ -1644,14 +1644,14 @@ export default function App() {
     // user stuck behind a long security screen. The watcher retries transient
     // initial-load failures; this is only the final escape hatch for a slow or
     // offline conversation.
-    const fallbackTimer = window.setTimeout(() => setConversationOpening(false), 5000);
+    const fallbackTimer = window.setTimeout(() => setConversationOpening(false), 3000);
     const stopWatching = watchMessages(selected.id, liveUser.uid, (items) => {
       const pending = Object.values(pendingMessages.current).filter((item) => !items.some((saved) => saved.senderId === item.senderId && saved.text === item.text));
       pendingMessages.current = Object.fromEntries(pending.map((item) => [item.id, item]));
       setMessages([...items, ...pending].sort((a, b) => (a.createdAt?.toMillis() || Date.now()) - (b.createdAt?.toMillis() || Date.now())));
       window.setTimeout(
         () => setConversationOpening(false),
-        Math.max(0, 650 - (Date.now() - conversationOpeningAt.current)),
+        Math.max(0, 300 - (Date.now() - conversationOpeningAt.current)),
       );
     });
     return () => {
@@ -1972,6 +1972,11 @@ export default function App() {
     };
     pendingMessages.current[pendingId] = optimistic;
     setMessages((old) => [...old, optimistic]);
+    // Keep the chat list responsive while the write/realtime event completes.
+    // The server remains authoritative and will reconcile this preview.
+    setConversations((items) => [...items.map((item) => item.id === selected.id
+      ? { ...item, lastMessage: value || (file ? `📎 ${file.name}` : ''), lastSenderId: liveUser.uid, lastMessageAt: optimistic.createdAt }
+      : item)].sort((a, b) => (b.lastMessageAt?.toMillis() || 0) - (a.lastMessageAt?.toMillis() || 0)));
     setSendingMessage(true);
     try {
       await sendMessage(
@@ -2010,11 +2015,30 @@ export default function App() {
     const recipientId = selected.memberIds.find((id) => id !== liveUser.uid);
     if (!recipientId) return;
     setSneakBusy(true);
+    const pendingId = `pending-sneak-${Date.now()}`;
+    const optimistic: ChatMessage = {
+      id: pendingId,
+      senderId: liveUser.uid,
+      text: "Serving pixels",
+      createdAt: Timestamp.now(),
+      attachment: { name: "sneak.jpg", url: dataUrl, type: "image/jpeg", size: dataUrl.length },
+      sneak: { recipientId, state: "unopened" },
+    };
+    pendingMessages.current[pendingId] = optimistic;
+    setMessages((old) => [...old, optimistic]);
+    setConversations((items) => [...items.map((item) => item.id === selected.id
+      ? { ...item, lastMessage: "Sneak", lastSenderId: liveUser.uid, lastMessageAt: optimistic.createdAt }
+      : item)].sort((a, b) => (b.lastMessageAt?.toMillis() || 0) - (a.lastMessageAt?.toMillis() || 0)));
     try {
       const file = await cameraDataUrlToFile(dataUrl, "none", 1);
       await sendSneak(selected.id, liveUser.uid, recipientId, file);
         setSneakCameraOpen(false);
-    } catch (error) { setSneakCameraOpen(false); setError(error instanceof Error ? error.message : "Could not send Sneak."); }
+    } catch (error) {
+      delete pendingMessages.current[pendingId];
+      setMessages((old) => old.filter((item) => item.id !== pendingId));
+      setSneakCameraOpen(false);
+      setError(error instanceof Error ? error.message : "Could not send Sneak.");
+    }
     finally { setSneakBusy(false); }
   };
   const prepareSneakForFriends = (dataUrl: string) => {

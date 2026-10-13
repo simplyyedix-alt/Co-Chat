@@ -6,7 +6,21 @@ import type { UserProfile } from './chat'
 
 const enabled = import.meta.env.VITE_CHAT_BACKEND === 'supabase' && supabaseReady
 const remoteNotificationsEnabled = supabaseReady
-const endpoint = `${supabaseProjectUrl.replace(/\/$/, '')}/functions/v1/chat-api`
+// Route chat traffic through Cloudflare first; retain Supabase as a rollback
+// path while the Worker deployment is being verified.
+const cloudflareEndpoint = import.meta.env.VITE_CHAT_API_URL || 'https://divine-meadow-8139.simplyyedix.workers.dev'
+const supabaseEndpoint = `${supabaseProjectUrl.replace(/\/$/, '')}/functions/v1/chat-api`
+
+// Several startup effects can request a token at the same time. Share one
+// lookup so Firebase does not repeat the same auth work for each request.
+let tokenLookup: Promise<string | null> | null = null
+const getAuthToken = () => {
+  if (!auth?.currentUser) return Promise.resolve<string | null>(null)
+  if (!tokenLookup) {
+    tokenLookup = auth.currentUser.getIdToken().finally(() => { tokenLookup = null })
+  }
+  return tokenLookup
+}
 
 const timestamp = (value: unknown) => {
   if (!value) return null
@@ -15,24 +29,33 @@ const timestamp = (value: unknown) => {
 }
 
 async function request<T>(payload: Record<string, unknown>): Promise<T> {
-  const token = await auth?.currentUser?.getIdToken()
+  const token = await getAuthToken()
   if (!token) throw new Error('Please sign in before using chat.')
-  const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 10000)
-  let response: Response
-  try {
-    response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, apikey: supabaseAnonKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    })
-  } finally {
-    window.clearTimeout(timeout)
+  const endpoints = [cloudflareEndpoint, supabaseEndpoint].filter((value, index, items) => value && items.indexOf(value) === index)
+  let lastResponse: Response | null = null
+  for (const target of endpoints) {
+      const controller = new AbortController()
+      const timeout = window.setTimeout(() => controller.abort(), target === cloudflareEndpoint ? 5000 : 10000)
+      try {
+        const response = await fetch(target, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, apikey: supabaseAnonKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        })
+        lastResponse = response
+        if (response.ok || (response.status >= 400 && response.status < 500)) {
+          const data = await response.json().catch(() => null)
+          if (!response.ok) throw new Error(typeof data?.error === 'string' ? data.error : `Chat request failed (${response.status})`)
+          return data as T
+        }
+      } catch (error) {
+        if (target === supabaseEndpoint) throw error
+      } finally {
+        window.clearTimeout(timeout)
+      }
   }
-  const data = await response.json().catch(() => null)
-  if (!response.ok) throw new Error(typeof data?.error === 'string' ? data.error : `Chat request failed (${response.status})`)
-  return data as T
+  throw new Error(`Chat request failed (${lastResponse?.status || 503})`)
 }
 
 const attachment = (value: unknown): ChatAttachment | null => {
@@ -54,6 +77,15 @@ const profileFromRow = (row: Record<string, unknown> | null | undefined): UserPr
 export async function upsertProfile(uid: string, profile: Partial<UserProfile>) {
   await request({ action: 'profile-upsert', displayName: profile.displayName || '', email: profile.email || '', photoURL: profile.photoURL || '', username: profile.username || '', bio: profile.bio || '', notificationsEnabled: profile.notificationsEnabled, discoverable: profile.discoverable, activeStatus: profile.activeStatus })
   return true
+}
+
+export async function listFriends(): Promise<UserProfile[]> {
+  const data = await request<{ profiles?: Record<string, unknown>[] }>({ action: 'friends' })
+  return (data.profiles || []).map(profileFromRow).filter((profile): profile is UserProfile => Boolean(profile))
+}
+
+export async function touchPresence(activeStatus: boolean) {
+  await request({ action: 'presence', activeStatus })
 }
 
 export async function saveStudySession(seconds: number, weekKey: string, studyDay?: string) {
@@ -101,11 +133,16 @@ export async function listConversations(uid: string): Promise<Conversation[]> {
 
 export async function listMessages(conversationId: string, uid: string, since?: number): Promise<ChatMessage[]> {
   const data = await request<{ items?: Record<string, unknown>[] }>({ action: 'messages', conversationId, ...(since ? { since: new Date(since).toISOString() } : {}) })
-  return (data.items || []).map(item => ({
-    id: String(item.id || ''), text: String(item.text || ''), senderId: String(item.sender_id || ''), createdAt: timestamp(item.created_at),
-    attachment: attachment(item.attachment), sneak: item.sneak ? { recipientId: String((item.sneak as Record<string, unknown>).recipient_id || (item.sneak as Record<string, unknown>).recipientId || ''), state: String((item.sneak as Record<string, unknown>).state || 'unopened') as 'unopened' | 'consumed' | 'expired', expiresAt: timestamp((item.sneak as Record<string, unknown>).expires_at || (item.sneak as Record<string, unknown>).expiresAt), consumedAt: timestamp((item.sneak as Record<string, unknown>).consumed_at || (item.sneak as Record<string, unknown>).consumedAt) } : undefined, replyTo: item.reply_to ? { id: String((item.reply_to as Record<string, unknown>).id || ''), text: String((item.reply_to as Record<string, unknown>).text || ''), senderId: String((item.reply_to as Record<string, unknown>).senderId || (item.reply_to as Record<string, unknown>).sender_id || '') } : null,
-    seenBy: Array.isArray(item.seen_by) ? item.seen_by.map(String) : [], hiddenFor: Array.isArray(item.hidden_for) ? item.hidden_for.map(String) : [],
-  })).filter(item => !item.hiddenFor?.includes(uid)).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0))
+  return (data.items || []).map(item => {
+    const sneakValue = typeof item.sneak === 'string'
+      ? (() => { try { return JSON.parse(item.sneak as string) as Record<string, unknown> } catch { return null } })()
+      : (item.sneak as Record<string, unknown> | null | undefined)
+    return {
+      id: String(item.id || ''), text: String(item.text || ''), senderId: String(item.sender_id || ''), createdAt: timestamp(item.created_at),
+      attachment: attachment(item.attachment), sneak: sneakValue ? { recipientId: String(sneakValue.recipient_id || sneakValue.recipientId || ''), state: String(sneakValue.state || 'unopened') as 'unopened' | 'consumed' | 'expired', expiresAt: timestamp(sneakValue.expires_at || sneakValue.expiresAt), consumedAt: timestamp(sneakValue.consumed_at || sneakValue.consumedAt) } : undefined, replyTo: item.reply_to ? { id: String((item.reply_to as Record<string, unknown>).id || ''), text: String((item.reply_to as Record<string, unknown>).text || ''), senderId: String((item.reply_to as Record<string, unknown>).senderId || (item.reply_to as Record<string, unknown>).sender_id || '') } : null,
+      seenBy: Array.isArray(item.seen_by) ? item.seen_by.map(String) : [], hiddenFor: Array.isArray(item.hidden_for) ? item.hidden_for.map(String) : [],
+    }
+  }).filter(item => !item.hiddenFor?.includes(uid)).sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0))
 }
 
 export function watchConversations(uid: string, callback: (items: Conversation[]) => void): Unsubscribe {
@@ -123,6 +160,7 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
   const fallbackStart = window.setTimeout(startFallback, 5000)
   const channel = supabase?.channel(`chat-conversations:${uid}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_members', filter: `uid=eq.${uid}` }, refresh)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, refresh)
     .subscribe((status) => { if (status === 'SUBSCRIBED') { window.clearTimeout(fallbackStart); stopFallback() } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') startFallback() })
   const onVisibilityChange = () => { if (document.visibilityState === 'visible') refresh() }
   document.addEventListener('visibilitychange', onVisibilityChange)

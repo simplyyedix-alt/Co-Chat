@@ -23,7 +23,7 @@ import {
 } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { StorageManager } from './storageManager'
-import { consumeSneak as consumeSupabaseSneak, notifyRemoteEvent as notifySupabaseRemoteEvent, sendSneak as sendSupabaseSneak } from './supabaseChat'
+import { consumeSneak as consumeSupabaseSneak, listFriends as listSupabaseFriends, notifyRemoteEvent as notifySupabaseRemoteEvent, sendSneak as sendSupabaseSneak, touchPresence as touchSupabasePresence } from './supabaseChat'
 import { addGroupMembers as addSupabaseGroupMembers, createDirect, createGroup as createSupabaseGroup, deleteConversation as deleteSupabaseConversation, deleteForMe as deleteSupabaseMessageForMe, getProfile as getSupabaseProfile, getStudyLeaderboard as getSupabaseStudyLeaderboard, getStudyStats as getSupabaseStudyStats, isSupabaseChatEnabled, leaveGroup as leaveSupabaseGroup, markRead as markSupabaseRead, removeGroupMember as removeSupabaseGroupMember, saveStudySession as saveSupabaseStudySession, sendMessage as sendSupabaseMessage, unsend as unsendSupabaseMessage, updateGroup as updateSupabaseGroup, updateStudyPresence as updateSupabaseStudyPresence, upsertProfile as upsertSupabaseProfile, watchConversations as watchSupabaseConversations, watchIncomingConversationEvents as watchSupabaseIncomingConversationEvents, watchMessages as watchSupabaseMessages, type IncomingConversationEvent, type StudyLeaderboardEntry, type StudyStats } from './supabaseChat'
 export { isSupabaseChatEnabled } from './supabaseChat'
 
@@ -152,7 +152,9 @@ export async function ensureUserProfile(uid: string, profile: Partial<UserProfil
       discoverable: firestoreProfile?.discoverable ?? existing?.discoverable ?? profile.discoverable,
       activeStatus: firestoreProfile?.activeStatus ?? existing?.activeStatus ?? profile.activeStatus,
     })
-    return !existing?.username
+      // Firestore can already contain the username chosen before the profile
+      // was synced to Supabase. Only new profiles need setup.
+      return !(firestoreProfile?.username || existing?.username)
   }
   if (!db) return false
   const ref = doc(db, 'users', uid)
@@ -184,10 +186,28 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 async function getFirestoreUserProfile(uid: string): Promise<UserProfile | null> {
   if (!db) return null
   const viewerUid = auth?.currentUser?.uid
-  if (viewerUid && viewerUid !== uid && await isBlockedBetween(viewerUid, uid)) return null
-  const snapshot = await getDoc(doc(db, 'users', uid))
-  return snapshot.exists() ? profileFromDoc(uid, snapshot.data()) : null
+  const cacheKey = `${viewerUid || ''}:${uid}`
+  const cached = profileCache.get(cacheKey)
+  if (cached && cached.expiresAt > Date.now()) return cached.value
+  const pending = profileRequests.get(cacheKey)
+  if (pending) return pending
+  const request = (async () => {
+    if (viewerUid && viewerUid !== uid && await isBlockedBetween(viewerUid, uid)) return null
+    const snapshot = await getDoc(doc(db, 'users', uid))
+    return snapshot.exists() ? profileFromDoc(uid, snapshot.data()) : null
+  })()
+  profileRequests.set(cacheKey, request)
+  try {
+    const value = await request
+    profileCache.set(cacheKey, { value, expiresAt: Date.now() + 15000 })
+    return value
+  } finally {
+    profileRequests.delete(cacheKey)
+  }
 }
+
+const profileCache = new Map<string, { value: UserProfile | null; expiresAt: number }>()
+const profileRequests = new Map<string, Promise<UserProfile | null>>()
 
 export function watchConversations(uid: string, callback: (items: Conversation[]) => void): Unsubscribe | undefined {
   if (isSupabaseChatEnabled()) return watchSupabaseConversations(uid, (items) => {
@@ -381,10 +401,7 @@ export async function markConversationRead(conversationId: string, uid: string) 
 }
 
 export async function touchPresence(uid: string, activeStatus: boolean) {
-  if (isSupabaseChatEnabled()) {
-    await upsertSupabaseProfile(uid, { activeStatus })
-    return
-  }
+  if (isSupabaseChatEnabled()) { await touchSupabasePresence(activeStatus); return }
   if (!db) return
   await updateDoc(doc(db, 'users', uid), { activeStatus, lastSeen: serverTimestamp() })
 }
@@ -416,6 +433,7 @@ export async function getFriendship(uid: string, otherUid: string): Promise<'fri
 }
 
 export async function listFriends(uid: string): Promise<UserProfile[]> {
+  if (isSupabaseChatEnabled()) return listSupabaseFriends()
   if (!db) return []
   const snapshot = await getDocs(query(collection(db, 'friendships'), where('memberIds', 'array-contains', uid), limit(100)))
   const ids = snapshot.docs.filter(item => item.data().status === 'accepted').flatMap(item => (item.data().memberIds || []).map(String)).filter(id => id !== uid)

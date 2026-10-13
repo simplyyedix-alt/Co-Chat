@@ -91,6 +91,16 @@ Deno.serve(async (request) => {
       await rest('profiles', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ uid: user.uid, display_name: String(body?.displayName || user.displayName || 'Co-Chat member').slice(0, 100), email: String(body?.email || user.email || ''), photo_url: String(body?.photoURL || user.photoURL || ''), username: String(body?.username || '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24) || `user_${user.uid.slice(0, 8)}`, bio: String(body?.bio || '').slice(0, 280), notifications_enabled: body?.notificationsEnabled !== false, discoverable: body?.discoverable !== false, active_status: body?.activeStatus !== false, last_seen: new Date().toISOString(), updated_at: new Date().toISOString() }) })
       return response({ ok: true })
     }
+    if (action === 'presence') {
+      await rest(`profiles?uid=eq.${encodeURIComponent(user.uid)}`, { method: 'PATCH', body: JSON.stringify({ active_status: body?.activeStatus !== false, last_seen: new Date().toISOString(), updated_at: new Date().toISOString() }) })
+      return response({ ok: true })
+    }
+    if (action === 'friends') {
+      const friendships = await rest(`friendships?or=(member_a.eq.${encodeURIComponent(user.uid)},member_b.eq.${encodeURIComponent(user.uid)})&status=eq.accepted&select=member_a,member_b&limit=100`)
+      const ids = [...new Set((friendships || []).flatMap((item: Record<string, unknown>) => [String(item.member_a || ''), String(item.member_b || '')].filter((id: string) => id && id !== user.uid)))]
+      const profiles = ids.length ? await rest(`profiles?uid=in.(${ids.map((id: string) => encodeURIComponent(id)).join(',')})&select=uid,display_name,email,username,photo_url,bio,notifications_enabled,discoverable,active_status,last_seen`) : []
+      return response({ profiles: profiles || [] })
+    }
     if (action === 'study-save') {
       const seconds = Math.max(0, Math.min(86400, Math.floor(Number(body?.seconds || 0))))
       const weekKey = String(body?.weekKey || '')
