@@ -181,7 +181,10 @@ async function handleChat(request) {
         const conversation = await rest(`conversations?id=eq.${encodeURIComponent(conversationId2)}&type=eq.direct&select=id&limit=1`);
         if (!conversation?.[0]) continue;
         const members = await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId2)}&select=uid`);
-        if ((members || []).some((member2) => String(member2.uid || "") === otherUid)) return response({ id: conversationId2 });
+        if ((members || []).some((member2) => String(member2.uid || "") === otherUid)) {
+          await Promise.all([user.uid, otherUid].map((memberUid) => rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId2)}&uid=eq.${encodeURIComponent(memberUid)}`, { method: "PATCH", body: JSON.stringify({ hidden_at: null }) })));
+          return response({ id: conversationId2 });
+        }
       }
       const created = await rest("conversations", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify({ type: "direct", name, created_by: user.uid }) });
       const conversationId = created?.[0]?.id;

@@ -23,7 +23,7 @@ import {
 } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { StorageManager } from './storageManager'
-import { consumeSneak as consumeSupabaseSneak, listFriends as listSupabaseFriends, notifyRemoteEvent as notifySupabaseRemoteEvent, sendSneak as sendSupabaseSneak, touchPresence as touchSupabasePresence } from './supabaseChat'
+import { consumeSneak as consumeSupabaseSneak, listConversations as listSupabaseConversations, notifyRemoteEvent as notifySupabaseRemoteEvent, sendSneak as sendSupabaseSneak, touchPresence as touchSupabasePresence } from './supabaseChat'
 import { addGroupMembers as addSupabaseGroupMembers, createDirect, createGroup as createSupabaseGroup, deleteConversation as deleteSupabaseConversation, deleteForMe as deleteSupabaseMessageForMe, getProfile as getSupabaseProfile, getStudyLeaderboard as getSupabaseStudyLeaderboard, getStudyStats as getSupabaseStudyStats, isSupabaseChatEnabled, leaveGroup as leaveSupabaseGroup, markRead as markSupabaseRead, removeGroupMember as removeSupabaseGroupMember, saveStudySession as saveSupabaseStudySession, sendMessage as sendSupabaseMessage, unsend as unsendSupabaseMessage, updateGroup as updateSupabaseGroup, updateStudyPresence as updateSupabaseStudyPresence, upsertProfile as upsertSupabaseProfile, watchConversations as watchSupabaseConversations, watchIncomingConversationEvents as watchSupabaseIncomingConversationEvents, watchMessages as watchSupabaseMessages, type IncomingConversationEvent, type StudyLeaderboardEntry, type StudyStats } from './supabaseChat'
 export { isSupabaseChatEnabled } from './supabaseChat'
 
@@ -223,7 +223,18 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
       const lastSeenMs = lastSeen?.toMillis() || 0
       const active = profile.activeStatus !== false && lastSeenMs > 0 && Date.now() - lastSeenMs < 90000
       return { ...item, name: profile.displayName || item.name, username: profile.username || item.username, photoURL: profile.photoURL || item.photoURL, lastSeen, active }
-    })).then(callback)
+    })).then(async enriched => {
+      // Firebase is the source of truth for friendships. Ensure every accepted
+      // friend has a direct Supabase chat membership, including friendships
+      // created before the chat migration.
+      const friends = await listFriends(uid)
+      const existingPairs = new Set(enriched.filter(item => item.type === 'direct').map(item => [...item.memberIds].sort().join(':')))
+      const missing = friends.filter(friend => !existingPairs.has([uid, friend.uid].sort().join(':')))
+      if (missing.length) {
+        await Promise.all(missing.map(friend => createConversation(uid, friend)))
+        callback(await listSupabaseConversations(uid))
+      } else callback(enriched)
+    }).catch(() => callback(items))
   })
   if (!db) return undefined
   const q = query(collection(db, 'conversations'), where('memberIds', 'array-contains', uid), limit(50))
@@ -436,7 +447,6 @@ export async function getFriendship(uid: string, otherUid: string): Promise<'fri
 }
 
 export async function listFriends(uid: string): Promise<UserProfile[]> {
-  if (isSupabaseChatEnabled()) return listSupabaseFriends()
   if (!db) return []
   const snapshot = await getDocs(query(collection(db, 'friendships'), where('memberIds', 'array-contains', uid), limit(100)))
   const ids = snapshot.docs.filter(item => item.data().status === 'accepted').flatMap(item => (item.data().memberIds || []).map(String)).filter(id => id !== uid)
