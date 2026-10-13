@@ -67,27 +67,10 @@ jobs:
       - name: Include app in website
         run: |
           cp -r client/dist website/app
-      - name: Prepare Gradle temporary directory
-        run: |
-          mkdir -p "$RUNNER_TEMP/gradle-tmp"
-          echo "JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=$RUNNER_TEMP/gradle-tmp" >> "$GITHUB_ENV"
-          echo "TMPDIR=$RUNNER_TEMP/gradle-tmp" >> "$GITHUB_ENV"
-          echo "TMP=$RUNNER_TEMP/gradle-tmp" >> "$GITHUB_ENV"
-          echo "TEMP=$RUNNER_TEMP/gradle-tmp" >> "$GITHUB_ENV"
-      - name: Build Android test APK
-        working-directory: client
-        run: |
-          npx cap sync android
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
-        env:
-          VITE_TURN_URL: ${{ secrets.VITE_TURN_URL }}
-          VITE_TURN_USERNAME: ${{ secrets.VITE_TURN_USERNAME }}
-          VITE_TURN_CREDENTIAL: ${{ secrets.VITE_TURN_CREDENTIAL }}
       - name: Include Android APK in website
         run: |
-          cp client/android/app/build/outputs/apk/debug/app-debug.apk website/downloads/co-chat-android.apk
+          test -s website/downloads/co-chat-android.apk
+          echo "Using the committed Android Studio APK so Firebase signing fingerprints remain valid."
       - name: Configure Pages
         uses: actions/configure-pages@v5
         with:
