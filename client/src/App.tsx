@@ -68,7 +68,7 @@ import {
 } from "./services/chat";
 import { attachTwittCommentMedia, attachTwittMedia, createTwitt as createRemoteTwitt, createTwittComment, deleteTwitt, deleteTwittComment, hideTwitt, isModerator, loadTwittComments, loadTwittPage, recordTwittView, toggleTwittCommentLike, toggleTwittLike, type TwittAttachment, type TwittComment } from "./services/twitts";
 import { StorageManager } from "./services/storageManager";
-import { clearStudyTimerNotification, listenNotificationActions, notifyIncomingCall, notifyIncomingMessage, notifyStudyTimer, registerFcmNotifications } from "./services/notifications";
+import { clearStudyTimerNotification, listenNotificationActions, notifyIncomingCall, notifyIncomingMessage, notifyStudyTimer, notifyStudyTimerComplete, registerFcmNotifications } from "./services/notifications";
 import "./index.css";
 import "./group-friend.css";
 import "./community-feed.css";
@@ -611,6 +611,7 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   const progress = targetSeconds ? Math.min(100, Math.round((seconds / targetSeconds) * 100)) : Math.min(100, Math.round((seconds / 3600) * 100));
   const saveSession = () => {
     if (seconds <= 0) return;
+    notifyStudyTimerComplete();
     const today = localStudyDateKey();
     const nextTotal = totalSeconds + seconds;
     const nextWeekly = weeklySeconds + seconds;

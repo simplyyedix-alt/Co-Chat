@@ -153,6 +153,12 @@ export function notifyStudyTimer(remainingSeconds: number, running: boolean) {
   if (isNativeAndroid()) { if (running) void scheduleNativeStudyCompletion(remainingSeconds); else void LocalNotifications.cancel({ notifications: [{ id: studyCompletionNotificationId }] }).catch(() => undefined); void showNativeNotification(title, body, { tag: 'cochat-study-timer', data: { type: 'study-timer' }, actionTypeId: running ? 'cochat-timer-running-actions' : 'cochat-timer-paused-actions', ongoing: running }); return }
   void showWebNotification(title, { body, icon: assetUrl('assets/logo.svg'), tag: 'cochat-study-timer', requireInteraction: running, data: { type: 'study-timer' }, actions: running ? [{ action: 'pause-timer', title: 'Pause' }, { action: 'finish-timer', title: 'Finish & save' }] : [{ action: 'resume-timer', title: 'Resume' }, { action: 'finish-timer', title: 'Finish & save' }] })
 }
+export function notifyStudyTimerComplete() {
+  const title = 'Focus session complete'
+  const body = 'Congratulations — you completed your study session.'
+  if (isNativeAndroid()) { void showNativeNotification(title, body, { tag: 'cochat-study-timer-complete', data: { type: 'study-timer-complete' } }); return }
+  void showWebNotification(title, { body, icon: assetUrl('assets/logo.svg'), tag: 'cochat-study-timer-complete', data: { type: 'study-timer-complete' } })
+}
 export function clearStudyTimerNotification() {
   if (isNativeAndroid()) {
     void LocalNotifications.cancel({ notifications: [{ id: studyCompletionNotificationId }] }).catch(() => undefined)
