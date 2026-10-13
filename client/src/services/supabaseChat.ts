@@ -120,13 +120,17 @@ export async function listConversations(uid: string): Promise<Conversation[]> {
     const name = String(nested.type === 'group' ? (nested.name || 'Group chat') : (profile?.displayName || nested.name || 'Conversation'))
     const lastSeen = profile?.lastSeen || null
     const lastSeenMs = lastSeen?.toMillis() || 0
+    const lastMessageAt = timestamp(nested.last_message_at)
+    const hiddenAt = timestamp(item.hidden_at)
+    const hiddenByNewerHide = Boolean(hiddenAt && (!lastMessageAt || hiddenAt.toMillis() >= lastMessageAt.toMillis()))
     return {
       id: String(nested.id || item.conversation_id || ''), name, memberIds: members,
       type: nested.type === 'group' ? ('group' as const) : ('direct' as const), adminId: nested.admin_id ? String(nested.admin_id) : undefined,
       lastMessage: String(nested.last_message || ''), lastSenderId: nested.last_sender_id ? String(nested.last_sender_id) : undefined,
-      lastMessageAt: timestamp(nested.last_message_at), createdAt: timestamp(nested.created_at), username: profile?.username || '',
+      lastMessageAt, createdAt: timestamp(nested.created_at), username: profile?.username || '',
       avatar: name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'U',
-      active: profile?.activeStatus !== false && lastSeenMs > 0 && Date.now() - lastSeenMs < 90000, lastSeen, photoURL: String(nested.type === 'group' ? (nested.photo_url || '') : (profile?.photoURL || '')), unreadCount: Number(item.unread_count || 0), hiddenFor: item.hidden_at ? [uid] : [],
+      active: profile?.activeStatus !== false && lastSeenMs > 0 && Date.now() - lastSeenMs < 90000, lastSeen, photoURL: String(nested.type === 'group' ? (nested.photo_url || '') : (profile?.photoURL || '')), unreadCount: Number(item.unread_count || 0),
+      hiddenFor: hiddenByNewerHide ? [uid] : [],
     }
   }).filter(item => item.id && !item.hiddenFor?.includes(uid)).sort((a, b) => (b.lastMessageAt?.toMillis() || b.createdAt?.toMillis() || 0) - (a.lastMessageAt?.toMillis() || a.createdAt?.toMillis() || 0)).filter((item, index, items) => item.type !== 'direct' || items.findIndex(candidate => candidate.type === 'direct' && [...candidate.memberIds].sort().join(':') === [...item.memberIds].sort().join(':')) === index)
 }
