@@ -318,7 +318,7 @@ async function handleChat(request) {
           broadcastChatMessage(conversationId, { messageId, messageAt })
         ]);
         const members = await membersPromise;
-        await Promise.all((members || []).filter((item) => String(item.uid || "") !== user.uid).map((item) => rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(String(item.uid || ""))}`, { method: "PATCH", body: JSON.stringify({ unread_count: Number(item.unread_count || 0) + 1 }) })));
+        await Promise.all((members || []).filter((item) => String(item.uid || "") !== user.uid).map((item) => rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(String(item.uid || ""))}`, { method: "PATCH", body: JSON.stringify({ unread_count: Number(item.unread_count || 0) + 1, hidden_at: null }) })));
       })());
       return response({ message: rows?.[0] || null });
     }
