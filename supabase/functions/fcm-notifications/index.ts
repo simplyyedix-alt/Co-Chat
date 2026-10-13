@@ -59,7 +59,7 @@ async function sendToToken(token: string, title: string, body: string, data: Rec
     // receiver displays it while the WebView/app is backgrounded or closed.
     // `icon` must reference a drawable resource, not the full-colour launcher
     // icon; Android status bars require a monochrome notification glyph.
-    body: JSON.stringify({ message: { token, notification: { title, body }, data, android: { priority: 'HIGH', notification: { channel_id: 'cochat-general', icon: 'ic_stat_cochat', sound: 'default', notification_priority: 'PRIORITY_HIGH' } } } }),
+    body: JSON.stringify({ message: { token, notification: { title, body }, data, android: { priority: 'HIGH', restricted_package_name: 'com.cochat.app', notification: { channel_id: 'cochat-general', icon: 'ic_stat_cochat', sound: 'default', default_sound: true, visibility: 'PUBLIC', notification_priority: 'PRIORITY_HIGH' } } } }),
   })
   return { ok: response.ok, status: response.status }
 }
