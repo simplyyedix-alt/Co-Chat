@@ -500,6 +500,7 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   const [journeyOpen, setJourneyOpen] = useState(false);
   const [timerStartedAt, setTimerStartedAt] = useState<number | null>(() => { try { return Number(JSON.parse(localStorage.getItem(studyKey) || "{}").timerStartedAt) || null; } catch { return null; } });
   const [running, setRunning] = useState(() => { try { const saved = JSON.parse(localStorage.getItem(studyKey) || "{}"); return Boolean(saved.timerRunning && saved.timerStartedAt && saved.targetSeconds); } catch { return false; } });
+  const timerNotificationState = useRef<"idle" | "ready" | "running" | "paused" | "complete">("idle");
   const timerRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     const refreshDailyTasks = () => {
@@ -670,15 +671,23 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
     setRunning(true);
   };
   useEffect(() => {
-    if (!targetSeconds || seconds >= targetSeconds) {
+    const nextState: "idle" | "ready" | "running" | "paused" | "complete" = !targetSeconds
+      ? "idle"
+      : seconds >= targetSeconds
+        ? "complete"
+        : running
+          ? "running"
+          : seconds > 0
+            ? "paused"
+            : "ready";
+    if (nextState === timerNotificationState.current) return;
+    timerNotificationState.current = nextState;
+    if (nextState === "idle" || nextState === "ready") {
       clearStudyTimerNotification();
       return;
     }
-    const publish = () => notifyStudyTimer(Math.max(0, targetSeconds - seconds), running);
-    publish();
-    if (!running) return;
-    const interval = window.setInterval(publish, 60_000);
-    return () => window.clearInterval(interval);
+    if (nextState === "running") notifyStudyTimer(Math.max(0, targetSeconds - seconds), true);
+    if (nextState === "paused") notifyStudyTimer(Math.max(0, targetSeconds - seconds), false);
   }, [running, targetSeconds, seconds]);
   useEffect(() => listenNotificationActions((event) => {
     if (event.tag !== "cochat-study-timer") return;
