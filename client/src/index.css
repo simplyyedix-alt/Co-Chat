@@ -788,3 +788,12 @@ body{background:var(--cc-bg);color:var(--cc-text)}
 @keyframes premium-page-in{from{opacity:.72;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 .content>*{animation:premium-page-in .3s cubic-bezier(.2,.75,.25,1) both}
 @media(prefers-reduced-motion:reduce){:where(button,a,[role="button"]):not(:disabled),:where(input,textarea,select),.chat-row,.twitt-card,.community-create-card,.study-shortcuts>button,.study-grid>article,.tool-grid>article,.settings-list>button,.page-transition{transition:none!important;animation:none!important}.chat-row:active,.twitt-card:active,.community-create-card:active,.study-shortcuts>button:active,.study-grid>article:active,.tool-grid>article:active,.settings-list>button:active{transform:none!important}}
+
+/* Keep every profile photo inside its circular avatar frame. */
+:root .avatar,
+:root .leaderboard-avatar,
+:root .twitt-author-avatar{position:relative;isolation:isolate}
+:root .avatar>img,
+:root .leaderboard-avatar>img,
+:root .twitt-author-avatar>img{position:absolute!important;inset:0!important;display:block!important;width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;object-fit:cover!important;border-radius:50%!important}
+:root .avatar>.active-dot{z-index:2}
