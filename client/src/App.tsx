@@ -1144,7 +1144,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
     }
   };
   const copyAuthorProfile = async (profile: UserProfile) => {
-    const value = `@${profile.username}`;
+    const value = profile.username;
     try { await navigator.clipboard.writeText(value); setRemoteError(`${value} copied to clipboard.`); }
     catch { setRemoteError(`Username: ${value}`); }
   };
