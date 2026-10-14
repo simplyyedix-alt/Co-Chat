@@ -18,9 +18,17 @@ export function avatarInitials(name: string) {
 // (`/Co-Chat/app/`) as well as local and Android builds.
 export const DEFAULT_AVATAR_URL = `${import.meta.env.BASE_URL}assets/co-chat-default-avatar.jpg`
 
+// Google can return a generated initials avatar as a photoURL when the user
+// has not uploaded a profile picture. Treat that provider fallback as empty so
+// Co-Chat can show its own anonymous avatar consistently.
+export function usablePhotoURL(value?: string) {
+  const candidate = value?.trim() || ''
+  return /(?:^https?:\/\/|^\/\/)(?:lh\d*\.)?googleusercontent\.com\//i.test(candidate) ? '' : candidate
+}
+
 export default function Avatar({ name = 'Anonymous', profile, photoURL, active = false, className = 'avatar', label = 'Online' }: Props) {
   const displayName = profile?.displayName || name
-  const uploadedSrc = profile?.photoURL || photoURL
+  const uploadedSrc = usablePhotoURL(profile?.photoURL || photoURL)
   const [imageFailed, setImageFailed] = useState(false)
   useEffect(() => setImageFailed(false), [uploadedSrc])
   const src = !imageFailed && uploadedSrc ? uploadedSrc : DEFAULT_AVATAR_URL
