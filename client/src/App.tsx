@@ -1557,6 +1557,7 @@ export default function App() {
         setProfileUsername(profile?.username || "");
         setProfileBio(profile?.bio || "");
         setProfilePhotoUrl(profile?.photoURL || liveUser.photoURL || "");
+        setProfileSaved(false);
         if (profile?.theme) setDarkMode(profile.theme === "dark");
         setThemeLoaded(true);
         setThemeLoadedUid(uid);
@@ -2180,7 +2181,6 @@ export default function App() {
       setProfileUsername(profileUsername.trim().toLowerCase());
       setProfileSaved(true);
       setError("");
-      setTimeout(() => setProfileSaved(false), 2000);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Profile could not be saved.");
     }
@@ -2989,7 +2989,7 @@ export default function App() {
           <div className="settings-page">
             <form className="profile-card settings-profile-card" onSubmit={save}>
               <div className="settings-card-kicker">PROFILE & IDENTITY <span>Changes sync across devices</span></div>
-              <div className="settings-profile-heading"><button type="button" className="settings-avatar-upload" title="Change profile photo" onClick={() => document.getElementById("profile-photo-input")?.click()}><div className="settings-avatar-wrap"><Avatar name={profileName || liveUser.email || "U"} photoURL={profilePhotoUrl || undefined} className="avatar large" /><span className={`settings-presence ${activeStatus ? "online" : ""}`} /></div><span className="settings-avatar-camera">📷</span></button><input id="profile-photo-input" className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (!file) return; if (file.size > 5 * 1024 * 1024) { setError("Profile photos must be smaller than 5 MB."); return; } const reader = new FileReader(); reader.onload = () => setProfilePhotoUrl(String(reader.result || "")); reader.readAsDataURL(file); }} /><div><span className="settings-eyebrow">PROFILE</span><h2>{profileName || "Co Chat member"}</h2><p>{liveUser.email}</p></div></div>
+              <div className="settings-profile-heading"><button type="button" className="settings-avatar-upload" title="Change profile photo" onClick={() => document.getElementById("profile-photo-input")?.click()}><div className="settings-avatar-wrap"><Avatar name={profileName || liveUser.email || "U"} photoURL={profilePhotoUrl || undefined} className="avatar large" /><span className={`settings-presence ${activeStatus ? "online" : ""}`} /></div><span className="settings-avatar-camera">📷</span></button><input id="profile-photo-input" className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (!file) return; if (file.size > 5 * 1024 * 1024) { setError("Profile photos must be smaller than 5 MB."); return; } const reader = new FileReader(); reader.onload = () => { setProfilePhotoUrl(String(reader.result || "")); setProfileSaved(false); }; reader.readAsDataURL(file); }} /><div><span className="settings-eyebrow">PROFILE</span><h2>{profileName || "Co Chat member"}</h2><p>{liveUser.email}</p></div></div>
               <div className="profile-details" aria-label="Profile details">
                 {isModerator(liveUser.uid) && <span className="verified-profile-label"><VerifiedTick />Verified account</span>}
                 <span><b>@</b>{profileUsername || "choose a username"}</span>
@@ -2997,10 +2997,10 @@ export default function App() {
                 <span><b>◌</b>{activeStatus ? "Available to friends" : "Activity hidden"}</span>
               </div>
               <div className="settings-form-grid">
-                <label className="field-label">Display name<input value={profileName} onChange={(e) => setProfileName(e.target.value)} required /></label>
-                <label className="field-label">Username<input value={profileUsername} onChange={(e) => setProfileUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase())} minLength={3} maxLength={24} pattern="[a-z0-9_]+" required /><small>3–24 characters: letters, numbers, and underscores.</small></label>
+                <label className="field-label">Display name<input value={profileName} onChange={(e) => { setProfileName(e.target.value); setProfileSaved(false); }} required /></label>
+                <label className="field-label">Username<input value={profileUsername} onChange={(e) => { setProfileUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase()); setProfileSaved(false); }} minLength={3} maxLength={24} pattern="[a-z0-9_]+" required /><small>3–24 characters: letters, numbers, and underscores.</small></label>
               </div>
-              <label className="field-label settings-bio-field">About you<textarea value={profileBio} onChange={(e) => setProfileBio(e.target.value)} maxLength={160} placeholder="A short line about what you are learning…" /><small>Shown when someone opens your profile from People or your friend list.</small></label>
+              <label className="field-label settings-bio-field">About you<textarea value={profileBio} onChange={(e) => { setProfileBio(e.target.value); setProfileSaved(false); }} maxLength={160} placeholder="A short line about what you are learning…" /><small>Shown when someone opens your profile from People or your friend list.</small></label>
               <div className="settings-save-row"><span>{profileSaved ? "Profile saved successfully" : "Changes sync across your devices"}</span><button type="submit" className="primary" disabled={preview}>{profileSaved ? "Saved ✓" : "Save profile"}</button></div>
             </form>
             {isModerator(liveUser.uid) && <section className="moderator-tools" aria-label="Moderator tools"><div><strong>Moderator tools</strong><small>Paste a username to block the account and stop them from messaging you.</small></div><button className="danger" type="button" onClick={async () => { const username = window.prompt("Enter the username to block (without @):")?.trim().replace(/^@/, ""); if (!username) return; try { const matches = await findUsers(username, liveUser.uid); const target = matches.find((profile) => profile.username.toLowerCase() === username.toLowerCase()) || matches[0]; if (!target) throw new Error("No account found with that username."); if (!window.confirm(`Block @${target.username}? They will not be able to message you or appear in your people lists.`)) return; await blockUser(liveUser.uid, target.uid); setError(`@${target.username} blocked. Their visible Twitts were removed.`); } catch (error) { setError(error instanceof Error ? error.message : "Could not block that account."); } }}>Block by username</button></section>}
