@@ -105,7 +105,15 @@ function attachmentFromUnknown(value: unknown): TwittAttachment | null {
 }
 
 export async function loadTwittPage(community: TwittCommunity | 'all', cursor?: string | null, options: { feedType?: TwittFeedType; friendIds?: string[] } = {}): Promise<TwittPage> {
-  if (socialBackend === 'supabase' && supabaseReady) return loadSupabaseTwittPage(community, cursor, options)
+  if (socialBackend === 'supabase' && supabaseReady) {
+    try {
+      return await loadSupabaseTwittPage(community, cursor, options)
+    } catch (error) {
+      // Keep the feed readable while an older Supabase Edge Function or
+      // schema is being deployed. Firebase remains the existing read path.
+      console.warn('Supabase Twitt feed unavailable; falling back to Firebase.', error)
+    }
+  }
   if (!db) return { items: [], cursor: null, hasMore: false }
   const constraints: QueryConstraint[] = community === 'all'
     ? [orderBy('createdAt', 'desc'), ...(cursor ? [where('createdAt', '<', Timestamp.fromDate(new Date(cursor)))] : []), limit(PAGE_SIZE)]
