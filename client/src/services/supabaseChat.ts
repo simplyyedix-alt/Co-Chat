@@ -71,11 +71,11 @@ export type StudyStats = { totalSeconds: number; weeklySeconds: number; weekKey:
 
 const profileFromRow = (row: Record<string, unknown> | null | undefined): UserProfile | null => {
   if (!row?.uid) return null
-  return { uid: String(row.uid), displayName: String(row.display_name || 'Co-Chat member'), email: String(row.email || ''), username: String(row.username || ''), photoURL: String(row.photo_url || ''), bio: String(row.bio || ''), notificationsEnabled: row.notifications_enabled !== false, discoverable: row.discoverable !== false, activeStatus: row.active_status !== false, lastSeen: timestamp(row.last_seen), profileComplete: true }
+  return { uid: String(row.uid), displayName: String(row.display_name || 'Co-Chat member'), email: String(row.email || ''), username: String(row.username || ''), photoURL: String(row.photo_url || ''), bio: String(row.bio || ''), notificationsEnabled: row.notifications_enabled !== false, discoverable: row.discoverable !== false, activeStatus: row.active_status !== false, hideTwittIdentity: row.hide_twitt_identity === true, lastSeen: timestamp(row.last_seen), profileComplete: true }
 }
 
 export async function upsertProfile(uid: string, profile: Partial<UserProfile>) {
-  await request({ action: 'profile-upsert', displayName: profile.displayName || '', email: profile.email || '', photoURL: profile.photoURL || '', username: profile.username || '', bio: profile.bio || '', notificationsEnabled: profile.notificationsEnabled, discoverable: profile.discoverable, activeStatus: profile.activeStatus })
+  await request({ action: 'profile-upsert', displayName: profile.displayName || '', email: profile.email || '', photoURL: profile.photoURL || '', username: profile.username || '', bio: profile.bio || '', notificationsEnabled: profile.notificationsEnabled, discoverable: profile.discoverable, activeStatus: profile.activeStatus, hideTwittIdentity: profile.hideTwittIdentity })
   return true
 }
 

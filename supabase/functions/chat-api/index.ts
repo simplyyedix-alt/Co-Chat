@@ -106,7 +106,7 @@ Deno.serve(async (request) => {
     const body = await request.json().catch(() => null) as Record<string, unknown> | null
     const action = String(body?.action || '')
     if (action === 'profile-upsert') {
-      await rest('profiles', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ uid: user.uid, display_name: String(body?.displayName || user.displayName || 'Co-Chat member').slice(0, 100), email: String(body?.email || user.email || ''), photo_url: String(body?.photoURL || user.photoURL || ''), username: String(body?.username || '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24) || `user_${user.uid.slice(0, 8)}`, bio: String(body?.bio || '').slice(0, 280), notifications_enabled: body?.notificationsEnabled !== false, discoverable: body?.discoverable !== false, active_status: body?.activeStatus !== false, last_seen: new Date().toISOString(), updated_at: new Date().toISOString() }) })
+      await rest('profiles', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ uid: user.uid, display_name: String(body?.displayName || user.displayName || 'Co-Chat member').slice(0, 100), email: String(body?.email || user.email || ''), photo_url: String(body?.photoURL || user.photoURL || ''), username: String(body?.username || '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24) || `user_${user.uid.slice(0, 8)}`, bio: String(body?.bio || '').slice(0, 280), notifications_enabled: body?.notificationsEnabled !== false, discoverable: body?.discoverable !== false, active_status: body?.activeStatus !== false, hide_twitt_identity: body?.hideTwittIdentity === true, last_seen: new Date().toISOString(), updated_at: new Date().toISOString() }) })
       return response({ ok: true })
     }
     if (action === 'presence') {
@@ -116,7 +116,7 @@ Deno.serve(async (request) => {
     if (action === 'friends') {
       const friendships = await rest(`friendships?or=(member_a.eq.${encodeURIComponent(user.uid)},member_b.eq.${encodeURIComponent(user.uid)})&status=eq.accepted&select=member_a,member_b&limit=100`)
       const ids = [...new Set((friendships || []).flatMap((item: Record<string, unknown>) => [String(item.member_a || ''), String(item.member_b || '')].filter((id: string) => id && id !== user.uid)))]
-      const profiles = ids.length ? await rest(`profiles?uid=in.(${ids.map((id: string) => encodeURIComponent(id)).join(',')})&select=uid,display_name,email,username,photo_url,bio,notifications_enabled,discoverable,active_status,last_seen`) : []
+      const profiles = ids.length ? await rest(`profiles?uid=in.(${ids.map((id: string) => encodeURIComponent(id)).join(',')})&select=uid,display_name,email,username,photo_url,bio,notifications_enabled,discoverable,active_status,hide_twitt_identity,last_seen`) : []
       return response({ profiles: profiles || [] })
     }
     if (action === 'study-save') {
@@ -187,7 +187,7 @@ Deno.serve(async (request) => {
       }
       const otherUids = [...new Set((members || []).map((member: Record<string, unknown>) => String(member.uid || '')).filter((uid: string) => uid && uid !== user.uid))]
       const profiles = otherUids.length
-        ? await rest(`profiles?uid=in.(${otherUids.map((uid: string) => encodeURIComponent(uid)).join(',')})&select=uid,display_name,email,username,photo_url,bio,notifications_enabled,discoverable,active_status,last_seen`)
+        ? await rest(`profiles?uid=in.(${otherUids.map((uid: string) => encodeURIComponent(uid)).join(',')})&select=uid,display_name,email,username,photo_url,bio,notifications_enabled,discoverable,active_status,hide_twitt_identity,last_seen`)
         : []
       const profileByUid = new Map((profiles || []).map((profile: Record<string, unknown>) => [String(profile.uid || ''), profile]))
       const items = (rows || []).map((item: Record<string, unknown>) => {

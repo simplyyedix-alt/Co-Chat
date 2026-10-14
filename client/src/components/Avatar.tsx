@@ -14,13 +14,16 @@ export function avatarInitials(name: string) {
   return name.split(/\s+/).filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'U'
 }
 
+export const DEFAULT_AVATAR_URL = '/assets/co-chat-default-avatar.jpg'
+
 export default function Avatar({ name = 'Co-Chat member', profile, photoURL, active = false, className = 'avatar', label = 'Online' }: Props) {
   const displayName = profile?.displayName || name
-  const src = profile?.photoURL || photoURL
+  const uploadedSrc = profile?.photoURL || photoURL
   const [imageFailed, setImageFailed] = useState(false)
-  useEffect(() => setImageFailed(false), [src])
+  useEffect(() => setImageFailed(false), [uploadedSrc])
+  const src = !imageFailed && uploadedSrc ? uploadedSrc : DEFAULT_AVATAR_URL
   return <span className={`${className}${active ? ' is-active' : ''}`}>
-    {src && !imageFailed ? <img src={src} alt={`${displayName} profile`} referrerPolicy="no-referrer" onError={() => setImageFailed(true)} /> : avatarInitials(displayName)}
+    <img src={src} alt={`${displayName} profile`} referrerPolicy="no-referrer" onError={() => setImageFailed(true)} />
     {active && <i className="active-dot" aria-label={label} />}
   </span>
 }

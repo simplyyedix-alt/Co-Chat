@@ -25,3 +25,9 @@
 [data-theme="light"] .twitt-card{background:var(--cc-surface);border-color:var(--cc-border);box-shadow:var(--premium-shadow)}
 [data-theme="light"] .feed-tabs,[data-theme="light"] .discovery-mode-tabs{background:var(--cc-surface-soft);border-color:var(--cc-border)}
 [data-theme="light"] .feed-tabs button.active,[data-theme="light"] .discovery-mode-tabs button.active{background:#e8e4ff;color:var(--cc-primary);box-shadow:0 5px 16px rgba(72,58,170,.12)}
+[data-theme="light"]{--cc-focus:#4a5568;--cc-selection-bg:#dfe5ef}
+[data-theme="light"] input,[data-theme="light"] textarea,[data-theme="light"] select{caret-color:var(--cc-focus)}
+[data-theme="light"] ::selection{background:var(--cc-selection-bg);color:#172033}
+[data-theme="light"] .search:focus,[data-theme="light"] input:focus,[data-theme="light"] textarea:focus,[data-theme="light"] select:focus,[data-theme="light"] button:focus-visible{border-color:#8a95a8;box-shadow:0 0 0 3px rgba(74,85,104,.14);outline:none}
+[data-theme="light"] .primary,[data-theme="light"] .secondary,[data-theme="light"] .discover-compose-fab{box-shadow:0 5px 14px rgba(57,66,92,.14)}
+[data-theme="light"] .modal,[data-theme="light"] .person-profile,[data-theme="light"] .profile-sheet{box-shadow:0 18px 48px rgba(38,45,70,.2)}

@@ -27,7 +27,7 @@ import { consumeSneak as consumeSupabaseSneak, listConversations as listSupabase
 import { addGroupMembers as addSupabaseGroupMembers, createDirect, createGroup as createSupabaseGroup, deleteConversation as deleteSupabaseConversation, deleteForMe as deleteSupabaseMessageForMe, getProfile as getSupabaseProfile, getStudyLeaderboard as getSupabaseStudyLeaderboard, getStudyStats as getSupabaseStudyStats, isSupabaseChatEnabled, leaveGroup as leaveSupabaseGroup, markRead as markSupabaseRead, removeGroupMember as removeSupabaseGroupMember, saveStudySession as saveSupabaseStudySession, sendMessage as sendSupabaseMessage, unsend as unsendSupabaseMessage, updateGroup as updateSupabaseGroup, updateStudyPresence as updateSupabaseStudyPresence, upsertProfile as upsertSupabaseProfile, watchConversations as watchSupabaseConversations, watchIncomingConversationEvents as watchSupabaseIncomingConversationEvents, watchMessages as watchSupabaseMessages, type IncomingConversationEvent, type StudyLeaderboardEntry, type StudyStats } from './supabaseChat'
 export { isSupabaseChatEnabled } from './supabaseChat'
 
-export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; bio?: string; notificationsEnabled?: boolean; discoverable?: boolean; activeStatus?: boolean; theme?: 'light' | 'dark'; lastSeen?: Timestamp | null; profileComplete?: boolean }
+export type UserProfile = { uid: string; displayName: string; email: string; username: string; photoURL?: string; bio?: string; notificationsEnabled?: boolean; discoverable?: boolean; activeStatus?: boolean; hideTwittIdentity?: boolean; theme?: 'light' | 'dark'; lastSeen?: Timestamp | null; profileComplete?: boolean }
 export type Conversation = {
   id: string
   name: string
@@ -163,6 +163,7 @@ export async function ensureUserProfile(uid: string, profile: Partial<UserProfil
       notificationsEnabled: firestoreProfile?.notificationsEnabled ?? existing?.notificationsEnabled ?? profile.notificationsEnabled,
       discoverable: firestoreProfile?.discoverable ?? existing?.discoverable ?? profile.discoverable,
       activeStatus: firestoreProfile?.activeStatus ?? existing?.activeStatus ?? profile.activeStatus,
+      hideTwittIdentity: firestoreProfile?.hideTwittIdentity ?? existing?.hideTwittIdentity ?? profile.hideTwittIdentity,
     })
       // Firestore can already contain the username chosen before the profile
       // was synced to Supabase. Only new profiles need setup.
@@ -189,7 +190,7 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
     const supabaseProfile = await getSupabaseProfile(uid)
     const firestoreProfile = await getFirestoreUserProfile(uid)
     if (!supabaseProfile) return firestoreProfile
-    return { ...supabaseProfile, displayName: firestoreProfile?.displayName || supabaseProfile.displayName, username: firestoreProfile?.username || supabaseProfile.username, photoURL: firestoreProfile?.photoURL || supabaseProfile.photoURL, bio: firestoreProfile?.bio || supabaseProfile.bio }
+    return { ...supabaseProfile, displayName: firestoreProfile?.displayName || supabaseProfile.displayName, username: firestoreProfile?.username || supabaseProfile.username, photoURL: firestoreProfile?.photoURL || supabaseProfile.photoURL, bio: firestoreProfile?.bio || supabaseProfile.bio, hideTwittIdentity: firestoreProfile?.hideTwittIdentity ?? supabaseProfile.hideTwittIdentity }
   }
   if (!db) return null
   return getFirestoreUserProfile(uid)
@@ -508,7 +509,7 @@ export function watchFriendRequests(uid: string, callback: (items: FriendRequest
   return () => { incomingUnsub(); outgoingUnsub() }
 }
 
-function profileFromDoc(uid: string, data: DocumentData): UserProfile { return { uid, displayName: String(data.displayName || 'Co-Chat member'), email: String(data.email || ''), username: String(data.username || ''), photoURL: String(data.photoURL || ''), bio: String(data.bio || ''), notificationsEnabled: data.notificationsEnabled !== false, discoverable: data.discoverable !== false, activeStatus: data.activeStatus !== false, theme: data.theme === 'light' ? 'light' : data.theme === 'dark' ? 'dark' : undefined, lastSeen: asTimestamp(data.lastSeen), profileComplete: data.profileComplete === true } }
+function profileFromDoc(uid: string, data: DocumentData): UserProfile { return { uid, displayName: String(data.displayName || 'Co-Chat member'), email: String(data.email || ''), username: String(data.username || ''), photoURL: String(data.photoURL || ''), bio: String(data.bio || ''), notificationsEnabled: data.notificationsEnabled !== false, discoverable: data.discoverable !== false, activeStatus: data.activeStatus !== false, hideTwittIdentity: data.hideTwittIdentity === true, theme: data.theme === 'light' ? 'light' : data.theme === 'dark' ? 'dark' : undefined, lastSeen: asTimestamp(data.lastSeen), profileComplete: data.profileComplete === true } }
 
 export async function saveTheme(uid: string, theme: 'light' | 'dark') {
   if (!db || !uid) return
@@ -606,7 +607,7 @@ export async function createStory(uid: string, displayName: string, text: string
   await addDoc(collection(db, 'stories'), { uid, displayName, text, createdAt: serverTimestamp(), expiresAt: expires })
 }
 
-export async function saveProfile(uid: string, values: Pick<UserProfile, 'displayName' | 'username' | 'bio' | 'notificationsEnabled' | 'discoverable'> & { activeStatus?: boolean; photoURL?: string }) {
+export async function saveProfile(uid: string, values: Pick<UserProfile, 'displayName' | 'username' | 'bio' | 'notificationsEnabled' | 'discoverable' | 'hideTwittIdentity'> & { activeStatus?: boolean; photoURL?: string }) {
   if (isSupabaseChatEnabled()) {
     const current = await getSupabaseProfile(uid)
     const username = normalizeUsername(values.username)
@@ -626,6 +627,7 @@ export async function saveProfile(uid: string, values: Pick<UserProfile, 'displa
           notificationsEnabled: values.notificationsEnabled,
           discoverable: values.discoverable,
           activeStatus: values.activeStatus !== false,
+          hideTwittIdentity: values.hideTwittIdentity === true,
           profileComplete: true,
           updatedAt: serverTimestamp(),
         }, { merge: true })
@@ -645,7 +647,7 @@ export async function saveProfile(uid: string, values: Pick<UserProfile, 'displa
   await reserveUsername(uid, username, uid)
   // Upsert so a fresh Android/WebView session can finish setup even if the
   // initial profile write was interrupted or the document does not exist yet.
-  await setDoc(userRef, { displayName: values.displayName.trim(), email: current.exists() ? String(current.data().email || '') : (auth?.currentUser?.email || ''), username, photoURL: values.photoURL || (current.exists() ? String(current.data().photoURL || auth?.currentUser?.photoURL || '') : (auth?.currentUser?.photoURL || '')), bio: String(values.bio || '').trim().slice(0, 280), notificationsEnabled: values.notificationsEnabled, discoverable: values.discoverable, activeStatus: values.activeStatus !== false, profileComplete: true, updatedAt: serverTimestamp() }, { merge: true })
+  await setDoc(userRef, { displayName: values.displayName.trim(), email: current.exists() ? String(current.data().email || '') : (auth?.currentUser?.email || ''), username, photoURL: values.photoURL || (current.exists() ? String(current.data().photoURL || auth?.currentUser?.photoURL || '') : (auth?.currentUser?.photoURL || '')), bio: String(values.bio || '').trim().slice(0, 280), notificationsEnabled: values.notificationsEnabled, discoverable: values.discoverable, activeStatus: values.activeStatus !== false, hideTwittIdentity: values.hideTwittIdentity === true, profileComplete: true, updatedAt: serverTimestamp() }, { merge: true })
   if (oldUsername && oldUsername !== username) {
     const oldRef = doc(db, 'usernames', oldUsername)
     const old = await getDoc(oldRef)

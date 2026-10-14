@@ -22,3 +22,9 @@
 [data-theme="dark"] .app.page-discover{background:var(--cc-bg)}
 [data-theme="dark"] .app.page-settings,[data-theme="dark"] .app.page-profile{background:radial-gradient(circle at 50% 0%,#7467e812,transparent 28%),var(--cc-bg)}
 [data-theme="dark"] .sneak-picker,[data-theme="dark"] .modal,[data-theme="dark"] .task-sheet,[data-theme="dark"] .timer-setup-sheet,[data-theme="dark"] .person-profile,[data-theme="dark"] .profile-sheet{background:linear-gradient(155deg,#151a23,#11161e);color:var(--cc-text)}
+[data-theme="dark"]{--cc-focus:#aeb8c7;--cc-selection-bg:#354252}
+[data-theme="dark"] input,[data-theme="dark"] textarea,[data-theme="dark"] select{caret-color:var(--cc-focus)}
+[data-theme="dark"] ::selection{background:var(--cc-selection-bg);color:#f5f7fb}
+[data-theme="dark"] .search:focus,[data-theme="dark"] input:focus,[data-theme="dark"] textarea:focus,[data-theme="dark"] select:focus,[data-theme="dark"] button:focus-visible{border-color:#5d6878;box-shadow:0 0 0 3px rgba(174,184,199,.16);outline:none}
+[data-theme="dark"] .primary,[data-theme="dark"] .secondary,[data-theme="dark"] .discover-compose-fab{box-shadow:0 5px 14px rgba(0,0,0,.22)}
+[data-theme="dark"] .modal,[data-theme="dark"] .person-profile,[data-theme="dark"] .profile-sheet{box-shadow:0 20px 55px rgba(0,0,0,.58)}
