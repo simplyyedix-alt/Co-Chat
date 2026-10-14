@@ -149,8 +149,10 @@ async function handleChat(request) {
       return response({ profile: rows?.[0] || null });
     }
     if (action === "conversations") {
-      const rows = await rest(`conversation_members?uid=eq.${encodeURIComponent(user.uid)}&select=conversation_id,hidden_at,unread_count,read_at,conversations(id,type,name,photo_url,admin_id,created_by,last_message,last_sender_id,last_message_at,created_at)&order=joined_at.desc`);
+      const rows = await rest(`conversation_members?uid=eq.${encodeURIComponent(user.uid)}&select=conversation_id,hidden_at,unread_count,read_at&order=joined_at.desc`);
       const conversationIds = (rows || []).map((item) => String(item.conversation_id || "")).filter(Boolean);
+      const conversations = conversationIds.length ? await rest(`conversations?id=in.(${conversationIds.map((id) => encodeURIComponent(id)).join(",")})&select=id,type,name,photo_url,admin_id,created_by,last_message,last_sender_id,last_message_at,created_at`) : [];
+      const conversationById = new Map((conversations || []).map((item) => [String(item.id || ""), item]));
       const members = conversationIds.length ? await rest(`conversation_members?conversation_id=in.(${conversationIds.map((id) => encodeURIComponent(id)).join(",")})&select=conversation_id,uid`) : [];
       const membersByConversation = /* @__PURE__ */ new Map();
       for (const member2 of members || []) {
@@ -166,7 +168,7 @@ async function handleChat(request) {
         const conversationId = String(item.conversation_id || "");
         const memberIds = membersByConversation.get(conversationId) || [];
         const otherUid = memberIds.map((member2) => String(member2.uid || "")).find((uid) => uid && uid !== user.uid);
-        return { ...item, member_ids: memberIds, other_profile: otherUid ? profileByUid.get(otherUid) || null : null };
+        return { ...item, conversations: conversationById.get(conversationId) || null, member_ids: memberIds, other_profile: otherUid ? profileByUid.get(otherUid) || null : null };
       });
       return response({ items });
     }
