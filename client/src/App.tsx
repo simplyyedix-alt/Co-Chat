@@ -503,6 +503,13 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   const timerNotificationState = useRef<"idle" | "ready" | "running" | "paused" | "complete">("idle");
   const timerRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
+    const sheetOpen = taskSheetOpen || timerSetupOpen || leaderboardOpen || journeyOpen;
+    if (!sheetOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [taskSheetOpen, timerSetupOpen, leaderboardOpen, journeyOpen]);
+  useEffect(() => {
     if (!timerSetupOpen) return;
     // The timer controls sit below the study dashboard. Bring them to the
     // reading position as soon as the sheet opens, so users never have to
