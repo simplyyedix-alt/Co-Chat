@@ -555,3 +555,53 @@ button:disabled{cursor:not-allowed;opacity:.55;transform:none!important}
 .modal-backdrop,.task-sheet-backdrop,.profile-sheet-backdrop,.media-preview-backdrop{background:#070811b8;backdrop-filter:blur(13px);-webkit-backdrop-filter:blur(13px)}
 .modal,.task-sheet,.timer-setup-sheet,.person-profile,.profile-sheet,.conversation-menu{border:1px solid color-mix(in srgb,var(--cc-border) 70%,var(--premium-glow));box-shadow:0 28px 90px #0008}
 .settings-list,.settings-profile-card{overflow:hidden}.settings-list>button{background:color-mix(in srgb,var(--cc-surface) 92%,transparent)}.settings-list>button:hover{background:color-mix(in srgb,var(--cc-primary) 9%,var(--cc-surface))}.settings-row-icon{box-shadow:0 6px 15px #0002}
+
+/* Deliberate premium dark theme pass: visual styling only. */
+:root.dark{--cc-bg:#080a0f;--cc-surface:#12161e;--cc-surface-soft:#181d27;--cc-text:#f3f5fb;--cc-muted:#98a2b8;--cc-border:#293140;--cc-primary:#7b6dff;--cc-primary-2:#b16ff0;--cc-danger:#ff7488}
+:root.dark body{background:#080a0f}
+:root.dark .app{background:radial-gradient(ellipse 80% 38% at 50% -12%,#6555d326,transparent 72%),radial-gradient(ellipse 50% 32% at 100% 36%,#2d8eb50d,transparent 70%),#080a0f}
+:root.dark .topbar,:root.dark .chat-header{background:#0d1118e8;border-color:#252c39;box-shadow:0 10px 35px #0003}
+:root.dark .brand-mark{background:linear-gradient(145deg,#7667ff,#b46eef);box-shadow:0 8px 25px #7464ff40}
+:root.dark .content{padding-top:26px}
+:root.dark .section-title,:root.dark .settings-section-label{color:#7f8aa3;letter-spacing:.16em}
+:root.dark .chat-home-hero{border:1px solid #4f48a566;background:linear-gradient(135deg,#191634 0%,#252052 53%,#1b3652 100%);box-shadow:0 20px 55px #0e0a2c66}
+:root.dark .chat-home-hero h1{font-size:clamp(1.55rem,4vw,2rem);letter-spacing:-.055em}
+:root.dark .chat-home-hero p{color:#c1c4e0}
+:root.dark .search{background:#11161f;border-color:#2f3848;box-shadow:inset 0 1px #ffffff08,0 12px 28px #0003}
+:root.dark .search::placeholder{color:#727e94}
+:root.dark .chat-row{background:linear-gradient(100deg,#121720,#11151d);border-color:#222b38;box-shadow:0 8px 25px #0002}
+:root.dark .chat-row:hover{background:linear-gradient(100deg,#181d29,#171b28);border-color:#514c8a;box-shadow:0 14px 34px #0005}
+:root.dark .chat-row .avatar{box-shadow:0 6px 18px #0005}
+:root.dark .chat-copy strong{color:#f0f2f8;font-weight:800}
+:root.dark .chat-copy span,:root.dark .chat-row small{color:#8c97ad}
+:root.dark .online-section{padding:14px 12px;border:1px solid #252d3b;border-radius:18px;background:#0f141b;box-shadow:0 14px 35px #0002}
+:root.dark .online-section .section-title{margin-top:0}
+:root.dark .online-person .avatar{border:2px solid #3a4160;box-shadow:0 8px 20px #0005}
+:root.dark .bottom-nav{background:#0c1017ed;border-color:#272f3c;box-shadow:0 -14px 42px #0007}
+:root.dark .bottom-nav button{color:#7f8a9e}
+:root.dark .bottom-nav button.active{color:#fff;background:linear-gradient(145deg,#292650,#242b4a);box-shadow:0 7px 24px #5e54d64d}
+:root.dark .bottom-nav button.active span{filter:drop-shadow(0 4px 8px #8877ff80)}
+:root.dark .settings-list,:root.dark .settings-profile-card{background:#10151c;border-color:#293140;box-shadow:0 20px 50px #0004}
+:root.dark .settings-list>button{min-height:64px;background:#10151c;border-color:#252e3c!important}
+:root.dark .settings-list>button:hover{background:#171d27}
+:root.dark .settings-option-copy b{color:#e9edf7;font-size:13px}
+:root.dark .settings-option-copy small{color:#818da3}
+:root.dark .settings-row-icon{background:#1e2531;color:#a99dff}
+:root.dark .settings-row-icon.online{background:#153b2d;color:#61df9a}
+:root.dark .settings-hero{border-color:#514c8a;background:linear-gradient(135deg,#1a1637,#252556 58%,#16334a);box-shadow:0 22px 60px #0006}
+:root.dark .settings-profile-card{background:linear-gradient(145deg,#131820,#151c27)}
+:root.dark .settings-profile-heading h2{color:#f5f6fc}
+:root.dark .settings-profile-heading p{color:#8f9ab0}
+:root.dark .composer{background:#0c1118f2;border-color:#2a3342;box-shadow:0 -12px 35px #0005}
+:root.dark .composer input,.native-android .message-composer-input{background:#171d27;border-color:#343e50;color:#f3f5fb}
+:root.dark .bubble{border:1px solid #283140;background:#151b24;box-shadow:0 8px 22px #0003}
+:root.dark .bubble.me{border-color:#5760c0;background:linear-gradient(145deg,#4f5fe0,#5552c5);box-shadow:0 9px 25px #3948bb55}
+:root.dark .task-sheet,.native-android .timer-setup-sheet{background:linear-gradient(160deg,#151a23,#11151d);border-color:#343e51;box-shadow:0 -20px 70px #0009}
+:root.dark .task-sheet-header,.native-android .timer-setup-header{border-color:#2b3544}
+:root.dark .task-row,.native-android .timer-picker label{background:#171d27;border-color:#2c3646}
+:root.dark .task-row:hover{background:#1c2330;border-color:#4a4f86}
+:root.dark .modal,:root.dark .person-profile,:root.dark .profile-sheet{background:linear-gradient(155deg,#171c25,#1b2030);border-color:#414b66}
+:root.dark .modal h2,:root.dark .modal h3,:root.dark .person-profile h3{color:#f5f6fc}
+:root.dark .primary{background:linear-gradient(135deg,#6675ff,#8669f0 62%,#b16de2);box-shadow:0 12px 28px #635fe052}
+:root.dark .secondary{background:#202733;border-color:#364153;color:#e7eafa}
+:root.dark .secondary:hover{background:#293241;border-color:#5e62a1}
