@@ -6,9 +6,9 @@ import type { UserProfile } from './chat'
 
 const enabled = import.meta.env.VITE_CHAT_BACKEND === 'supabase' && supabaseReady
 const remoteNotificationsEnabled = supabaseReady
-// Supabase is the deployed primary chat API. An explicitly configured
-// Cloudflare endpoint remains an optional fallback.
-const cloudflareEndpoint = import.meta.env.VITE_CHAT_API_URL || ''
+// Cloudflare is the primary chat API to preserve the production request
+// allowance. Supabase remains the authenticated fallback.
+const cloudflareEndpoint = import.meta.env.VITE_CHAT_API_URL || 'https://divine-meadow-8139.simplyyedix.workers.dev'
 const supabaseEndpoint = `${supabaseProjectUrl.replace(/\/$/, '')}/functions/v1/chat-api`
 
 // Several startup effects can request a token at the same time. Share one
@@ -31,7 +31,7 @@ const timestamp = (value: unknown) => {
 async function request<T>(payload: Record<string, unknown>): Promise<T> {
   const token = await getAuthToken()
   if (!token) throw new Error('Please sign in before using chat.')
-  const endpoints = [supabaseEndpoint, cloudflareEndpoint].filter((value, index, items) => value && items.indexOf(value) === index)
+  const endpoints = [cloudflareEndpoint, supabaseEndpoint].filter((value, index, items) => value && items.indexOf(value) === index)
   let lastResponse: Response | null = null
   for (const target of endpoints) {
       const controller = new AbortController()
