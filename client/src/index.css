@@ -604,4 +604,30 @@ button:disabled{cursor:not-allowed;opacity:.55;transform:none!important}
 :root.dark .modal h2,:root.dark .modal h3,:root.dark .person-profile h3{color:#f5f6fc}
 :root.dark .primary{background:linear-gradient(135deg,#6675ff,#8669f0 62%,#b16de2);box-shadow:0 12px 28px #635fe052}
 :root.dark .secondary{background:#202733;border-color:#364153;color:#e7eafa}
+:root.dark .community-hero,:root.dark .discover-intro,:root.dark .feed-note{border:1px solid #413c74;background:linear-gradient(135deg,#191633,#20274a);box-shadow:0 20px 55px #0005}
+:root.dark .community-hero h2,:root.dark .discover-intro h2{color:#f3f5ff;letter-spacing:-.045em}
+:root.dark .community-create-card{border-color:#2e394a;background:linear-gradient(100deg,#151b25,#171e2b);box-shadow:0 12px 30px #0003}
+:root.dark .community-create-card:hover{border-color:#5f5a9b;transform:translateY(-1px)}
+:root.dark .feed-tabs,:root.dark .discovery-mode-tabs,:root.dark .leaderboard-mode-tabs{padding:4px;border:1px solid #2c3545;border-radius:14px;background:#10151d}
+:root.dark .feed-tabs button,:root.dark .discovery-mode-tabs button,:root.dark .leaderboard-mode-tabs button{border-radius:10px;color:#8b96ab;transition:background .2s,color .2s,box-shadow .2s}
+:root.dark .feed-tabs button.active,:root.dark .discovery-mode-tabs button.active,:root.dark .leaderboard-mode-tabs button.active{background:linear-gradient(135deg,#3a3769,#303b63);color:#fff;box-shadow:0 5px 16px #0004}
+:root.dark .twitt-card{border:1px solid #293343;border-radius:20px;background:linear-gradient(145deg,#131922,#11161e);box-shadow:0 15px 40px #0003}
+:root.dark .twitt-card:hover{border-color:#4b4a78}
+:root.dark .leaderboard-sheet,:root.dark .journey-sheet{background:linear-gradient(160deg,#131923,#191c2d);border-color:#39445c;box-shadow:0 28px 85px #0009}
+:root.dark .leaderboard-podium-card{border-color:#343d50;background:linear-gradient(155deg,#1c2430,#151a23)!important;box-shadow:0 12px 30px #0004}
+:root.dark .leaderboard-ranks{border:1px solid #2b3545;border-radius:16px;overflow:hidden;background:#11161e}
+:root.dark .leaderboard-ranks>div{border-color:#273140!important}
+:root.dark .journey-highlight{border:1px solid #4a4386;background:linear-gradient(135deg,#201b45,#202d4a);box-shadow:0 14px 32px #0004}
+:root.dark .hero-card.coming-soon{opacity:.92;border-style:dashed;background:linear-gradient(145deg,#151a24,#181b2e)}
+:root.dark .conversation-empty{border:1px dashed #344054;border-radius:22px;background:radial-gradient(circle at 50% 25%,#332e692b,transparent 52%);color:#aab3c6}
+:root.dark .conversation-empty-icon{background:linear-gradient(145deg,#2d2855,#263b5a);box-shadow:0 12px 28px #0005}
+:root.dark .notification-panel{border:1px solid #354057;background:#151b24;box-shadow:0 24px 70px #0008}
+:root.dark .notification-panel>div{border-color:#2b3545}
+:root.dark .emoji-picker,:root.dark .message-menu,:root.dark .forward-panel{border:1px solid #3a465e;background:#151b25;box-shadow:0 25px 70px #0009}
+:root.dark .auth{background:radial-gradient(ellipse at 12% 12%,#30245f 0%,transparent 38%),radial-gradient(ellipse at 90% 85%,#1f4c62 0%,transparent 36%),#080a0f}
+:root.dark .auth-showcase{border-color:#454078;background:linear-gradient(145deg,#141027,#28205a 56%,#1c4960);box-shadow:0 30px 90px #0008}
+:root.dark .auth-panel{border-color:#303b4f;background:#11161e;box-shadow:0 30px 90px #0009}
+:root.dark .auth-panel .primary{min-height:50px;font-size:14px}
+:root.dark .app-loading-screen{background:radial-gradient(circle at 50% 45%,#2d265c,#080a0f 62%)}
+:root.dark .app-loading-card{border:1px solid #454278;background:#141923;box-shadow:0 30px 90px #0009}
 :root.dark .secondary:hover{background:#293241;border-color:#5e62a1}
