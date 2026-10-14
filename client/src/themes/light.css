@@ -1,0 +1,24 @@
+/* Light theme owns only light tokens and light-only surfaces. */
+[data-theme="light"]{
+  color-scheme:light;
+  --cc-bg:#f6f7fb;
+  --cc-surface:#ffffff;
+  --cc-surface-soft:#f3f4fa;
+  --cc-text:#172033;
+  --cc-muted:#667085;
+  --cc-border:#e1e5ee;
+  --cc-primary:#5b49d7;
+  --cc-primary-2:#9860e8;
+  --cc-danger:#c84761;
+  --cc-overlay:rgba(17,20,35,.44);
+  --premium-glow:#7c6cf0;
+  --premium-shadow:0 16px 42px rgba(45,35,105,.12);
+  --cc-modal-bg:#ffffff;
+}
+[data-theme="light"] .app{background:radial-gradient(circle at 90% -8%,#7564e512,transparent 34%),var(--cc-bg)}
+[data-theme="light"] .hero-card,[data-theme="light"] .profile-card{background:linear-gradient(145deg,#f0edff,var(--cc-surface))}
+[data-theme="light"] .discover-intro,[data-theme="light"] .community-hero{background:linear-gradient(135deg,#ece9ff,#f3f6ff);color:var(--cc-text);border-color:#d9d4f4}
+[data-theme="light"] .discover-intro p,[data-theme="light"] .community-hero p{color:#59627a}
+[data-theme="light"] .twitt-card{background:var(--cc-surface);border-color:var(--cc-border);box-shadow:var(--premium-shadow)}
+[data-theme="light"] .feed-tabs,[data-theme="light"] .discovery-mode-tabs{background:var(--cc-surface-soft);border-color:var(--cc-border)}
+[data-theme="light"] .feed-tabs button.active,[data-theme="light"] .discovery-mode-tabs button.active{background:#e8e4ff;color:var(--cc-primary);box-shadow:0 5px 16px rgba(72,58,170,.12)}

@@ -1,0 +1,18 @@
+/* Dark theme owns only dark tokens and dark-only surfaces. */
+[data-theme="dark"]{
+  color-scheme:dark;
+  --cc-bg:#080a0f;
+  --cc-surface:#12161e;
+  --cc-surface-soft:#181d27;
+  --cc-text:#f3f5fb;
+  --cc-muted:#98a2b8;
+  --cc-border:#293140;
+  --cc-primary:#7b6dff;
+  --cc-primary-2:#b16ff0;
+  --cc-danger:#ff7488;
+  --cc-overlay:rgba(4,6,12,.76);
+  --premium-glow:#8c7bff;
+  --premium-shadow:0 20px 58px rgba(0,0,0,.38);
+  --cc-modal-bg:#12161e;
+}
+[data-theme="dark"] .sneak-picker,[data-theme="dark"] .modal,[data-theme="dark"] .task-sheet,[data-theme="dark"] .timer-setup-sheet,[data-theme="dark"] .person-profile,[data-theme="dark"] .profile-sheet{background:linear-gradient(155deg,#151a23,#11161e);color:var(--cc-text)}

@@ -2,6 +2,8 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
+import './themes/light.css'
+import './themes/dark.css'
 import './composer-fix.css'
 
 class AppErrorBoundary extends React.Component<React.PropsWithChildren, { hasError: boolean; message: string }> {
