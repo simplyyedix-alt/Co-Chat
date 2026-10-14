@@ -630,4 +630,19 @@ button:disabled{cursor:not-allowed;opacity:.55;transform:none!important}
 :root.dark .auth-panel .primary{min-height:50px;font-size:14px}
 :root.dark .app-loading-screen{background:radial-gradient(circle at 50% 45%,#2d265c,#080a0f 62%)}
 :root.dark .app-loading-card{border:1px solid #454278;background:#141923;box-shadow:0 30px 90px #0009}
+:root.dark .camera-studio-primary,:root.dark .camera-filter-picker{border:1px solid #39455c;border-radius:22px;background:linear-gradient(145deg,#131a24,#1b2031);box-shadow:0 20px 55px #0006}
+:root.dark .camera-filter-list{border-color:#303b4e;background:#10151d}
+:root.dark .camera-filter-list button{border-color:#2b3545;color:#c3cada;background:#171d27}
+:root.dark .camera-filter-list button.active{border-color:#8175ff;background:linear-gradient(135deg,#302c65,#263858);color:#fff;box-shadow:0 8px 22px #655be044}
+:root.dark .call-card{border:1px solid #514d85;background:linear-gradient(145deg,#17152e,#18283c);box-shadow:0 30px 90px #000a}
+:root.dark .group-creator{border-color:#3d4860;background:linear-gradient(155deg,#141a23,#1c2030);box-shadow:0 26px 80px #0009}
+:root.dark .group-stepper,.native-android .group-stepper{background:#10151d;border-color:#2d384a}
+:root.dark .group-stepper button.active{background:linear-gradient(135deg,#3c376e,#314264);color:#fff;box-shadow:0 7px 18px #0005}
+:root.dark .comment-sheet,:root.dark .comment-sheet-post,:root.dark .comment-sheet-compose{background:#141a23;border-color:#303b4d;box-shadow:0 25px 75px #0009}
+:root.dark .comment-sheet-header{border-color:#2e394a}
+:root.dark .comment-action,:root.dark .reply-button{color:#aeb9cd}
+:root.dark .media-preview-panel{border:1px solid #3d4860;background:#141a23;box-shadow:0 28px 85px #000a}
+:root.dark .forward-panel{border-radius:20px}
+:root.dark .loading-spinner{border-color:#343d53;border-top-color:#958aff}
+:root.dark .notice{border:1px solid #454275;background:linear-gradient(100deg,#252052,#202d48);color:#d9d8ff;box-shadow:0 12px 30px #0003}
 :root.dark .secondary:hover{background:#293241;border-color:#5e62a1}
