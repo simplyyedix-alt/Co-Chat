@@ -2309,7 +2309,7 @@ export default function App() {
             title={selected.type === "group" ? "Open group settings" : "Open profile"}
             onClick={() => setShowChatProfile(true)}
           >
-            <Avatar name={selected.name} photoURL={selectedPhotoURL} active={selectedIsActive} />
+            <Avatar name={selected.name} photoURL={selectedPhotoURL} className="avatar chat-header-avatar" active={selectedIsActive} />
           </button>
           <div>
             <strong>{selected.name}</strong>

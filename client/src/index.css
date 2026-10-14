@@ -822,3 +822,6 @@ body{background:var(--cc-bg);color:var(--cc-text)}
 :root .avatar>.active-dot{border:2px solid var(--cc-surface)!important;background:var(--cc-online,#31c875)!important}
 :root .avatar.is-active,
 :root .avatar:has(>.active-dot){border-radius:50%!important;outline:none!important;box-shadow:0 0 0 1.5px var(--cc-online,#31c875)!important}
+.chat-header .profile-avatar{position:relative!important;width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;flex:0 0 44px!important;overflow:visible!important;border-radius:50%!important;z-index:6}
+.chat-header .chat-header-avatar{position:relative!important;overflow:visible!important;z-index:7}
+.chat-header .chat-header-avatar>.active-dot{right:-6px!important;bottom:-6px!important;z-index:20!important}
