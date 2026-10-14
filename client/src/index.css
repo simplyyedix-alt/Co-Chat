@@ -180,6 +180,18 @@ button:disabled{cursor:not-allowed;opacity:.55;transform:none!important}
 .profile-sheet-backdrop{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:18px;background:#080910a8;backdrop-filter:blur(8px);animation:ui-backdrop-in .18s ease-out}
 .profile-sheet-backdrop .profile-sheet,.profile-sheet-backdrop .direct-chat-profile{width:min(100%,560px);max-height:min(88vh,760px);margin:0;overflow:auto;border:1px solid color-mix(in srgb,var(--cc-primary) 18%,var(--cc-border));box-shadow:0 26px 80px #0008}
 .profile-sheet-backdrop .profile-sheet{background:linear-gradient(155deg,var(--cc-surface),color-mix(in srgb,var(--cc-primary) 12%,var(--cc-surface)))}
+.profile-sheet-backdrop .profile-sheet{padding:22px 22px 18px;border-radius:24px;text-align:center;gap:0}
+.profile-sheet-backdrop .profile-sheet>.avatar.large{width:68px;height:68px;margin:0 auto 8px;border:3px solid var(--cc-primary);box-shadow:0 8px 24px #0005}
+.profile-sheet-backdrop .profile-sheet h3{margin:4px 0 2px;font-size:20px;letter-spacing:-.03em}
+.profile-sheet-backdrop .profile-sheet>p{margin:0 0 10px;font-size:12px}
+.profile-sheet-backdrop .profile-sheet .public-profile-atmosphere{gap:8px;margin:10px 0;padding:10px;border-radius:15px}
+.profile-sheet-backdrop .profile-sheet .public-profile-stats span{padding:7px 5px}
+.profile-sheet-backdrop .profile-sheet .public-profile-achievements{gap:5px}
+.profile-sheet-backdrop .profile-sheet .public-profile-details{margin:10px 0;padding:10px 12px}
+.profile-sheet-backdrop .profile-sheet .profile-actions{margin-top:10px}
+:root.dark .profile-sheet-backdrop .profile-sheet{background:linear-gradient(145deg,#171a22 0%,#20233a 62%,#252a43 100%);border-color:#4c4d82;box-shadow:0 28px 90px #000b;color:#f6f7ff}
+:root.dark .profile-sheet-backdrop .profile-sheet .public-profile-atmosphere{background:#11151c;border-color:#353b4d}
+:root.dark .profile-sheet-backdrop .profile-sheet .public-profile-details{background:#11151c;border-color:#353b4d}
 @keyframes ui-backdrop-in{from{opacity:0}to{opacity:1}}
 @media(max-width:440px){.profile-sheet-backdrop{align-items:flex-end;padding:0}.profile-sheet-backdrop .profile-sheet,.profile-sheet-backdrop .direct-chat-profile{max-height:88dvh;border-radius:26px 26px 0 0}}
 .direct-chat-profile .close-profile{justify-self:end}
