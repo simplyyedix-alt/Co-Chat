@@ -534,3 +534,24 @@ button:disabled{cursor:not-allowed;opacity:.55;transform:none!important}
 .chat-screen .bubble{max-width:min(82%,420px);overflow:visible;overflow-wrap:anywhere;word-break:break-word}
 .chat-screen .bubble>span{display:block;max-width:100%;overflow-wrap:anywhere;word-break:break-word;white-space:pre-wrap}
 :root.dark .auth{background:radial-gradient(circle at 20% 20%,#30285f,transparent 34%),#11131b;color:var(--cc-text)}:root.dark .auth-card{background:#1b1e27;border:1px solid #30353c;box-shadow:0 20px 60px #0008}:root.dark .auth h1{color:#f5f5ff}:root.dark .auth label{color:#e8e8f0}:root.dark .auth input{background:#15181f;border-color:#3a4050;color:#f5f5ff}:root.dark .auth input::placeholder{color:#8e95a8}:root.dark .auth p{color:#b6bbca}
+
+/* Universal premium visual system. Visual-only: no interaction or data behavior changes. */
+:root{--premium-glow:#8c7bff;--premium-blue:#6478ff;--premium-shadow:0 18px 55px #19112d1c}
+:root.dark{--premium-surface:#151820;--premium-surface-raised:#1b202b;--premium-border:#30384b;--premium-text:#f5f7ff;--premium-muted:#a5aec2}
+.app{position:relative;background:radial-gradient(circle at 90% -8%,#7564e51c,transparent 34%),radial-gradient(circle at -10% 45%,#4d8bff0d,transparent 30%),var(--cc-bg)}
+.app::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(120deg,transparent 0 45%,#a18cff05 55%,transparent 75%)}
+.topbar,.chat-header{background:color-mix(in srgb,var(--cc-surface) 86%,transparent);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-color:color-mix(in srgb,var(--cc-border) 75%,transparent)}
+.brand-line,.topbar h1,.chat-header strong{letter-spacing:-.035em}
+.search,input,textarea,select{border-color:color-mix(in srgb,var(--cc-border) 82%,var(--premium-glow));box-shadow:0 8px 24px #20134408;transition:border-color .2s,box-shadow .2s,background-color .2s}
+.search:focus,input:focus,textarea:focus,select:focus{border-color:color-mix(in srgb,var(--premium-glow) 70%,var(--cc-border));box-shadow:0 0 0 4px #8978ff1c,0 10px 28px #20134412;outline:0}
+.primary{background:linear-gradient(135deg,var(--premium-blue),#8867ef 58%,#bd6de0);box-shadow:0 10px 24px #6f5be83d;border:1px solid #ffffff18}
+.secondary{border:1px solid color-mix(in srgb,var(--cc-border) 76%,var(--premium-glow));box-shadow:0 7px 20px #2013440b}
+.primary:hover,.secondary:hover{transform:translateY(-1px);box-shadow:0 13px 28px #6f5be82c}
+.hero-card,.profile-card,.settings-profile-card,.settings-list,.community-create-card,.tool-grid article,.chat-row,.empty-state{border-color:color-mix(in srgb,var(--cc-border) 80%,var(--premium-glow));box-shadow:var(--premium-shadow)}
+.hero-card,.profile-card{position:relative;overflow:hidden;background:linear-gradient(145deg,color-mix(in srgb,var(--cc-primary) 14%,var(--cc-surface)),var(--cc-surface))}
+.hero-card::before,.profile-card::before{content:"";position:absolute;inset:-80px auto auto 55%;width:260px;height:160px;border-radius:50%;background:#a28dff20;filter:blur(24px);pointer-events:none}
+.chat-row{transition:transform .2s ease,background-color .2s ease,box-shadow .2s ease,border-color .2s ease}.chat-row:hover{transform:translateY(-2px)}
+.bottom-nav{background:color-mix(in srgb,var(--cc-surface) 82%,transparent);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border-color:color-mix(in srgb,var(--cc-border) 70%,transparent);box-shadow:0 -12px 38px #160c2c22}.bottom-nav button.active{box-shadow:0 8px 22px #6f5be827}
+.modal-backdrop,.task-sheet-backdrop,.profile-sheet-backdrop,.media-preview-backdrop{background:#070811b8;backdrop-filter:blur(13px);-webkit-backdrop-filter:blur(13px)}
+.modal,.task-sheet,.timer-setup-sheet,.person-profile,.profile-sheet,.conversation-menu{border:1px solid color-mix(in srgb,var(--cc-border) 70%,var(--premium-glow));box-shadow:0 28px 90px #0008}
+.settings-list,.settings-profile-card{overflow:hidden}.settings-list>button{background:color-mix(in srgb,var(--cc-surface) 92%,transparent)}.settings-list>button:hover{background:color-mix(in srgb,var(--cc-primary) 9%,var(--cc-surface))}.settings-row-icon{box-shadow:0 6px 15px #0002}
