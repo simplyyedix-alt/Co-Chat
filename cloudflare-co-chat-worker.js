@@ -14,6 +14,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
+function serverKeyHeaders(key) {
+  return { apikey: key, ...key.startsWith("sb_") ? {} : { Authorization: `Bearer ${key}` } };
+}
 function response(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
@@ -38,7 +41,7 @@ async function rest(path, init = {}) {
   if (!base || !key) throw new Error("Missing Supabase server configuration");
   const result = await fetch(`${base}/rest/v1/${path}`, {
     ...init,
-    headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", ...init.headers || {} }
+    headers: { ...serverKeyHeaders(key), "Content-Type": "application/json", ...init.headers || {} }
   });
   const body = await result.json().catch(() => null);
   if (!result.ok) throw new Error(typeof body?.message === "string" ? body.message : `Database request failed (${result.status})`);
@@ -51,7 +54,7 @@ async function broadcastChatMessage(conversationId, payload) {
   const topic = encodeURIComponent(`chat-messages:${conversationId}`);
   await fetch(`${base}/realtime/v1/api/broadcast/${topic}/events/message`, {
     method: "POST",
-    headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    headers: { ...serverKeyHeaders(key), "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   });
 }
@@ -68,7 +71,7 @@ async function notifyMessageRecipients(targetUids, senderName, message, conversa
   const fcmUrl = configuredFcmUrl ? configuredFcmUrl.includes("workers.dev") && !configuredFcmUrl.replace(/\/$/, "").endsWith("/fcm") ? `${configuredFcmUrl.replace(/\/$/, "")}/fcm` : configuredFcmUrl : `${base}/functions/v1/fcm-notifications`;
   await fetch(fcmUrl, {
     method: "POST",
-    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json", "x-internal-notifications-secret": secret },
+    headers: { ...serverKeyHeaders(serviceKey), "Content-Type": "application/json", "x-internal-notifications-secret": secret },
     body: JSON.stringify({ targetUids, title: senderName || "New Co-Chat message", body: message || "\u{1F4CE} Attachment", data: { type: "message", conversationId, messageId, messageAt, ...extraData } })
   });
 }
