@@ -796,4 +796,4 @@ body{background:var(--cc-bg);color:var(--cc-text)}
 :root .avatar>img,
 :root .leaderboard-avatar>img,
 :root .twitt-author-avatar>img{position:absolute!important;inset:0!important;display:block!important;width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;object-fit:cover!important;border-radius:50%!important}
-:root .avatar>.active-dot{z-index:2}
+:root .avatar>.active-dot{right:1px;bottom:1px;width:12px;height:12px;border-width:2px;z-index:2}
