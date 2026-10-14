@@ -28,8 +28,8 @@
 [data-theme="dark"] .search:focus,[data-theme="dark"] input:focus,[data-theme="dark"] textarea:focus,[data-theme="dark"] select:focus,[data-theme="dark"] button:focus-visible{border-color:#5d6878;box-shadow:0 0 0 3px rgba(174,184,199,.16);outline:none}
 [data-theme="dark"] .primary,[data-theme="dark"] .secondary,[data-theme="dark"] .discover-compose-fab{box-shadow:0 5px 14px rgba(0,0,0,.22)}
 [data-theme="dark"] .modal,[data-theme="dark"] .person-profile,[data-theme="dark"] .profile-sheet{box-shadow:0 20px 55px rgba(0,0,0,.58)}
-[data-theme="dark"] .discovery-mode-tabs button.active,[data-theme="dark"] .feed-tabs button.active{background:transparent;color:var(--cc-text);box-shadow:none;border-bottom:2px solid #667386;border-radius:10px 10px 5px 5px}
+[data-theme="dark"] .discovery-mode-tabs button.active,[data-theme="dark"] .feed-tabs button.active{background:color-mix(in srgb,var(--cc-text) 6%,var(--cc-surface-soft));color:var(--cc-text);box-shadow:inset 0 1px 0 rgba(255,255,255,.06);border:1px solid var(--cc-border);border-radius:10px}
 [data-theme="dark"] .discovery-mode-tabs button.active>span,[data-theme="dark"] .feed-tabs button.active>span{color:inherit}
 [data-theme="dark"] .bottom-nav{box-shadow:none}
-[data-theme="dark"] .bottom-nav button.active{background:#171c24;color:var(--cc-text);box-shadow:none;border:1px solid #303844;filter:none}
+[data-theme="dark"] .bottom-nav button.active{background:#171c24;color:var(--cc-text);box-shadow:0 3px 10px rgba(123,109,255,.16);border:1px solid #303844;filter:none}
 [data-theme="dark"] .bottom-nav button.active span{filter:none}
