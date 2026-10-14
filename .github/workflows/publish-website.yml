@@ -87,35 +87,43 @@ jobs:
         with:
           script: |
             const { owner, repo } = context.repo;
-            const { data: deployments } = await github.rest.repos.listDeployments({
-              owner,
-              repo,
-              environment: 'github-pages',
-              task: 'deploy',
-              per_page: 20,
-            });
-
-            for (const deployment of deployments) {
-              if (deployment.sha === context.sha) continue;
-
-              const { data: statuses } = await github.rest.repos.listDeploymentStatuses({
+            for (let attempt = 1; attempt <= 12; attempt += 1) {
+              const { data: deployments } = await github.rest.repos.listDeployments({
                 owner,
                 repo,
-                deployment_id: deployment.id,
-                per_page: 5,
+                environment: 'github-pages',
+                task: 'deploy',
+                per_page: 20,
               });
+              let active = 0;
 
-              if (statuses.some((status) => status.state === 'in_progress' || status.state === 'queued')) {
-                await github.rest.repos.createDeploymentStatus({
+              for (const deployment of deployments) {
+                if (deployment.sha === context.sha) continue;
+
+                const { data: statuses } = await github.rest.repos.listDeploymentStatuses({
                   owner,
                   repo,
                   deployment_id: deployment.id,
-                  state: 'inactive',
-                  description: 'Superseded by the latest Co-Chat Pages publish.',
+                  per_page: 5,
                 });
-                core.info(`Marked stale Pages deployment ${deployment.id} inactive.`);
+                if (statuses.some((status) => status.state === 'in_progress' || status.state === 'queued')) {
+                  active += 1;
+                  await github.rest.repos.createDeploymentStatus({
+                    owner,
+                    repo,
+                    deployment_id: deployment.id,
+                    state: 'inactive',
+                    description: 'Superseded by the latest Co-Chat Pages publish.',
+                  });
+                  core.info(`Marked stale Pages deployment ${deployment.id} inactive.`);
+                }
               }
+
+              if (active === 0) return;
+              core.info(`Waiting for GitHub Pages to release ${active} stale deployment lock(s) (attempt ${attempt}/12).`);
+              await new Promise((resolve) => setTimeout(resolve, 10000));
             }
+            core.setFailed('GitHub Pages still has an active deployment after waiting 120 seconds.');
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
