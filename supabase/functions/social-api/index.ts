@@ -69,6 +69,8 @@ const socialMediaLimit = 5 * 1024 * 1024
 
 type SocialRequest = {
   action?: string
+  targetUid?: string
+  targetUsername?: string
   twittId?: string
   commentId?: string
   text?: string
@@ -146,6 +148,19 @@ Deno.serve(async (request) => {
       }
       return response({ items })
     }
+    if (body.action === 'moderator-restrict') {
+      const targetUid = String(body.targetUid || '').trim()
+      const targetUsername = String(body.targetUsername || '').trim().replace(/^@/, '').toLowerCase()
+      const profileRows = targetUid
+        ? await callRest(`profiles?uid=eq.${encodeURIComponent(targetUid)}&select=uid,display_name,username&limit=1`) as Array<Record<string, unknown>>
+        : targetUsername
+          ? await callRest(`profiles?username=eq.${encodeURIComponent(targetUsername)}&select=uid,display_name,username&limit=1`) as Array<Record<string, unknown>>
+          : []
+      const target = profileRows?.[0]
+      if (!target?.uid) return response({ error: 'User profile not found' }, 404)
+      const result = await callRpc('moderator_restrict_twitt_user', { p_target_user_id: String(target.uid), p_moderator_id: uid, p_duration_hours: 72 }) as Record<string, unknown>
+      return response({ restricted: true, targetUid: String(target.uid), username: String(target.username || targetUsername), displayName: String(target.display_name || 'Anonymous'), restrictedUntil: result?.restricted_until || null, deletedCount: Number(result?.deleted_count || 0) })
+    }
     if (body.action === 'comments') {
       if (!body.twittId) return response({ error: 'twittId is required' }, 400)
       const params = new URLSearchParams({ select: 'id,author_id,body,attachment,likes_count,created_at', twitt_id: `eq.${body.twittId}`, order: 'created_at.desc', limit: '20' })
@@ -164,6 +179,7 @@ Deno.serve(async (request) => {
       }
       if (containsRestrictedContent(text)) return response({ error: 'Adult or explicit content is not allowed.' }, 400)
       if (attachmentNameIsRestricted(body.attachment)) return response({ error: 'Adult or explicit content is not allowed.' }, 400)
+      if (await callRpc('is_twitt_user_restricted', { p_user_id: uid })) return response({ error: 'Twitt posting is temporarily restricted for this account.' }, 403)
       if (mode === 'social') await callRpc('purge_expired_social_twitts', {}).catch(() => undefined)
   const retentionMs = mode === 'social' ? 24 * 3_600_000 : 7 * 24 * 3_600_000
   const rows = await callRest('twitts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ author_id: uid, body: text, community: normalizedCommunity, feed_type: mode, expires_at: new Date(Date.now() + retentionMs).toISOString(), attachment: body.attachment || null }) })
@@ -181,6 +197,7 @@ Deno.serve(async (request) => {
       if (!comment || comment.length > 240 || (body.attachment !== undefined && !validSocialAttachment(body.attachment))) return response({ error: 'Comment must be 1–240 characters and the attachment must be a photo or PDF up to 5 MB' }, 400)
       if (containsRestrictedContent(comment)) return response({ error: 'Adult or explicit content is not allowed.' }, 400)
       if (attachmentNameIsRestricted(body.attachment)) return response({ error: 'Adult or explicit content is not allowed.' }, 400)
+      if (await callRpc('is_twitt_user_restricted', { p_user_id: uid })) return response({ error: 'Twitt posting is temporarily restricted for this account.' }, 403)
       const id = await callRpc('create_twitt_comment', { p_twitt_id: body.twittId, p_user_id: uid, p_body: comment })
       if (body.attachment) await callRest(`twitt_comments?id=eq.${encodeURIComponent(String(id))}&author_id=eq.${encodeURIComponent(uid)}`, { method: 'PATCH', body: JSON.stringify({ attachment: body.attachment }) })
       return response({ id })

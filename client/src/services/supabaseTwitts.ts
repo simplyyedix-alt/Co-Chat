@@ -45,6 +45,18 @@ export async function createSupabaseTwitt(uid: string, body: string, community: 
   return String(result.id || '')
 }
 
+export async function restrictSupabaseTwittUser(targetUid: string | undefined, targetUsername: string | undefined) {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  const result = await invokeSocialApi(await firebaseToken(), { action: 'moderator-restrict', targetUid, targetUsername })
+  return {
+    targetUid: String(result.targetUid || targetUid || ''),
+    username: String(result.username || targetUsername || ''),
+    displayName: String(result.displayName || 'Anonymous'),
+    restrictedUntil: result.restrictedUntil ? String(result.restrictedUntil) : null,
+    deletedCount: Number(result.deletedCount || 0),
+  }
+}
+
 export async function toggleSupabaseTwittLike(twittId: string, uid: string, liked: boolean) {
   if (!supabase) throw new Error('Supabase is not configured.')
   void uid

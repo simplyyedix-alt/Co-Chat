@@ -2,14 +2,17 @@ import {
   addDoc,
   collection,
   doc,
+  getDoc,
   getDocs,
   limit,
   orderBy,
   query,
   runTransaction,
   serverTimestamp,
+  setDoc,
   Timestamp,
   updateDoc,
+  writeBatch,
   where,
   type DocumentData,
   type QueryConstraint,
@@ -17,7 +20,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import { socialBackend, supabaseReady } from '../supabase'
-import { attachSupabaseTwittCommentMedia, attachSupabaseTwittMedia, createSupabaseTwitt, createSupabaseTwittComment, deleteSupabaseTwitt, deleteSupabaseTwittComment, hideSupabaseTwitt, loadSupabaseTwittComments, loadSupabaseTwittPage, recordSupabaseTwittView, toggleSupabaseTwittCommentLike, toggleSupabaseTwittLike } from './supabaseTwitts'
+import { attachSupabaseTwittCommentMedia, attachSupabaseTwittMedia, createSupabaseTwitt, createSupabaseTwittComment, deleteSupabaseTwitt, deleteSupabaseTwittComment, hideSupabaseTwitt, loadSupabaseTwittComments, loadSupabaseTwittPage, recordSupabaseTwittView, restrictSupabaseTwittUser, toggleSupabaseTwittCommentLike, toggleSupabaseTwittLike } from './supabaseTwitts'
 
 export type TwittCommunity = string
 export type TwittFeedType = 'study' | 'social'
@@ -55,9 +58,10 @@ export const VERIFIED_UIDS = new Set([
   'UpQYzZ8sO9f1FHnpRk39V0KhOgJ2',
 ])
 export const isVerified = (uid?: string | null) => Boolean(uid && VERIFIED_UIDS.has(uid))
-// Kept compatible with existing badge/moderation checks. The listed accounts
-// are trusted accounts in the current client authorization model.
-export const isModerator = (uid?: string | null) => isVerified(uid)
+// Verification and moderation are separate permissions. All verified accounts
+// receive the blue tick, but only the original moderator can use moderator
+// tools (and moderator-only delete permissions).
+export const isModerator = (uid?: string | null) => uid === MODERATOR_UID
 
 // Keep the Firebase fallback aligned with the server-side social safety gate.
 // Only captions and the original filename are checked. Never scan generated
@@ -112,12 +116,30 @@ export async function loadTwittPage(community: TwittCommunity | 'all', cursor?: 
 export async function createTwitt(uid: string, body: string, community: TwittCommunity, attachment?: TwittAttachment | null, feedType: TwittFeedType = 'study') {
   if (socialBackend === 'supabase' && supabaseReady) return createSupabaseTwitt(uid, body, community, attachment, feedType)
   if (!db) throw new Error('Firebase is not configured.')
+  const restriction = await getDoc(doc(db, 'twittModeratorRestrictions', uid))
+  const restrictedUntil = restriction.exists() ? Number(restriction.data().restrictedUntilMs || 0) : 0
+  if (restrictedUntil > Date.now()) throw new Error('Twitt posting is temporarily restricted for this account.')
   const text = body.trim()
   if (!text || text.length > 280) throw new Error('Twitt must be between 1 and 280 characters.')
   assertSafeTwittContent(text, attachment)
   const retentionMs = feedType === 'social' ? 24 * 3_600_000 : 7 * 24 * 3_600_000
   const ref = await addDoc(collection(db, 'twitts'), { uid, body: text, community, feedType, expiresAt: new Date(Date.now() + retentionMs), likes: 0, comments: 0, views: 0, ...(attachment ? { attachment } : {}), createdAt: serverTimestamp() })
   return ref.id
+}
+
+export async function restrictTwittUser(moderatorUid: string, targetUid?: string, targetUsername?: string) {
+  if (socialBackend === 'supabase' && supabaseReady) return restrictSupabaseTwittUser(targetUid, targetUsername)
+  if (!db) throw new Error('Firebase is not configured.')
+  if (!isModerator(moderatorUid)) throw new Error('Only the moderator can restrict Twitt access.')
+  if (!targetUid || targetUid === moderatorUid) throw new Error('A different user is required.')
+  const restrictedUntilMs = Date.now() + 72 * 60 * 60 * 1000
+  await setDoc(doc(db, 'twittModeratorRestrictions', targetUid), { userId: targetUid, moderatorId: moderatorUid, restrictedUntilMs, createdAt: serverTimestamp() }, { merge: true })
+  const snapshot = await getDocs(query(collection(db, 'twitts'), where('uid', '==', targetUid)))
+  if (snapshot.empty) return { targetUid, username: targetUsername || '', displayName: 'Anonymous', restrictedUntil: new Date(restrictedUntilMs).toISOString(), deletedCount: 0 }
+  const batch = writeBatch(db)
+  snapshot.docs.forEach((item) => batch.delete(item.ref))
+  await batch.commit()
+  return { targetUid, username: targetUsername || '', displayName: 'Anonymous', restrictedUntil: new Date(restrictedUntilMs).toISOString(), deletedCount: snapshot.size }
 }
 
 export async function toggleTwittLike(twittId: string, uid: string, liked: boolean) {
@@ -165,6 +187,9 @@ export async function createTwittComment(twittId: string, uid: string, body: str
   if (!db) throw new Error('Firebase is not configured.')
   const text = body.trim()
   if (!text || text.length > 240) throw new Error('Comment must be between 1 and 240 characters.')
+  const restriction = await getDoc(doc(db, 'twittModeratorRestrictions', uid))
+  const restrictedUntil = restriction.exists() ? Number(restriction.data().restrictedUntilMs || 0) : 0
+  if (restrictedUntil > Date.now()) throw new Error('Twitt posting is temporarily restricted for this account.')
   assertSafeTwittContent(text, attachment)
   const twittRef = doc(db, 'twitts', twittId)
   const commentRef = doc(collection(twittRef, 'comments'))
