@@ -1199,7 +1199,6 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
   };
   return <div className={`twitt-feed feed-type-${feedType}${authorLoading ? " authors-loading" : ""}`}>
     <div className="discovery-mode-tabs compact-mode-switch" role="tablist" aria-label="Discovery mode"><button type="button" role="tab" aria-selected={feedType === "study"} className={feedType === "study" ? "active" : ""} onClick={() => { setFeedType("study"); setTab("recent"); setCommunity("all"); setVisible(20); }}><span aria-hidden="true">◷</span> Study <small>Questions & answers</small></button><button type="button" role="tab" aria-selected={feedType === "social"} className={feedType === "social" ? "active" : ""} onClick={() => { setFeedType("social"); setTab("recent"); setCommunity("all"); setVisible(20); }}><span aria-hidden="true">✦</span> Social <small>24-hour moments</small></button></div>
-    <section className="discover-intro"><div><span className="kicker">CO-CHAT {feedType === "study" ? "STUDY" : "SOCIAL"}</span><h2>{feedType === "study" ? "Ask it. Solve it together." : "Share the moment."}</h2><p>{feedType === "study" ? "Post a doubt as text, photo, or PDF and get clear answers from your circle." : "Friends appear first. Once you see a post, it moves down so your feed stays fresh."}</p></div><button className="primary compact" type="button" onClick={() => setComposerOpen(true)}>＋ {feedType === "study" ? "Ask a doubt" : "Share a moment"}</button></section>
     <button className="discover-compose-fab" type="button" aria-label={feedType === "study" ? "Ask a study doubt" : "Create a social post"} title={feedType === "study" ? "Ask a study doubt" : "Create a social post"} onClick={() => setComposerOpen(true)}><span aria-hidden="true">＋</span><small>{feedType === "study" ? "Ask" : "Post"}</small></button>
     {composerOpen && <section className="twitt-composer"><div className="composer-heading"><strong>{feedType === "study" ? "Ask your study community" : "Share with friends"}</strong><button className="icon" type="button" disabled={publishing || cameraBusy} onClick={() => setComposerOpen(false)}>×</button></div><textarea disabled={publishing || cameraBusy} value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 280))} placeholder={feedType === "study" ? "Describe your doubt or study win…" : "What is happening today? (expires in 24 hours)"} autoFocus /><div className="twitt-media-actions"><button className="twitt-camera-button" type="button" disabled={publishing || cameraBusy} onClick={() => void captureCameraPhoto()}>📸 {cameraBusy ? "Opening camera…" : "Open camera"}</button><label className="twitt-media-picker"><MediaIcon /> Add photo/PDF (max 5 MB)<input disabled={publishing || cameraBusy} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => { setCameraDataUrl(null); setDraftFile(event.target.files?.[0] || null); }} /></label></div>{cameraDataUrl && <div className="camera-filter-picker"><div className="camera-filter-heading"><strong>Camera studio</strong><small>Normal first · choose a look before posting</small></div><div className="camera-filter-list">{cameraFilterOptions.map(({ id, label, icon }) => <button key={id} type="button" className={cameraFilter === id ? "active" : ""} disabled={publishing || cameraBusy} onClick={() => setCameraFilter(id)}><span>{icon}</span>{label}</button>)}</div><img className={`camera-capture-preview filter-${cameraFilter}`} style={{ filter: cameraFilterCss[cameraFilter] }} src={cameraDataUrl} alt="Captured moment preview" /></div>}<small className="twitt-safety-note">Explicit porn content is not allowed. Normal photos are welcome.</small>{draftFile && <small className="twitt-file-name">{draftFile.name}</small>}{publishError && <p className="twitt-sync-error">{publishError}</p>}<div className="composer-footer">{feedType === "study" ? <div className="tag-input"><span>#</span><input disabled={publishing} list="twitt-tag-suggestions" value={draftCommunity} onChange={(event) => setDraftCommunity(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} placeholder="Add a study tag (required)" /><datalist id="twitt-tag-suggestions">{tagSuggestions.map((tag) => <option value={tag} key={tag} />)}</datalist></div> : <span className="social-expiry-note">Visible for 24 hours</span>}<span>{draft.length}/280</span><button className="primary compact" type="button" disabled={(!draft.trim() && !draftFile) || (feedType === "study" && !draftCommunity) || publishing || cameraBusy} onClick={() => void createTwitt()}>{publishing ? "◌ Posting…" : "Post"}</button></div></section>}
     {focusedAuthor && <div className="profile-sheet-backdrop twitt-author-profile-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setFocusedAuthor(null); }}><section className="person-profile profile-sheet twitt-author-profile" role="dialog" aria-modal="true" aria-label="Twitt author profile" onMouseDown={(event) => event.stopPropagation()}><button className="icon close-profile" type="button" aria-label="Close profile" onClick={() => setFocusedAuthor(null)}>×</button><Avatar profile={focusedAuthor} className="avatar large profile-sheet-avatar" /><span className="settings-eyebrow">CO-CHAT PROFILE</span><h3>{focusedAuthor.displayName}{isModerator(focusedAuthor.uid) && <VerifiedTick />}</h3><p>@{focusedAuthor.username}</p><div className="direct-profile-summary"><span>{focusedAuthor.activeStatus === false ? "Offline" : "Available"}</span><small>{focusedAuthor.bio?.trim() || "No bio added yet."}</small></div><div className="public-profile-stats"><span><b>{focusedAuthor.profileComplete ? "Ready" : "New"}</b><small>profile status</small></span><span><b>{focusedAuthor.activeStatus === false ? "Hidden" : "On"}</b><small>active status</small></span><span><b>Co‑Chat</b><small>member</small></span></div><div className="profile-actions"><button className="secondary" type="button" onClick={() => void copyAuthorProfile(focusedAuthor)}>Copy handle</button><button className="secondary danger-outline" type="button" onClick={() => void blockFocusedAuthor()}>Block</button></div></section></div>}
@@ -2703,7 +2702,7 @@ export default function App() {
       </main>
     );
   return (
-    <main className={`app${isNativeAndroid ? " native-android" : ""}`}>
+    <main className={`app page-${page}${isNativeAndroid ? " native-android" : ""}`}>
       <header className="topbar">
         {page === "settings" ? (
           <div className="settings-topbar-title">
@@ -2790,15 +2789,6 @@ export default function App() {
         )}
         {(page === "chats" || page === "communities") && (
           <>
-            {page === "chats" && (
-              <section className="chat-home-hero" aria-label="Chats home">
-                <div>
-                  <span className="kicker">YOUR SPACE</span>
-                  <h1>Stay in the loop.</h1>
-                  <p>Catch up with your people, share the moment, and keep moving together.</p>
-                </div>
-              </section>
-            )}
             {page === "chats" && <input
               className="search"
               value={search}
@@ -2835,7 +2825,6 @@ export default function App() {
             )}
             {page === "communities" && (
               <>
-              <section className="community-hero"><div><span className="kicker">YOUR COMMUNITIES</span><h2>Find your people.</h2><p>Find your lane, swap ideas, and stay accountable together.</p></div><span className="community-symbol">♧</span></section>
               <div className="community-create-card"><div><span className="kicker">YOUR GROUP SPACE</span><strong>Create a private group</strong><small>Choose friends and keep the full Co-Chat experience in one conversation.</small></div><button className="primary" type="button" onClick={() => setShowGroup(true)}>＋ Create group</button></div>
               </>
             )}
@@ -2988,20 +2977,11 @@ export default function App() {
         )}
         {page === "study" && <StudyHome uid={liveUser.uid} onOpenDiscover={() => { setDiscoverCommunity("all"); setPage("discover"); }} />}
         {page === "discover" && <TwittFeed initialCommunity={discoverCommunity} />}
-        {page === "status" && (
-          <div className="hero-card coming-soon">
-            <span>◉</span>
-            <h2>Stories are on the way</h2>
-            <p>
-              We’re keeping Co‑Chat focused on fast, reliable conversations first.
-              Stories will land when they’re ready.
-            </p>
-          </div>
-        )}
+        {page === "status" && <div className="empty-state">No stories yet.</div>}
         {(page === "profile" || page === "settings") && (
           <div className="settings-page">
             <div className="settings-hero">
-              <div><span className="settings-eyebrow">ACCOUNT CENTER</span><h1>{page === "settings" ? "Settings & profile" : "Your profile"}</h1><p>Set your vibe, keep your circle close.</p><div className="settings-hero-meta"><span>● {activeStatus ? "Available" : "Away"}</span><span>✓ {liveUser.emailVerified ? "Verified" : "Verify email"}</span></div></div>
+              <div><span className="settings-eyebrow">ACCOUNT CENTER</span><h1>{page === "settings" ? "Settings & profile" : "Your profile"}</h1><div className="settings-hero-meta"><span>● {activeStatus ? "Available" : "Away"}</span><span>✓ {liveUser.emailVerified ? "Verified" : "Verify email"}</span></div></div>
               <div className="settings-hero-mark" aria-hidden="true">✦</div>
             </div>
             <form className="profile-card settings-profile-card" onSubmit={save}>
@@ -3020,11 +3000,6 @@ export default function App() {
               <label className="field-label settings-bio-field">About you<textarea value={profileBio} onChange={(e) => setProfileBio(e.target.value)} maxLength={160} placeholder="A short line about what you are learning…" /><small>Shown when someone opens your profile from People or your friend list.</small></label>
               <div className="settings-save-row"><span>{profileSaved ? "Profile saved successfully" : "Changes sync across your devices"}</span><button type="submit" className="primary" disabled={preview}>{profileSaved ? "Saved ✓" : "Save profile"}</button></div>
             </form>
-            <div className="settings-quick-grid" aria-label="Co-Chat account summary">
-              <article><span>✦</span><div><b>Personal space</b><small>Your profile, bio, and handle are ready to share.</small></div></article>
-              <article><span>⌁</span><div><b>Stay in the loop</b><small>Messages, calls, and study updates follow your notification choice.</small></div></article>
-              <article><span>◉</span><div><b>Your boundaries</b><small>Control who can discover you and see your active status.</small></div></article>
-            </div>
             {isModerator(liveUser.uid) && <section className="moderator-tools" aria-label="Moderator tools"><div><strong>Moderator tools</strong><small>Paste a username to block the account and stop them from messaging you.</small></div><button className="danger" type="button" onClick={async () => { const username = window.prompt("Enter the username to block (without @):")?.trim().replace(/^@/, ""); if (!username) return; try { const matches = await findUsers(username, liveUser.uid); const target = matches.find((profile) => profile.username.toLowerCase() === username.toLowerCase()) || matches[0]; if (!target) throw new Error("No account found with that username."); if (!window.confirm(`Block @${target.username}? They will not be able to message you or appear in your people lists.`)) return; await blockUser(liveUser.uid, target.uid); setError(`@${target.username} blocked. Their visible Twitts were removed.`); } catch (error) { setError(error instanceof Error ? error.message : "Could not block that account."); } }}>Block by username</button></section>}
             <div className="settings settings-list">
               <div className="settings-section-label">YOUR CO-CHAT EXPERIENCE <span>Personalize your space</span></div>
