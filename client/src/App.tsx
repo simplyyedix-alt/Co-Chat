@@ -2250,8 +2250,8 @@ export default function App() {
           <button
             className={`avatar profile-avatar ${selected.type === "group" && activeGroupCount > 0 ? "group-avatar-active" : ""}`}
             type="button"
-            title={selected.type === "group" ? "Open group settings" : undefined}
-            onClick={selected.type === "group" ? () => setShowChatProfile(true) : undefined}
+            title={selected.type === "group" ? "Open group settings" : "Open profile"}
+            onClick={() => setShowChatProfile(true)}
           >
             <Avatar name={selected.name} photoURL={selected.photoURL} active={selectedIsActive} />
           </button>
@@ -2416,6 +2416,32 @@ export default function App() {
                   catch (error) { setError(error instanceof Error ? error.message : "Could not leave the group."); }
                 }}>Leave group</button>
               ) : null}
+            </div>
+          </div>
+        )}
+        {showChatProfile && selected.type === "direct" && (
+          <div className="person-profile chat-profile-menu direct-chat-profile">
+            <button className="icon close-profile" type="button" aria-label="Close profile" onClick={() => setShowChatProfile(false)}>×</button>
+            <Avatar name={selectedFriendProfile?.displayName || selected.name} photoURL={selectedFriendProfile?.photoURL || selected.photoURL} className="avatar large profile-sheet-avatar" />
+            <span className="settings-eyebrow">CONVERSATION PROFILE</span>
+            <h3>{selectedFriendProfile?.displayName || selected.name}</h3>
+            <p>@{selectedFriendProfile?.username || "member"}</p>
+            <div className="direct-profile-summary">
+              <span>{selectedIsActive ? "● Online now" : "○ Offline"}</span>
+              <span>{selectedFriendProfile?.bio?.trim() || "No bio added yet."}</span>
+            </div>
+            <div className="profile-actions">
+              <button className="secondary danger-outline danger-text" type="button" onClick={() => {
+                const otherUid = selected.memberIds.find((id) => id !== liveUser.uid)
+                if (!otherUid) return
+                if (!window.confirm("Block this person? The conversation will be removed and they will disappear from search.")) return
+                void blockUser(liveUser.uid, otherUid).then(() => {
+                  setBlockedUsers((old) => old.includes(otherUid) ? old : [...old, otherUid])
+                  setShowChatProfile(false)
+                  setSelected(null)
+                  setError("User blocked and conversation removed.")
+                }).catch((error) => setError(error instanceof Error ? error.message : "Could not block this user."))
+              }}>Block user</button>
             </div>
           </div>
         )}

@@ -85,6 +85,14 @@ export async function blockUser(blockerId: string, blockedId: string) {
   batch.delete(doc(db, 'friendRequests', `${blockerId}_${blockedId}`))
   batch.delete(doc(db, 'friendRequests', `${blockedId}_${blockerId}`))
   await batch.commit()
+  // The migrated chat store has its own conversations. Remove direct chats
+  // after the block so neither participant keeps a stale navigation entry.
+  if (isSupabaseChatEnabled()) {
+    const conversations = await listSupabaseConversations(blockerId).catch(() => [])
+    await Promise.all(conversations
+      .filter((conversation) => conversation.type === 'direct' && conversation.memberIds.includes(blockedId))
+      .map((conversation) => deleteSupabaseConversation(conversation.id).catch(() => undefined)))
+  }
 }
 
 export async function unblockUser(blockerId: string, blockedId: string) {
