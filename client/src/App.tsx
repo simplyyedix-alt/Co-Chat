@@ -3733,8 +3733,11 @@ function GroupCreator({
         ) : (
           <>
             <div className="group-preview">
-              <div className="group-avatar-stack"><div className="avatar large">{initials(name || "Group")}</div>{members.slice(0, 3).map((member, index) => <Avatar key={member.uid} profile={member} className={`group-stack-avatar stack-${index}`} />)}</div>
-              <div><strong>{name.trim() || "New group"}</strong><small>{members.length + 1} members · You are the admin</small><span>{members.map((member) => member.displayName).join(" · ")}</span></div>
+              <div className="group-avatar-stack" aria-hidden="true">
+                <div className="avatar large group-preview-avatar">{initials(name || "Group")}</div>
+                {members.slice(0, 3).map((member, index) => <Avatar key={member.uid} profile={member} className={`avatar group-stack-avatar stack-${index}`} />)}
+              </div>
+              <div className="group-preview-copy"><strong>{name.trim() || "New group"}</strong><small>{members.length + 1} members · You are the admin</small><span>{members.map((member) => member.displayName).join(" · ")}</span></div>
             </div>
             <label className="field-label">
               Group name
