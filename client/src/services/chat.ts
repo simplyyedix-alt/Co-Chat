@@ -79,12 +79,16 @@ export type BlockRecord = { id: string; blockerId: string; blockedId: string; cr
 
 export async function blockUser(blockerId: string, blockedId: string) {
   if (!db || !blockerId || !blockedId || blockerId === blockedId) return
-  const batch = writeBatch(db)
-  batch.set(doc(db, 'blocks', `${blockerId}_${blockedId}`), { blockerId, blockedId, createdAt: serverTimestamp() })
-  batch.delete(doc(db, 'friendships', [blockerId, blockedId].sort().join('_')))
-  batch.delete(doc(db, 'friendRequests', `${blockerId}_${blockedId}`))
-  batch.delete(doc(db, 'friendRequests', `${blockedId}_${blockerId}`))
-  await batch.commit()
+  // Persist the block independently. Cleanup documents can be absent (or have
+  // different ownership rules), and putting those deletes in the same batch
+  // would make Firestore reject the block itself.
+  await setDoc(doc(db, 'blocks', `${blockerId}_${blockedId}`), { blockerId, blockedId, createdAt: serverTimestamp() }, { merge: true })
+  const cleanupRefs = [
+    doc(db, 'friendships', [blockerId, blockedId].sort().join('_')),
+    doc(db, 'friendRequests', `${blockerId}_${blockedId}`),
+    doc(db, 'friendRequests', `${blockedId}_${blockerId}`),
+  ]
+  await Promise.all(cleanupRefs.map((ref) => deleteDoc(ref).catch(() => undefined)))
   // The migrated chat store has its own conversations. Remove direct chats
   // after the block so neither participant keeps a stale navigation entry.
   if (isSupabaseChatEnabled()) {

@@ -1339,6 +1339,7 @@ export default function App() {
   const [showFriendRequests, setShowFriendRequests] = useState(false);
   const [unseenFriendRequestIds, setUnseenFriendRequestIds] = useState<string[]>([]);
   const [showChatProfile, setShowChatProfile] = useState(false);
+  const [directProfile, setDirectProfile] = useState<UserProfile | null>(null);
   const [groupPhotoBusy, setGroupPhotoBusy] = useState(false);
   const [groupMembers, setGroupMembers] = useState<UserProfile[]>([]);
   const [groupFriends, setGroupFriends] = useState<UserProfile[]>([]);
@@ -1767,6 +1768,18 @@ export default function App() {
     );
   }, [showChatProfile, selected?.id, selected?.type]);
   useEffect(() => {
+    if (!liveUser || !showChatProfile || !selected || selected.type !== "direct") {
+      setDirectProfile(null);
+      return;
+    }
+    const otherUid = selected.memberIds.find((id) => id !== liveUser.uid);
+    if (!otherUid) return;
+    setDirectProfile(selectedFriendProfile || null);
+    void getUserProfile(otherUid).then((profile) => {
+      if (profile) setDirectProfile(profile);
+    }).catch(() => undefined);
+  }, [getUserProfile, liveUser?.uid, selected?.id, selected?.type, showChatProfile]);
+  useEffect(() => {
     if (!liveUser || !showChatProfile || !selected || selected.type !== "group") return;
     listFriends(liveUser.uid).then(setGroupFriends).catch(() => setGroupFriends([]));
   }, [showChatProfile, selected?.id, selected?.type, liveUser?.uid]);
@@ -1798,34 +1811,6 @@ export default function App() {
     document.addEventListener("click", closeMenu);
     return () => document.removeEventListener("click", closeMenu);
   }, [conversationMenu]);
-  useEffect(() => {
-    const handleBlock = (event: globalThis.MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (
-        !target.closest(".chat-profile-menu .danger-text") ||
-        !selected ||
-        !liveUser ||
-        liveUser.uid === "preview" ||
-        selected.memberIds.length !== 2
-      )
-        return;
-      const otherUid = selected.memberIds.find((id) => id !== liveUser.uid);
-      if (!otherUid) return;
-      event.preventDefault();
-      void blockUser(liveUser.uid, otherUid)
-        .then(() => {
-          setBlockedUsers((old) =>
-            old.includes(otherUid) ? old : [...old, otherUid],
-          );
-          setShowChatProfile(false);
-          setSelected(null);
-          setError("User blocked. You can unblock them from Profile settings.");
-        })
-        .catch(() => setError("Could not block this user."));
-    };
-    document.addEventListener("click", handleBlock, true);
-    return () => document.removeEventListener("click", handleBlock, true);
-  }, [selected, liveUser?.uid]);
   useEffect(() => {
     const handleViewProfile = (event: globalThis.MouseEvent) => {
       const target = event.target as HTMLElement;
@@ -2420,18 +2405,19 @@ export default function App() {
           </div>
         )}
         {showChatProfile && selected.type === "direct" && (
-          <div className="person-profile chat-profile-menu direct-chat-profile">
+          <div className="profile-sheet-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowChatProfile(false); }}>
+          <div className="person-profile chat-profile-menu direct-chat-profile" role="dialog" aria-modal="true" aria-label="Conversation profile" onMouseDown={(event) => event.stopPropagation()}>
             <button className="icon close-profile" type="button" aria-label="Close profile" onClick={() => setShowChatProfile(false)}>×</button>
-            <Avatar name={selectedFriendProfile?.displayName || selected.name} photoURL={selectedFriendProfile?.photoURL || selected.photoURL} className="avatar large profile-sheet-avatar" />
+            <Avatar name={directProfile?.displayName || selected.name} photoURL={directProfile?.photoURL || selected.photoURL} className="avatar large profile-sheet-avatar" />
             <span className="settings-eyebrow">CONVERSATION PROFILE</span>
-            <h3>{selectedFriendProfile?.displayName || selected.name}</h3>
-            <p>@{selectedFriendProfile?.username || "member"}</p>
+            <h3>{directProfile?.displayName || selected.name}</h3>
+            <p>@{directProfile?.username || "member"}</p>
             <div className="direct-profile-summary">
               <span>{selectedIsActive ? "● Online now" : "○ Offline"}</span>
-              <span>{selectedFriendProfile?.bio?.trim() || "No bio added yet."}</span>
+              <span>{directProfile?.bio?.trim() || "No bio added yet."}</span>
             </div>
             <div className="profile-actions">
-              <button className="secondary danger-outline danger-text" type="button" onClick={() => {
+              <button className="secondary danger-outline" type="button" onClick={() => {
                 const otherUid = selected.memberIds.find((id) => id !== liveUser.uid)
                 if (!otherUid) return
                 if (!window.confirm("Block this person? The conversation will be removed and they will disappear from search.")) return
@@ -2443,6 +2429,7 @@ export default function App() {
                 }).catch((error) => setError(error instanceof Error ? error.message : "Could not block this user."))
               }}>Block user</button>
             </div>
+          </div>
           </div>
         )}
         {showVoiceCall && voiceTarget && (
@@ -3245,7 +3232,8 @@ function FriendZone({
         </div>
       )}
       {focused && (
-        <div className="person-profile">
+        <div className="profile-sheet-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setFocused(null); }}>
+        <div className="person-profile profile-sheet" role="dialog" aria-modal="true" aria-label="User profile" onMouseDown={(event) => event.stopPropagation()}>
           <button
             className="icon close-profile"
             type="button"
@@ -3292,6 +3280,7 @@ function FriendZone({
               View profile
             </button>
           </div>
+        </div>
         </div>
       )}
     </div>
@@ -3507,7 +3496,8 @@ function SearchPanel({
         )}
       </div>
       {focused && (
-        <div className="person-profile">
+        <div className="profile-sheet-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setFocused(null); }}>
+        <div className="person-profile profile-sheet" role="dialog" aria-modal="true" aria-label="User profile" onMouseDown={(event) => event.stopPropagation()}>
           <button
             className="icon close-profile"
             type="button"
@@ -3545,6 +3535,7 @@ function SearchPanel({
             {relationships[focused.uid] === "friends" && <button className="secondary danger-outline" type="button" onClick={() => void unfriend(focused)}>Unfriend</button>}
             <button className="secondary danger-outline" type="button" onClick={() => void blockProfile(focused)}>Block</button>
           </div>
+        </div>
         </div>
       )}
     </section>
