@@ -136,9 +136,19 @@ Deno.serve(async (request) => {
       // database-backed and prevents a temporary “Loading profile…” card for
       // every Twitt while the client performs one request per author.
       const authorIds = [...new Set(rows.map((item) => String(item.author_id || '')).filter(Boolean))]
-      const profiles = authorIds.length
-        ? await callRest(`profiles?uid=in.(${authorIds.map((id) => encodeURIComponent(id)).join(',')})&select=uid,display_name,username,photo_url,bio,active_status,hide_twitt_identity`) as Array<Record<string, unknown>>
-        : []
+      let profiles: Array<Record<string, unknown>> = []
+      if (authorIds.length) {
+        const profileFilter = `uid=in.(${authorIds.map((id) => encodeURIComponent(id)).join(',')})`
+        try {
+          profiles = await callRest(`profiles?${profileFilter}&select=uid,display_name,username,photo_url,bio,active_status,hide_twitt_identity`) as Array<Record<string, unknown>>
+        } catch (error) {
+          // Older projects may not have migration 015 applied yet. Keep the
+          // feed readable while the schema catches up; identity hiding is
+          // false until the column exists.
+          if (!String(error).includes('hide_twitt_identity')) throw error
+          profiles = await callRest(`profiles?${profileFilter}&select=uid,display_name,username,photo_url,bio,active_status`) as Array<Record<string, unknown>>
+        }
+      }
       const profileByUid = new Map(profiles.map((profile) => [String(profile.uid), {
         uid: String(profile.uid),
         displayName: String(profile.display_name || 'Anonymous'),

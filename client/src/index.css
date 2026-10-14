@@ -730,15 +730,21 @@ body{background:var(--cc-bg);color:var(--cc-text)}
 .primary{background:linear-gradient(135deg,var(--cc-primary),var(--cc-primary-2));color:#fff}
 .secondary{background:var(--cc-surface-soft);color:var(--cc-text);border-color:var(--cc-border)}
 .discover-compose-fab{background:linear-gradient(135deg,var(--cc-primary),var(--cc-primary-2));box-shadow:0 12px 34px color-mix(in srgb,var(--cc-primary) 42%,transparent)}
-.twitt-author-avatar{padding:0;border:0;background:transparent;cursor:pointer;overflow:hidden;touch-action:manipulation}
+.twitt-author-avatar{width:44px;height:44px;flex:0 0 44px;padding:0;border:0;border-radius:50%!important;background:transparent;cursor:pointer;overflow:hidden;touch-action:manipulation}
 .twitt-author-avatar.is-anonymous{border:0;background:transparent}
-.twitt-author-avatar img{width:100%;height:100%;display:block;object-fit:cover;border-radius:inherit}
-.twitt-author-avatar:focus-visible{outline:3px solid var(--cc-primary);outline-offset:3px}
+.twitt-author-avatar img{width:100%;height:100%;display:block;object-fit:cover;border-radius:50%}
+.twitt-author-avatar:focus-visible{outline:2px solid var(--cc-primary);outline-offset:2px}
 .twitt-author-profile{width:min(100%,430px)!important;text-align:center}
 .twitt-author-profile .direct-profile-summary{margin:15px 0 10px}
 .twitt-author-profile .public-profile-stats{margin:10px 0 14px}
 .twitt-author-profile .profile-actions{display:flex;gap:9px}
 .twitt-author-profile .profile-actions button{min-height:44px}
+
+/* Feed polish: avatars stay circular and the composer stays in the dock. */
+.chat-header>.avatar,.twitt-head>.avatar,.twitt-author-avatar{width:44px;height:44px;min-width:44px;min-height:44px;flex:0 0 44px;border-radius:50%!important;overflow:hidden}
+.chat-header>.avatar img,.twitt-head>.avatar img,.twitt-author-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block}
+.discover-compose-fab{position:fixed!important;right:max(16px,calc((100vw - 760px)/2 + 16px));bottom:calc(82px + env(safe-area-inset-bottom))!important;top:auto!important}
+.feed-note{border:0!important;background:transparent!important}
 
 /* Keep every profile action row inside the modal on narrow Android screens. */
 .profile-sheet .profile-actions{display:flex!important;align-items:stretch;width:100%;gap:6px}
