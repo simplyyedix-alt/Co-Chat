@@ -3,7 +3,7 @@ const projectId = Deno.env.get('FIREBASE_PROJECT_ID') || ''
 const clientEmail = Deno.env.get('FIREBASE_CLIENT_EMAIL') || ''
 const privateKey = (Deno.env.get('FIREBASE_PRIVATE_KEY') || '').replace(/\\n/g, '\n')
 
-type PushRequest = { targetUids?: unknown; title?: unknown; body?: unknown; data?: unknown }
+type PushRequest = { action?: unknown; token?: unknown; platform?: unknown; targetUids?: unknown; title?: unknown; body?: unknown; data?: unknown }
 type FirestoreToken = { token: string; documentName: string }
 let accessTokenCache: { value: string; expiresAt: number } | null = null
 
@@ -24,6 +24,21 @@ function pemToArrayBuffer(pem: string) {
   const bytes = new Uint8Array(binary.length)
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
   return bytes.buffer
+}
+
+async function verifyFirebaseToken(request: Request) {
+  const header = request.headers.get('authorization') || ''
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : ''
+  const apiKey = Deno.env.get('FIREBASE_WEB_API_KEY') || ''
+  if (!token || !apiKey) return null
+  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken: token }),
+  })
+  if (!response.ok) return null
+  const payload = await response.json().catch(() => null) as { users?: Array<{ localId?: string }> } | null
+  return payload?.users?.[0]?.localId || null
 }
 
 async function googleAccessToken() {
@@ -51,6 +66,20 @@ async function tokensForUser(uid: string, accessToken: string): Promise<Firestor
   })
 }
 
+async function registerToken(uid: string, token: string, platform: string, accessToken: string) {
+  const documentId = encodeURIComponent(token)
+  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/users/${encodeURIComponent(uid)}/fcmTokens/${documentId}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: {
+      token: { stringValue: token },
+      platform: { stringValue: platform },
+      updatedAt: { timestampValue: new Date().toISOString() },
+    } }),
+  })
+  if (!response.ok) throw new Error(`FCM token registration failed (${response.status})`)
+}
+
 async function sendToToken(token: string, title: string, body: string, data: Record<string, string>, accessToken: string) {
   const response = await fetch(`https://fcm.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/messages:send`, {
     method: 'POST',
@@ -66,9 +95,18 @@ async function sendToToken(token: string, title: string, body: string, data: Rec
 
 Deno.serve(async (request) => {
   if (request.method !== 'POST') return json({ error: 'POST required' }, 405)
-  if (!internalSecret || request.headers.get('x-internal-notifications-secret') !== internalSecret) return json({ error: 'Unauthorized' }, 401)
   try {
     const input = await request.json().catch(() => null) as PushRequest | null
+    if (input?.action === 'register-token') {
+      const uid = await verifyFirebaseToken(request)
+      const token = String(input.token || '').trim()
+      const platform = String(input.platform || 'android').slice(0, 20)
+      if (!uid) return json({ error: 'Invalid Firebase identity token' }, 401)
+      if (!token) return json({ error: 'FCM token is required' }, 400)
+      await registerToken(uid, token, platform, await googleAccessToken())
+      return json({ registered: true })
+    }
+    if (!internalSecret || request.headers.get('x-internal-notifications-secret') !== internalSecret) return json({ error: 'Unauthorized' }, 401)
     const targetUids = [...new Set(Array.isArray(input?.targetUids) ? input.targetUids.map(String).filter(Boolean).slice(0, 100) : [])]
     const title = String(input?.title || 'Co-Chat').slice(0, 100)
     const body = String(input?.body || 'You have a new message.').slice(0, 2000)

@@ -8,6 +8,9 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if signedIn();
       allow create, update, delete: if owner(userId);
+      match /fcmTokens/{tokenId} {
+        allow read, create, update, delete: if owner(userId);
+      }
     }
     match /usernames/{username} {
       allow read: if signedIn();

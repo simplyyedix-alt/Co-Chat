@@ -6,9 +6,9 @@ import type { UserProfile } from './chat'
 
 const enabled = import.meta.env.VITE_CHAT_BACKEND === 'supabase' && supabaseReady
 const remoteNotificationsEnabled = supabaseReady
-// Route chat traffic through Cloudflare first; retain Supabase as a rollback
-// path while the Worker deployment is being verified.
-const cloudflareEndpoint = import.meta.env.VITE_CHAT_API_URL || 'https://divine-meadow-8139.simplyyedix.workers.dev'
+// Supabase is the deployed primary chat API. An explicitly configured
+// Cloudflare endpoint remains an optional fallback.
+const cloudflareEndpoint = import.meta.env.VITE_CHAT_API_URL || ''
 const supabaseEndpoint = `${supabaseProjectUrl.replace(/\/$/, '')}/functions/v1/chat-api`
 
 // Several startup effects can request a token at the same time. Share one
@@ -31,7 +31,7 @@ const timestamp = (value: unknown) => {
 async function request<T>(payload: Record<string, unknown>): Promise<T> {
   const token = await getAuthToken()
   if (!token) throw new Error('Please sign in before using chat.')
-  const endpoints = [cloudflareEndpoint, supabaseEndpoint].filter((value, index, items) => value && items.indexOf(value) === index)
+  const endpoints = [supabaseEndpoint, cloudflareEndpoint].filter((value, index, items) => value && items.indexOf(value) === index)
   let lastResponse: Response | null = null
   for (const target of endpoints) {
       const controller = new AbortController()
@@ -113,7 +113,7 @@ export async function getProfile(uid: string): Promise<UserProfile | null> {
 
 export async function listConversations(uid: string): Promise<Conversation[]> {
   const data = await request<{ items?: Record<string, unknown>[] }>({ action: 'conversations' })
-  return (data.items || []).map(item => {
+  return (data.items || []).filter(item => !item.hidden_at).map(item => {
     const nested = (item.conversations || {}) as Record<string, unknown>
     const members = Array.isArray(item.member_ids) ? item.member_ids.map(value => typeof value === 'object' && value ? String((value as Record<string, unknown>).uid || '') : String(value)) : []
     const profile = profileFromRow(item.other_profile as Record<string, unknown> | null)
@@ -154,17 +154,23 @@ export async function listMessages(conversationId: string, uid: string, since?: 
 export function watchConversations(uid: string, callback: (items: Conversation[]) => void): Unsubscribe {
   let active = true
   let inFlight = false
+  let refreshQueued = false
   let fallbackTimer: number | null = null
   const refresh = () => {
-    if (!active || inFlight || document.visibilityState === 'hidden') return
+    if (!active || document.visibilityState === 'hidden') return
+    if (inFlight) { refreshQueued = true; return }
     inFlight = true
-    void listConversations(uid).then(items => { if (active) callback(items) }).catch(() => undefined).finally(() => { inFlight = false })
+    void listConversations(uid).then(items => { if (active) callback(items) }).catch(() => undefined).finally(() => {
+      inFlight = false
+      if (active && refreshQueued && document.visibilityState !== 'hidden') { refreshQueued = false; refresh() }
+    })
   }
   refresh()
   const startFallback = () => { if (fallbackTimer === null) fallbackTimer = window.setInterval(refresh, 10000) }
   const stopFallback = () => { if (fallbackTimer !== null) { window.clearInterval(fallbackTimer); fallbackTimer = null } }
   const fallbackStart = window.setTimeout(startFallback, 5000)
   const channel = supabase?.channel(`chat-conversations:${uid}`)
+    .on('broadcast', { event: 'conversation' }, refresh)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_members', filter: `uid=eq.${uid}` }, refresh)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, refresh)
     .subscribe((status) => { if (status === 'SUBSCRIBED') { window.clearTimeout(fallbackStart); stopFallback() } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') startFallback() })
@@ -187,7 +193,15 @@ export type IncomingConversationEvent = {
 
 export function watchIncomingConversationEvents(uid: string, callback: (event: IncomingConversationEvent) => void): Unsubscribe {
   if (!enabled || !supabase) return () => undefined
-  const channel = supabase.channel(`chat-notifications:${uid}`)
+  const channel = supabase.channel(`chat-conversations:${uid}`)
+    .on('broadcast', { event: 'conversation' }, (payload) => {
+      const row = (payload.payload || {}) as Record<string, unknown>
+      const conversationId = String(row.conversationId || '')
+      const senderId = String(row.senderId || '')
+      const messageAt = String(row.messageAt || '')
+      if (!conversationId || !senderId || senderId === uid || !messageAt) return
+      callback({ conversationId, senderId, message: String(row.message || ''), messageAt })
+    })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, (payload) => {
       const row = payload.new as Record<string, unknown>
       const senderId = String(row.last_sender_id || '')

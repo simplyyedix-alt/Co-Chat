@@ -169,10 +169,27 @@ export function clearStudyTimerNotification() {
   }
   void navigator.serviceWorker?.ready.then((registration) => registration.getNotifications({ tag: 'cochat-study-timer' }).then((items) => items.forEach((item) => item.close()))).catch(() => undefined)
 }
+async function saveTokenThroughBackend(token: string, platform: 'web' | 'android') {
+  if (!auth?.currentUser) return false
+  const base = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '')
+  if (!base) return false
+  const idToken = await auth.currentUser.getIdToken()
+  const response = await fetch(`${base}/functions/v1/fcm-notifications`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'register-token', token, platform }),
+  })
+  return response.ok
+}
 async function saveToken(token: string, platform: 'web' | 'android') {
-  if (!auth?.currentUser || !db) return false
-  await setDoc(doc(db, 'users', auth.currentUser.uid, 'fcmTokens', platform === 'android' ? encodeURIComponent(token) : token), { token, platform, updatedAt: serverTimestamp() }, { merge: true })
-  return true
+  if (!auth?.currentUser) return false
+  try {
+    if (db) {
+      await setDoc(doc(db, 'users', auth.currentUser.uid, 'fcmTokens', encodeURIComponent(token)), { token, platform, updatedAt: serverTimestamp() }, { merge: true })
+      return true
+    }
+  } catch { /* The backend registration path handles projects with older rules. */ }
+  return saveTokenThroughBackend(token, platform)
 }
 export async function registerFcmNotifications(enabled = true) {
   if (!enabled || !app || !auth?.currentUser || !db) return false

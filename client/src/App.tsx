@@ -2969,15 +2969,15 @@ export default function App() {
                     setConversationMenu(null);
                   }}
                 >
-                  Delete conversation
+                  Remove conversation
                 </button>
               </div>
             )}
             {deleteTarget && (
               <div className="modal-backdrop">
                 <section className="modal" role="dialog" aria-modal="true">
-                  <h2>Delete conversation?</h2>
-                  <p>This removes the conversation and its messages for everyone.</p>
+                  <h2>Remove conversation?</h2>
+                  <p>This removes it from your conversation list. Other members keep their messages.</p>
                   <div className="group-step-actions">
                     <button className="secondary" type="button" onClick={() => setDeleteTarget(null)}>Cancel</button>
                     <button className="danger" type="button" onClick={async () => {
@@ -2985,6 +2985,9 @@ export default function App() {
                       await deleteConversation(
                         deleteTarget.id,
                         liveUser.uid,
+                      );
+                      setConversations((current) =>
+                        current.filter((item) => item.id !== deleteTarget.id),
                       );
                       setSelected((current) =>
                         current?.id === deleteTarget.id ? null : current,
@@ -2997,7 +3000,7 @@ export default function App() {
                           : "Could not delete conversation.",
                       );
                     }
-                    }}>Delete</button>
+                    }}>Remove</button>
                   </div>
                 </section>
               </div>

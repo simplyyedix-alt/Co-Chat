@@ -58,6 +58,16 @@ async function broadcastChatMessage(conversationId, payload) {
     body: JSON.stringify(payload)
   });
 }
+async function broadcastConversationChange(memberUids, payload) {
+  const base = Deno.env.get("SUPABASE_URL") || "";
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (!base || !key) return;
+  await Promise.all(memberUids.filter(Boolean).map((uid) => fetch(`${base}/realtime/v1/api/broadcast/${encodeURIComponent(`chat-conversations:${uid}`)}/events/conversation`, {
+    method: "POST",
+    headers: { ...serverKeyHeaders(key), "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  })));
+}
 async function member(conversationId, uid) {
   const rows = await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(uid)}&select=conversation_id,uid,hidden_at,unread_count,read_at`);
   return Array.isArray(rows) && rows.length > 0;
@@ -322,21 +332,30 @@ async function handleChat(request) {
         const unreadCount = memberUid === user.uid ? Number(item.unread_count || 0) : Number(item.unread_count || 0) + 1;
         return rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(memberUid)}`, { method: "PATCH", body: JSON.stringify({ unread_count: unreadCount, hidden_at: null }) });
       }));
-      runInBackground((async () => {
-        const targets = (members || []).map((item) => String(item.uid || "")).filter((uid) => uid && uid !== user.uid);
-        await Promise.all([
-          rest(`messages?conversation_id=eq.${encodeURIComponent(conversationId)}&created_at=lt.${encodeURIComponent(cutoff)}&select=id`, { method: "DELETE" }),
-          notifyMessageRecipients(targets, user.displayName, text || "\u{1F4CE} Attachment", conversationId, messageId, messageAt),
-          broadcastChatMessage(conversationId, { messageId, messageAt })
-        ]);
-      })());
+      const memberUids = (members || []).map((item) => String(item.uid || "")).filter(Boolean);
+      const targets = memberUids.filter((uid) => uid !== user.uid);
+      await Promise.all([
+        rest(`messages?conversation_id=eq.${encodeURIComponent(conversationId)}&created_at=lt.${encodeURIComponent(cutoff)}&select=id`, { method: "DELETE" }),
+        notifyMessageRecipients(targets, user.displayName, text || "\u{1F4CE} Attachment", conversationId, messageId, messageAt),
+        broadcastChatMessage(conversationId, { messageId, messageAt }),
+        broadcastConversationChange(memberUids, { conversationId, senderId: user.uid, message: text || "\u{1F4CE} Attachment", messageAt })
+      ]);
       return response({ message: rows?.[0] || null });
     }
     if (action === "delete-conversation") {
       const conversationId = String(body?.conversationId || "");
-      if (!conversationId || !await member(conversationId, user.uid)) return response({ error: "You cannot delete this conversation." }, 403);
-      await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: "DELETE" });
-      return response({ deleted: true });
+      if (!conversationId) return response({ error: "Conversation is required." }, 400);
+      const memberships = await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(user.uid)}&select=uid`);
+      if (memberships?.length) {
+        await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(user.uid)}`, { method: "PATCH", body: JSON.stringify({ hidden_at: new Date().toISOString(), unread_count: 0 }) });
+        return response({ deleted: true, hidden: true });
+      }
+      const owned = await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}&created_by=eq.${encodeURIComponent(user.uid)}&select=id&limit=1`);
+      if (owned?.length) {
+        await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: "DELETE" });
+        return response({ deleted: true });
+      }
+      return response({ error: "You cannot delete this conversation." }, 403);
     }
     if (action === "mark-read") {
       const conversationId = String(body?.conversationId || "");
