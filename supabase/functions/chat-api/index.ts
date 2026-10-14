@@ -271,8 +271,9 @@ Deno.serve(async (request) => {
       const rows = await rest('messages', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ conversation_id: conversationId, sender_id: user.uid, text: 'Serving pixels', attachment: body?.attachment || null, sneak, seen_by: [user.uid] }) })
       const messageAt = new Date().toISOString()
       const messageId = String(rows?.[0]?.id || '')
+      await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: 'PATCH', body: JSON.stringify({ last_message: 'Sneak', last_sender_id: user.uid, last_message_at: messageAt }) })
+      await Promise.all([user.uid, recipientId].map((memberUid) => rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(memberUid)}`, { method: 'PATCH', body: JSON.stringify({ hidden_at: null }) })))
       runInBackground(Promise.all([
-        rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: 'PATCH', body: JSON.stringify({ last_message: 'Sneak', last_sender_id: user.uid, last_message_at: messageAt }) }),
         notifyMessageRecipients([recipientId], user.displayName, 'Sent you a Sneak', conversationId, messageId, messageAt),
         broadcastChatMessage(conversationId, { messageId, messageAt }),
       ]))
