@@ -14,6 +14,18 @@ function serverKeyHeaders(key: string) {
   return { apikey: key, ...(key.startsWith('sb_') ? {} : { Authorization: `Bearer ${key}` }) }
 }
 
+function supabaseServerKey() {
+  const custom = Deno.env.get('CHAT_SUPABASE_SECRET_KEY') || ''
+  if (custom) return custom
+  const secretKeys = Deno.env.get('SUPABASE_SECRET_KEYS') || ''
+  try {
+    const values = Object.values(JSON.parse(secretKeys) as Record<string, unknown>)
+    const key = values.find((value): value is string => typeof value === 'string' && value.startsWith('sb_secret_'))
+    if (key) return key
+  } catch { /* older runtimes may not expose SUPABASE_SECRET_KEYS */ }
+  return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+}
+
 function response(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 }
@@ -34,7 +46,7 @@ async function verifyFirebaseToken(request: Request) {
 
 async function rest(path: string, init: RequestInit = {}) {
   const base = Deno.env.get('SUPABASE_URL') || ''
-  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+  const key = supabaseServerKey()
   if (!base || !key) throw new Error('Missing Supabase server configuration')
   const result = await fetch(`${base}/rest/v1/${path}`, {
     ...init,
@@ -47,7 +59,7 @@ async function rest(path: string, init: RequestInit = {}) {
 
 async function broadcastChatMessage(conversationId: string, payload: Record<string, unknown>) {
   const base = Deno.env.get('SUPABASE_URL') || ''
-  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+  const key = supabaseServerKey()
   if (!base || !key) return
   const topic = encodeURIComponent(`chat-messages:${conversationId}`)
   await fetch(`${base}/realtime/v1/api/broadcast/${topic}/events/message`, {
@@ -64,7 +76,7 @@ async function member(conversationId: string, uid: string) {
 
 async function notifyMessageRecipients(targetUids: string[], senderName: string, message: string, conversationId: string, messageId: string, messageAt: string, extraData: Record<string, string> = {}) {
   const base = Deno.env.get('SUPABASE_URL') || ''
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+  const serviceKey = supabaseServerKey()
   const secret = Deno.env.get('INTERNAL_NOTIFICATIONS_SECRET') || ''
   if (!base || !serviceKey || !secret || !targetUids.length) return
   await fetch(`${base}/functions/v1/fcm-notifications`, {
