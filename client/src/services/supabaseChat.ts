@@ -121,8 +121,10 @@ export async function listConversations(uid: string): Promise<Conversation[]> {
     const lastSeen = profile?.lastSeen || null
     const lastSeenMs = lastSeen?.toMillis() || 0
     const lastMessageAt = timestamp(nested.last_message_at)
-    const hiddenAt = timestamp(item.hidden_at)
-    const hiddenByNewerHide = Boolean(hiddenAt && (!lastMessageAt || hiddenAt.toMillis() >= lastMessageAt.toMillis()))
+    // `hidden_at` was populated by an early migration, but the current chat
+    // delete flow removes the conversation rather than hiding its membership.
+    // Treating those legacy timestamps as active hides every migrated chat
+    // from navigation even though its messages are still present.
     return {
       id: String(nested.id || item.conversation_id || ''), name, memberIds: members,
       type: nested.type === 'group' ? ('group' as const) : ('direct' as const), adminId: nested.admin_id ? String(nested.admin_id) : undefined,
@@ -130,7 +132,7 @@ export async function listConversations(uid: string): Promise<Conversation[]> {
       lastMessageAt, createdAt: timestamp(nested.created_at), username: profile?.username || '',
       avatar: name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'U',
       active: profile?.activeStatus !== false && lastSeenMs > 0 && Date.now() - lastSeenMs < 90000, lastSeen, photoURL: String(nested.type === 'group' ? (nested.photo_url || '') : (profile?.photoURL || '')), unreadCount: Number(item.unread_count || 0),
-      hiddenFor: hiddenByNewerHide ? [uid] : [],
+      hiddenFor: [] as string[],
     }
   }).filter(item => item.id && !item.hiddenFor?.includes(uid)).sort((a, b) => (b.lastMessageAt?.toMillis() || b.createdAt?.toMillis() || 0) - (a.lastMessageAt?.toMillis() || a.createdAt?.toMillis() || 0)).filter((item, index, items) => item.type !== 'direct' || items.findIndex(candidate => candidate.type === 'direct' && [...candidate.memberIds].sort().join(':') === [...item.memberIds].sort().join(':')) === index)
 }
