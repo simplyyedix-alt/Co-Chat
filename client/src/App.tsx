@@ -3242,6 +3242,7 @@ function FriendZone({
             ×
           </button>
           <Avatar profile={focused} className="avatar large" />
+          <span className="settings-eyebrow">CO-CHAT PROFILE</span>
           <h3>{focused.displayName}</h3>
           <p>@{focused.username}{isModerator(focused.uid) && <VerifiedTick />}</p>
           <div className="public-profile-atmosphere">
@@ -3506,6 +3507,7 @@ function SearchPanel({
             ×
           </button>
           <Avatar profile={focused} className="avatar large" />
+          <span className="settings-eyebrow">CO-CHAT PROFILE</span>
           <h3>{focused.displayName}</h3>
           <p>@{focused.username}{isModerator(focused.uid) && <VerifiedTick />}</p>
           <div className="public-profile-atmosphere">
