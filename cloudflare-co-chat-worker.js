@@ -308,25 +308,21 @@ async function handleChat(request) {
       const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1e3).toISOString();
       const messageId = String(rows?.[0]?.id || "");
       const messageAt = String(rows?.[0]?.created_at || (/* @__PURE__ */ new Date()).toISOString());
+      const members = await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&select=uid,unread_count`);
+      await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: "PATCH", body: JSON.stringify({ last_message: text || "\u{1F4CE} Attachment", last_sender_id: user.uid, last_message_at: messageAt }) });
+      await Promise.all((members || []).map((item) => {
+        const memberUid = String(item.uid || "");
+        if (!memberUid) return Promise.resolve();
+        const unreadCount = memberUid === user.uid ? Number(item.unread_count || 0) : Number(item.unread_count || 0) + 1;
+        return rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(memberUid)}`, { method: "PATCH", body: JSON.stringify({ unread_count: unreadCount, hidden_at: null }) });
+      }));
       runInBackground((async () => {
-        const membersPromise = rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&select=uid,unread_count`);
-        const notifyPromise = membersPromise.then((members2) => {
-          const targets = (members2 || []).map((item) => String(item.uid || "")).filter((uid) => uid && uid !== user.uid);
-          return notifyMessageRecipients(targets, user.displayName, text || "\u{1F4CE} Attachment", conversationId, messageId, messageAt);
-        });
+        const targets = (members || []).map((item) => String(item.uid || "")).filter((uid) => uid && uid !== user.uid);
         await Promise.all([
           rest(`messages?conversation_id=eq.${encodeURIComponent(conversationId)}&created_at=lt.${encodeURIComponent(cutoff)}&select=id`, { method: "DELETE" }),
-          rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: "PATCH", body: JSON.stringify({ last_message: text || "\u{1F4CE} Attachment", last_sender_id: user.uid, last_message_at: messageAt }) }),
-          notifyPromise,
+          notifyMessageRecipients(targets, user.displayName, text || "\u{1F4CE} Attachment", conversationId, messageId, messageAt),
           broadcastChatMessage(conversationId, { messageId, messageAt })
         ]);
-        const members = await membersPromise;
-        await Promise.all((members || []).map((item) => {
-          const memberUid = String(item.uid || "");
-          if (!memberUid) return Promise.resolve();
-          const unreadCount = memberUid === user.uid ? Number(item.unread_count || 0) : Number(item.unread_count || 0) + 1;
-          return rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(memberUid)}`, { method: "PATCH", body: JSON.stringify({ unread_count: unreadCount, hidden_at: null }) });
-        }));
       })());
       return response({ message: rows?.[0] || null });
     }

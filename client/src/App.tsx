@@ -504,7 +504,12 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   const timerRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (!timerSetupOpen) return;
-    const frame = window.requestAnimationFrame(() => timerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
+    // The timer controls sit below the study dashboard. Bring them to the
+    // reading position as soon as the sheet opens, so users never have to
+    // hunt for the timer after tapping a task or Set timer.
+    const frame = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => timerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    });
     return () => window.cancelAnimationFrame(frame);
   }, [timerSetupOpen]);
   useEffect(() => {

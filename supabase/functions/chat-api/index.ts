@@ -315,29 +315,25 @@ Deno.serve(async (request) => {
       const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
       const messageId = String(rows?.[0]?.id || '')
       const messageAt = String(rows?.[0]?.created_at || new Date().toISOString())
+      const members = await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&select=uid,unread_count`)
+      await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: 'PATCH', body: JSON.stringify({ last_message: text || '📎 Attachment', last_sender_id: user.uid, last_message_at: messageAt }) })
+      await Promise.all((members || []).map((item: Record<string, unknown>) => {
+        const memberUid = String(item.uid || '')
+        if (!memberUid) return Promise.resolve()
+        const unreadCount = memberUid === user.uid ? Number(item.unread_count || 0) : Number(item.unread_count || 0) + 1
+        return rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(memberUid)}`, { method: 'PATCH', body: JSON.stringify({ unread_count: unreadCount, hidden_at: null }) })
+      }))
       // A successful message insert is the acknowledgement the sender needs.
       // Keep cleanup, unread counters, the conversation preview, broadcast,
       // and FCM delivery alive in the Edge runtime instead of serialising them
       // before returning the response.
       runInBackground((async () => {
-        const membersPromise = rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&select=uid,unread_count`)
-        const notifyPromise = membersPromise.then((members) => {
-          const targets = (members || []).map((item: Record<string, unknown>) => String(item.uid || '')).filter((uid: string) => uid && uid !== user.uid)
-          return notifyMessageRecipients(targets, user.displayName, text || '📎 Attachment', conversationId, messageId, messageAt)
-        })
+        const targets = (members || []).map((item: Record<string, unknown>) => String(item.uid || '')).filter((uid: string) => uid && uid !== user.uid)
         await Promise.all([
           rest(`messages?conversation_id=eq.${encodeURIComponent(conversationId)}&created_at=lt.${encodeURIComponent(cutoff)}&select=id`, { method: 'DELETE' }),
-          rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: 'PATCH', body: JSON.stringify({ last_message: text || '📎 Attachment', last_sender_id: user.uid, last_message_at: messageAt }) }),
-          notifyPromise,
+          notifyMessageRecipients(targets, user.displayName, text || '📎 Attachment', conversationId, messageId, messageAt),
           broadcastChatMessage(conversationId, { messageId, messageAt }),
         ])
-        const members = await membersPromise
-        await Promise.all((members || []).map((item: Record<string, unknown>) => {
-          const memberUid = String(item.uid || '')
-          if (!memberUid) return Promise.resolve()
-          const unreadCount = memberUid === user.uid ? Number(item.unread_count || 0) : Number(item.unread_count || 0) + 1
-          return rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(memberUid)}`, { method: 'PATCH', body: JSON.stringify({ unread_count: unreadCount, hidden_at: null }) })
-        }))
       })())
       return response({ message: rows?.[0] || null })
     }
