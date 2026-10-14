@@ -14,6 +14,7 @@ import {
   type User,
 } from "firebase/auth";
 import { auth, firebaseReady, googleProvider } from "./firebase";
+import coChatLogo from "./assets/logo.svg";
 import { Timestamp } from "firebase/firestore";
 import { supabaseReady, verifyFirebaseIdentity } from "./supabase";
 import {
@@ -67,7 +68,7 @@ import {
   type StudyLeaderboardEntry,
   type UserProfile,
 } from "./services/chat";
-import { attachTwittCommentMedia, attachTwittMedia, createTwitt as createRemoteTwitt, createTwittComment, deleteTwitt, deleteTwittComment, hideTwitt, isModerator, isVerified, loadTwittComments, loadTwittPage, recordTwittView, restrictTwittUser, toggleTwittCommentLike, toggleTwittLike, type TwittAttachment, type TwittComment } from "./services/twitts";
+import { attachTwittCommentMedia, attachTwittMedia, createTwitt as createRemoteTwitt, createTwittComment, deleteTwitt, deleteTwittComment, hideTwitt, isModerator, isVerified, loadTwittComments, loadTwittPage, recordTwittView, restrictTwittUser, toggleTwittCommentLike, toggleTwittLike, type TwittAttachment, type TwittAuthorProfile, type TwittComment, type TwittRecord } from "./services/twitts";
 import { StorageManager } from "./services/storageManager";
 import { clearStudyTimerNotification, listenNotificationActions, notifyIncomingCall, notifyIncomingMessage, notifyStudyTimer, notifyStudyTimerComplete, registerFcmNotifications } from "./services/notifications";
 import "./index.css";
@@ -729,7 +730,35 @@ function StudyHome({ uid, onOpenDiscover }: { uid: string; onOpenDiscover: () =>
   );
 }
 
-type TwittPreview = { id: string; authorUid: string; author: string; handle: string; avatar: string; body: string; likes: number; comments: number; views: string; age: string; createdAt: number; community: string; feedType: "study" | "social"; expiresAt?: string | null; seen?: boolean; liked?: boolean; attachment?: TwittAttachment | null };
+type TwittPreview = { id: string; authorUid: string; author: string; handle: string; avatar: string; body: string; likes: number; comments: number; views: string; age: string; createdAt: number; community: string; feedType: "study" | "social"; expiresAt?: string | null; seen?: boolean; liked?: boolean; attachment?: TwittAttachment | null; authorProfile?: TwittAuthorProfile | null };
+
+function previewFromTwitt(item: TwittRecord, viewerUid: string): TwittPreview {
+  const profile = item.authorProfile || null;
+  const isViewer = item.uid === viewerUid;
+  const isAnonymous = !isViewer && profile?.hideTwittIdentity === true;
+  const visibleProfile = isAnonymous && profile ? { ...profile, photoURL: "" } : profile;
+  const now = Date.now();
+  return {
+    id: item.id,
+    authorUid: item.uid,
+    author: isViewer ? "You" : isAnonymous ? "Anonymous" : profile?.displayName || "Anonymous",
+    handle: isViewer || !isAnonymous ? profile?.username || "" : "",
+    avatar: visibleProfile?.photoURL || DEFAULT_AVATAR_URL,
+    body: item.body,
+    likes: Math.max(0, item.likes),
+    liked: Boolean(item.liked),
+    comments: Math.max(0, item.comments),
+    views: String(item.views),
+    attachment: item.attachment,
+    age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`,
+    createdAt: item.createdAt?.toMillis?.() || now,
+    community: item.community,
+    feedType: item.feedType,
+    expiresAt: item.expiresAt,
+    seen: item.seen,
+    authorProfile: visibleProfile,
+  };
+}
 
 function CommentSheet({ post, comments, loading, hasMore, names, currentUid, onClose, onLoadMore, onSubmit, onLike, onDelete }: {
   post: TwittPreview; comments: TwittComment[]; loading: boolean; hasMore: boolean; names: Record<string, string>; currentUid?: string;
@@ -746,7 +775,7 @@ function CommentSheet({ post, comments, loading, hasMore, names, currentUid, onC
       <div className="comment-sheet-list">
         {loading && !comments.length && <p className="comment-loading">Loading comments…</p>}
         {!loading && !comments.length && <div className="comment-empty"><strong>Start the conversation</strong><span>Be the first to leave a helpful comment.</span></div>}
-        {comments.map((comment) => { const name = names[comment.uid] || "Profile unavailable"; return <article className="sheet-comment" key={comment.id}><div className="comment-avatar">{name.slice(0, 2).toUpperCase()}</div><div className="sheet-comment-body"><div><strong>{name === "Profile unavailable" ? name : `@${name}`}</strong>{comment.uid === currentUid && <button className="comment-delete" type="button" onClick={() => onDelete(comment)}>Delete</button>}</div><p>{comment.body}</p>{comment.attachment && (comment.attachment.type.startsWith("image/") ? <a className="twitt-media-preview" href={comment.attachment.url} target="_blank" rel="noreferrer" download={comment.attachment.name}><img loading="lazy" decoding="async" src={comment.attachment.url} alt={comment.attachment.name} /><span>Open / save image</span></a> : <a className="twitt-attachment" href={comment.attachment.url} target="_blank" rel="noreferrer" download={comment.attachment.name}>📄 {comment.attachment.name} · Open / save</a>)}<button className={comment.liked ? "comment-like liked" : "comment-like"} type="button" onClick={() => onLike(comment)}>♡ {comment.likes || 0}</button></div></article>; })}
+        {comments.map((comment) => { const name = names[comment.uid] || "Anonymous"; return <article className="sheet-comment" key={comment.id}><div className="comment-avatar">{name === "Anonymous" ? "" : name.slice(0, 2).toUpperCase()}</div><div className="sheet-comment-body"><div><strong>{name === "Anonymous" ? name : `@${name}`}</strong>{comment.uid === currentUid && <button className="comment-delete" type="button" onClick={() => onDelete(comment)}>Delete</button>}</div><p>{comment.body}</p>{comment.attachment && (comment.attachment.type.startsWith("image/") ? <a className="twitt-media-preview" href={comment.attachment.url} target="_blank" rel="noreferrer" download={comment.attachment.name}><img loading="lazy" decoding="async" src={comment.attachment.url} alt={comment.attachment.name} /><span>Open / save image</span></a> : <a className="twitt-attachment" href={comment.attachment.url} target="_blank" rel="noreferrer" download={comment.attachment.name}>📄 {comment.attachment.name} · Open / save</a>)}<button className={comment.liked ? "comment-like liked" : "comment-like"} type="button" onClick={() => onLike(comment)}>♡ {comment.likes || 0}</button></div></article>; })}
         {hasMore && <button className="load-comments" type="button" disabled={loading} onClick={onLoadMore}>{loading ? "Loading…" : "Load more comments"}</button>}
       </div>
       <form className="comment-sheet-compose" onSubmit={submit}><input value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 240))} placeholder="Add a thoughtful comment" autoFocus /><label className="comment-media-picker" title="Photo or PDF, max 5 MB"><MediaIcon /><input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label>{file && <small className="comment-file-name" title={file.name}>{file.name}</small>}<button className="primary compact" type="submit" disabled={!draft.trim() && !file}>Send</button></form>
@@ -913,7 +942,9 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
       {
         const now = Date.now();
         setAuthorLoading(true);
-        setPosts(page.items.map((item) => ({ id: item.id, authorUid: item.uid, author: item.uid === viewerUid ? "You" : "Anonymous", handle: "", avatar: item.uid === viewerUid ? "YO" : "CM", body: item.body, likes: Math.max(0, item.likes), liked: Boolean(item.liked), comments: Math.max(0, item.comments), views: String(item.views), attachment: item.attachment, age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community, feedType: item.feedType, expiresAt: item.expiresAt, seen: item.seen })));
+        const hydrated = page.items.filter((item) => item.authorProfile?.username).reduce<Record<string, string>>((profiles, item) => { profiles[item.uid] = item.authorProfile!.username; return profiles; }, {});
+        setAuthorNames((current) => ({ ...current, ...hydrated }));
+        setPosts(page.items.map((item) => previewFromTwitt(item, viewerUid)));
         setVisible(20);
       }
       setRemoteCursor(page.cursor);
@@ -933,9 +964,11 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
       setRemoteLoading(true);
       try {
         const page = await loadTwittPage("all", remoteCursor, { feedType, friendIds });
-        const now = Date.now();
         setAuthorLoading(true);
-        setPosts((current) => [...current, ...page.items.map((item) => ({ id: item.id, authorUid: item.uid, author: item.uid === auth?.currentUser?.uid ? "You" : "Anonymous", handle: "", avatar: DEFAULT_AVATAR_URL, body: item.body, likes: Math.max(0, item.likes), liked: Boolean(item.liked), comments: Math.max(0, item.comments), views: String(item.views), attachment: item.attachment, age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community, feedType: item.feedType, expiresAt: item.expiresAt, seen: item.seen }))]);
+        const viewerUid = auth?.currentUser?.uid || "";
+        const hydrated = page.items.filter((item) => item.authorProfile?.username).reduce<Record<string, string>>((profiles, item) => { profiles[item.uid] = item.authorProfile!.username; return profiles; }, {});
+        setAuthorNames((current) => ({ ...current, ...hydrated }));
+        setPosts((current) => [...current, ...page.items.map((item) => previewFromTwitt(item, viewerUid))]);
         setRemoteCursor(page.cursor);
         setRemoteHasMore(page.hasMore);
         setVisible((current) => current + page.items.length);
@@ -1000,7 +1033,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
       const page = await loadTwittComments(postId);
       const items = page.items;
       const profiles = await Promise.all(items.map(async (comment) => [comment.uid, await getUserProfile(comment.uid)] as const));
-      setCommentNames((current) => ({ ...current, ...Object.fromEntries(profiles.map(([uid, profile]) => [uid, profile?.username || "Profile unavailable"])) }));
+      setCommentNames((current) => ({ ...current, ...Object.fromEntries(profiles.map(([uid, profile]) => [uid, profile?.username || "Anonymous"])) }));
       setCommentsByPost((current) => ({ ...current, [postId]: items }));
       setCommentCursors((current) => ({ ...current, [postId]: page.cursor }));
       setCommentMore((current) => ({ ...current, [postId]: page.hasMore }));
@@ -1014,7 +1047,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
       const page = await loadTwittComments(postId, cursor);
       const items = page.items;
       const profiles = await Promise.all(items.map(async (comment) => [comment.uid, await getUserProfile(comment.uid)] as const));
-      setCommentNames((current) => ({ ...current, ...Object.fromEntries(profiles.map(([uid, profile]) => [uid, profile?.username || "Profile unavailable"])) }));
+      setCommentNames((current) => ({ ...current, ...Object.fromEntries(profiles.map(([uid, profile]) => [uid, profile?.username || "Anonymous"])) }));
       setCommentsByPost((current) => ({ ...current, [postId]: [...(current[postId] || []), ...items] }));
       setCommentCursors((current) => ({ ...current, [postId]: page.cursor }));
       setCommentMore((current) => ({ ...current, [postId]: page.hasMore }));
@@ -1038,7 +1071,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
         setCommentsByPost((current) => ({ ...current, [post.id]: (current[post.id] || []).filter((comment) => comment.id !== localId) }));
       }
       const profile = uid !== 'you' ? await getUserProfile(uid) : null;
-      setCommentNames((current) => ({ ...current, [uid]: profile?.username || current[uid] || uid.slice(0, 10) }));
+      setCommentNames((current) => ({ ...current, [uid]: profile?.username || current[uid] || "Anonymous" }));
     } catch (error) {
       setCommentsByPost((current) => ({ ...current, [post.id]: (current[post.id] || []).filter((comment) => comment.id !== localId) }));
       setPosts((current) => current.map((item) => item.id === post.id ? { ...item, comments: Math.max(0, item.comments - 1) } : item));
@@ -1050,7 +1083,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
       const detail = (event as CustomEvent<{ twittId?: string; id?: string; uid?: string; body?: string; attachment?: TwittAttachment | null }>).detail;
       if (!detail?.twittId || !detail.id || !detail.uid || !detail.body) return;
       void getUserProfile(detail.uid).then((profile) => {
-        setCommentNames((names) => ({ ...names, [detail.uid!]: profile?.username || detail.uid!.slice(0, 10) }));
+        setCommentNames((names) => ({ ...names, [detail.uid!]: profile?.username || "Anonymous" }));
         setCommentsByPost((current) => {
           const comments = current[detail.twittId!] || [];
           if (comments.some((comment) => comment.id === detail.id)) return current;
@@ -1194,7 +1227,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
     {commentError && <div className="notice twitt-sync-error">{commentError}<button className="icon" type="button" aria-label="Dismiss comment error" onClick={() => setCommentError("")}>×</button></div>}
     {remoteLoading && !posts.length && <div className="twitt-skeleton-list" aria-label="Loading Twitts"><article><span/><div><b/><i/></div></article><article><span/><div><b/><i/></div></article><article><span/><div><b/><i/></div></article></div>}
     {remoteLoading && <div className="twitt-feed-loading" role="status" aria-live="polite"><span className="loading-spinner" /> Loading moments…</div>}
-    <div className="twitt-list">{filtered.slice(0, visible).map((post) => { const authorPhoto = authorProfiles[post.authorUid]?.photoURL || ""; const anonymousAvatar = !authorPhoto; return <article className="twitt-card" key={post.id}><div className="twitt-head"><button className={`avatar twitt-author-avatar${anonymousAvatar ? " is-anonymous" : ""}`} type="button" aria-label={anonymousAvatar && post.author === "Anonymous" ? "Open Anonymous profile" : `Open ${post.author}'s profile`} onClick={() => void openAuthorProfile(post.authorUid)}><img loading="lazy" decoding="async" src={authorPhoto || DEFAULT_AVATAR_URL} alt="" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = DEFAULT_AVATAR_URL; event.currentTarget.closest(".twitt-author-avatar")?.classList.add("is-anonymous"); }} /></button><div><strong>{post.author}</strong>{isVerified(post.authorUid) && <VerifiedTick />}<small>{post.handle ? `@${post.handle} · ` : ""}{post.age} · {post.community.toUpperCase()}</small></div><div className="twitt-actions"><button className="icon" aria-label="Twitt options" aria-expanded={postMenu === post.id} onClick={() => setPostMenu(postMenu === post.id ? null : post.id)}>•••</button>{postMenu === post.id && <div className="twitt-menu">{post.authorUid === auth?.currentUser?.uid ? <button type="button" className="danger" onClick={() => void removePost(post)}>Delete Twitt</button> : <button type="button" onClick={() => void dismissPost(post)}>Not interested</button>}<button type="button" onClick={() => setPostMenu(null)}>Cancel</button></div>}</div></div><p>{post.body}</p>{post.attachment && (post.attachment.type.startsWith("image/") ? <a className="twitt-media-preview" href={post.attachment.url} target="_blank" rel="noreferrer" download={post.attachment.name}><img loading="lazy" decoding="async" src={post.attachment.url} alt={post.attachment.name} /><span>Open / save image</span></a> : <a className="twitt-attachment" href={post.attachment.url} target="_blank" rel="noreferrer" download={post.attachment.name}>📄 {post.attachment.name} · Open / save</a>)}<div className="twitt-meta"><button className={post.liked ? "liked" : ""} aria-label={post.liked ? "Unlike Twitt" : "Like Twitt"} onClick={() => void handleLike(post)}><span className="like-icon" aria-hidden="true">♡</span> {post.likes}</button><button className="comment-action" aria-label="Open comments" onClick={() => void openComments(post.id)}><span className="comment-icon" aria-hidden="true" /> {post.comments}</button><span>◉ {post.views}</span><button className={following.includes(post.community) ? "followed" : ""} onClick={() => setFollowing((current) => current.includes(post.community) ? current.filter((id) => id !== post.community) : [...current, post.community])}>{following.includes(post.community) ? "Following" : `Follow ${post.community.toUpperCase()}`}</button></div></article>; })}</div>
+    <div className="twitt-list">{filtered.slice(0, visible).map((post) => { const authorPhoto = post.authorProfile?.photoURL || authorProfiles[post.authorUid]?.photoURL || ""; const anonymousAvatar = !authorPhoto; return <article className="twitt-card" key={post.id}><div className="twitt-head"><button className={`avatar twitt-author-avatar${anonymousAvatar ? " is-anonymous" : ""}`} type="button" aria-label={anonymousAvatar && post.author === "Anonymous" ? "Open Anonymous profile" : `Open ${post.author}'s profile`} onClick={() => void openAuthorProfile(post.authorUid)}><img loading="lazy" decoding="async" src={authorPhoto || DEFAULT_AVATAR_URL} alt="" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = DEFAULT_AVATAR_URL; event.currentTarget.closest(".twitt-author-avatar")?.classList.add("is-anonymous"); }} /></button><div><strong>{post.author}</strong>{isVerified(post.authorUid) && <VerifiedTick />}<small>{post.handle ? `@${post.handle} · ` : ""}{post.age} · {post.community.toUpperCase()}</small></div><div className="twitt-actions"><button className="icon" aria-label="Twitt options" aria-expanded={postMenu === post.id} onClick={() => setPostMenu(postMenu === post.id ? null : post.id)}>•••</button>{postMenu === post.id && <div className="twitt-menu">{post.authorUid === auth?.currentUser?.uid ? <button type="button" className="danger" onClick={() => void removePost(post)}>Delete Twitt</button> : <button type="button" onClick={() => void dismissPost(post)}>Not interested</button>}<button type="button" onClick={() => setPostMenu(null)}>Cancel</button></div>}</div></div><p>{post.body}</p>{post.attachment && (post.attachment.type.startsWith("image/") ? <a className="twitt-media-preview" href={post.attachment.url} target="_blank" rel="noreferrer" download={post.attachment.name}><img loading="lazy" decoding="async" src={post.attachment.url} alt={post.attachment.name} /><span>Open / save image</span></a> : <a className="twitt-attachment" href={post.attachment.url} target="_blank" rel="noreferrer" download={post.attachment.name}>📄 {post.attachment.name} · Open / save</a>)}<div className="twitt-meta"><button className={post.liked ? "liked" : ""} aria-label={post.liked ? "Unlike Twitt" : "Like Twitt"} onClick={() => void handleLike(post)}><span className="like-icon" aria-hidden="true">♡</span> {post.likes}</button><button className="comment-action" aria-label="Open comments" onClick={() => void openComments(post.id)}><span className="comment-icon" aria-hidden="true" /> {post.comments}</button><span>◉ {post.views}</span><button className={following.includes(post.community) ? "followed" : ""} onClick={() => setFollowing((current) => current.includes(post.community) ? current.filter((id) => id !== post.community) : [...current, post.community])}>{following.includes(post.community) ? "Following" : `Follow ${post.community.toUpperCase()}`}</button></div></article>; })}</div>
     {commenting && posts.find((post) => post.id === commenting) && <CommentSheet post={posts.find((post) => post.id === commenting)!} comments={commentsByPost[commenting] || []} loading={commentLoading === commenting} hasMore={Boolean(commentMore[commenting])} names={commentNames} currentUid={auth?.currentUser?.uid} onClose={() => setCommenting(null)} onLoadMore={() => void loadMoreComments(commenting)} onSubmit={(body, file) => void submitComment(posts.find((post) => post.id === commenting)!, body, file)} onLike={(comment) => void likeComment(commenting, comment)} onDelete={(comment) => void removeComment(posts.find((post) => post.id === commenting)!, comment)} />}
     {!remoteLoading && !remoteError && !filtered.length && <div className="empty-state">No Twitts in {communityLabel} yet. Be the first to share something useful.</div>}
     {(visible < filtered.length || remoteHasMore) && <button className="load-more" type="button" onClick={() => void loadMore()} disabled={remoteLoading}>{remoteLoading ? "Loading Twitts…" : "Load 20 more Twitts"}</button>}
@@ -1932,7 +1965,7 @@ export default function App() {
         <div className="app-loading-glow app-loading-glow-one" />
         <div className="app-loading-glow app-loading-glow-two" />
         <section className="app-loading-card" aria-label="Loading Co-Chat">
-          <div className="app-loading-brand"><span className="brand-mark">C</span><strong>Co-Chat</strong></div>
+          <div className="app-loading-brand"><img className="app-loading-logo" src={coChatLogo} alt="Co-Chat" /><strong>Co-Chat</strong></div>
           <div className="app-loading-orbit"><span className="app-loading-spinner" /><b>✦</b></div>
           <p className="app-loading-kicker">YOUR SPACE IS SYNCING</p>
           <h1>Connect to your space</h1>
@@ -2200,7 +2233,7 @@ export default function App() {
   };
   const shareProfile = async (displayName: string, username: string) => {
     const handle = username.trim() ? `@${username.trim()}` : displayName.trim();
-    const message = `${displayName.trim() || "A Co-Chat member"} is on Co-Chat — ${handle}`;
+    const message = `${displayName.trim() || "Anonymous"} is on Co-Chat — ${handle}`;
     try {
       if (navigator.share) await navigator.share({ title: "Co-Chat profile", text: message, url: window.location.href });
       else {
@@ -2989,7 +3022,7 @@ export default function App() {
           <div className="settings-page">
             <form className="profile-card settings-profile-card" onSubmit={save}>
               <div className="settings-card-kicker">PROFILE & IDENTITY <span>Changes sync across devices</span></div>
-              <div className="settings-profile-heading"><button type="button" className="settings-avatar-upload" title="Change profile photo" onClick={() => document.getElementById("profile-photo-input")?.click()}><div className="settings-avatar-wrap"><Avatar name={profileName || liveUser.email || "U"} photoURL={profilePhotoUrl || undefined} className="avatar large" /><span className={`settings-presence ${activeStatus ? "online" : ""}`} /></div><span className="settings-avatar-camera">📷</span></button><input id="profile-photo-input" className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (!file) return; if (file.size > 5 * 1024 * 1024) { setError("Profile photos must be smaller than 5 MB."); return; } const reader = new FileReader(); reader.onload = () => { setProfilePhotoUrl(String(reader.result || "")); setProfileSaved(false); }; reader.readAsDataURL(file); }} /><div><span className="settings-eyebrow">PROFILE</span><h2>{profileName || "Co Chat member"}</h2><p>{liveUser.email}</p></div></div>
+              <div className="settings-profile-heading"><button type="button" className="settings-avatar-upload" title="Change profile photo" onClick={() => document.getElementById("profile-photo-input")?.click()}><div className="settings-avatar-wrap"><Avatar name={profileName || liveUser.email || "Anonymous"} photoURL={profilePhotoUrl || undefined} className="avatar large" /><span className={`settings-presence ${activeStatus ? "online" : ""}`} /></div><span className="settings-avatar-camera">📷</span></button><input id="profile-photo-input" className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (!file) return; if (file.size > 5 * 1024 * 1024) { setError("Profile photos must be smaller than 5 MB."); return; } const reader = new FileReader(); reader.onload = () => { setProfilePhotoUrl(String(reader.result || "")); setProfileSaved(false); }; reader.readAsDataURL(file); }} /><div><span className="settings-eyebrow">PROFILE</span><h2>{profileName || "Anonymous"}</h2><p>{liveUser.email}</p></div></div>
               <div className="profile-details" aria-label="Profile details">
                 {isVerified(liveUser.uid) && <span className="verified-profile-label"><VerifiedTick />Verified account</span>}
                 <span><b>@</b>{profileUsername || "choose a username"}</span>

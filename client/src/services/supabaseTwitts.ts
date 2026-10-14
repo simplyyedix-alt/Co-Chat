@@ -1,6 +1,6 @@
 import { invokeSocialApi, supabase } from '../supabase'
 import { auth } from '../firebase'
-import type { TwittAttachment, TwittCommunity, TwittComment, TwittFeedType, TwittRecord } from './twitts'
+import type { TwittAttachment, TwittAuthorProfile, TwittCommunity, TwittComment, TwittFeedType, TwittRecord } from './twitts'
 
 const PAGE_SIZE = 20
 
@@ -24,10 +24,11 @@ type SupabaseRow = {
   seen?: boolean
   liked?: boolean
   attachment?: TwittAttachment | null
+  author_profile?: TwittAuthorProfile | null
 }
 
 function fromRow(row: SupabaseRow): TwittRecord {
-  return { id: row.id, uid: row.author_id, community: row.community, feedType: row.feed_type === 'social' ? 'social' : 'study', expiresAt: row.expires_at || null, seen: Boolean(row.seen), body: row.body, likes: row.likes_count, comments: row.comments_count, views: row.views_count, liked: Boolean(row.liked), attachment: row.attachment || null, createdAt: { toMillis: () => new Date(row.created_at).getTime() } }
+  return { id: row.id, uid: row.author_id, community: row.community, feedType: row.feed_type === 'social' ? 'social' : 'study', expiresAt: row.expires_at || null, seen: Boolean(row.seen), body: row.body, likes: row.likes_count, comments: row.comments_count, views: row.views_count, liked: Boolean(row.liked), attachment: row.attachment || null, authorProfile: row.author_profile || null, createdAt: { toMillis: () => new Date(row.created_at).getTime() } }
 }
 
 export async function loadSupabaseTwittPage(community: TwittCommunity | 'all', cursor?: string | null, options: { feedType?: TwittFeedType; friendIds?: string[] } = {}): Promise<{ items: TwittRecord[]; cursor: string | null; hasMore: boolean }> {

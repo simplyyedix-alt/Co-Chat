@@ -25,6 +25,7 @@ import { attachSupabaseTwittCommentMedia, attachSupabaseTwittMedia, createSupaba
 export type TwittCommunity = string
 export type TwittFeedType = 'study' | 'social'
 export type TwittAttachment = { name: string; url: string; storageKey?: string; type: string; size: number }
+export type TwittAuthorProfile = { uid: string; displayName: string; username: string; photoURL: string; bio: string; activeStatus: boolean; hideTwittIdentity: boolean }
 
 export type TwittRecord = {
   id: string
@@ -40,6 +41,7 @@ export type TwittRecord = {
   views: number
   liked?: boolean
   attachment?: TwittAttachment | null
+  authorProfile?: TwittAuthorProfile | null
 }
 
 export type TwittPage = {

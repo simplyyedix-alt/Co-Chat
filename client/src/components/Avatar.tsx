@@ -18,7 +18,7 @@ export function avatarInitials(name: string) {
 // (`/Co-Chat/app/`) as well as local and Android builds.
 export const DEFAULT_AVATAR_URL = `${import.meta.env.BASE_URL}assets/co-chat-default-avatar.jpg`
 
-export default function Avatar({ name = 'Co-Chat member', profile, photoURL, active = false, className = 'avatar', label = 'Online' }: Props) {
+export default function Avatar({ name = 'Anonymous', profile, photoURL, active = false, className = 'avatar', label = 'Online' }: Props) {
   const displayName = profile?.displayName || name
   const uploadedSrc = profile?.photoURL || photoURL
   const [imageFailed, setImageFailed] = useState(false)

@@ -106,7 +106,7 @@ Deno.serve(async (request) => {
     const body = await request.json().catch(() => null) as Record<string, unknown> | null
     const action = String(body?.action || '')
     if (action === 'profile-upsert') {
-      await rest('profiles', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ uid: user.uid, display_name: String(body?.displayName || user.displayName || 'Co-Chat member').slice(0, 100), email: String(body?.email || user.email || ''), photo_url: String(body?.photoURL || user.photoURL || ''), username: String(body?.username || '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24) || `user_${user.uid.slice(0, 8)}`, bio: String(body?.bio || '').slice(0, 280), notifications_enabled: body?.notificationsEnabled !== false, discoverable: body?.discoverable !== false, active_status: body?.activeStatus !== false, hide_twitt_identity: body?.hideTwittIdentity === true, last_seen: new Date().toISOString(), updated_at: new Date().toISOString() }) })
+      await rest('profiles', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ uid: user.uid, display_name: String(body?.displayName || user.displayName || 'Anonymous').slice(0, 100), email: String(body?.email || user.email || ''), photo_url: String(body?.photoURL || user.photoURL || ''), username: String(body?.username || '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24) || `user_${user.uid.slice(0, 8)}`, bio: String(body?.bio || '').slice(0, 280), notifications_enabled: body?.notificationsEnabled !== false, discoverable: body?.discoverable !== false, active_status: body?.activeStatus !== false, hide_twitt_identity: body?.hideTwittIdentity === true, last_seen: new Date().toISOString(), updated_at: new Date().toISOString() }) })
       return response({ ok: true })
     }
     if (action === 'presence') {
@@ -155,7 +155,7 @@ Deno.serve(async (request) => {
       // leaders consume the limit and hide current-week participants.
       const rows = await rest(`profiles?select=uid,display_name,username,photo_url,weekly_study_seconds,total_study_seconds,study_week_key,study_active_until,study_label${filter}&limit=500`)
       const items = (rows || []).map((item: Record<string, unknown>) => ({
-        uid: String(item.uid || ''), displayName: String(item.display_name || 'Co-Chat member'), username: String(item.username || ''), photoURL: String(item.photo_url || ''),
+        uid: String(item.uid || ''), displayName: String(item.display_name || 'Anonymous'), username: String(item.username || ''), photoURL: String(item.photo_url || ''),
         weeklySeconds: String(item.study_week_key || '') === weekKey ? Number(item.weekly_study_seconds || 0) : 0,
         totalSeconds: Number(item.total_study_seconds || 0), active: Boolean(item.study_active_until && new Date(String(item.study_active_until)).getTime() > Date.now()), label: String(item.study_label || ''),
       })).sort((a, b) => b.weeklySeconds - a.weeklySeconds || b.totalSeconds - a.totalSeconds)
@@ -324,7 +324,7 @@ Deno.serve(async (request) => {
       const rawData = body?.data && typeof body.data === 'object' ? body.data as Record<string, unknown> : {}
       const data = Object.fromEntries(Object.entries(rawData).slice(0, 12).map(([key, value]) => [key.slice(0, 64), String(value).slice(0, 256)]))
       const message = kind === 'call'
-        ? `${data.callType === 'video' ? 'Video' : 'Voice'} call from ${user.displayName || 'a Co-Chat member'}`
+        ? `${data.callType === 'video' ? 'Video' : 'Voice'} call from ${user.displayName || 'Anonymous'}`
         : 'Sent you a friend request'
       const eventId = String(data.callId || data.requestId || crypto.randomUUID())
       const eventAt = new Date().toISOString()

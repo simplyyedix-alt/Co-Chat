@@ -132,13 +132,29 @@ Deno.serve(async (request) => {
       const hidden = await callRest(`twitt_hidden?select=twitt_id&user_id=eq.${encodeURIComponent(uid)}`) as Array<{ twitt_id: string }>
       if (hidden.length) params.set('id', `not.in.(${hidden.map((item) => item.twitt_id).join(',')})`)
       const rows = await callRest(`twitts?${params.toString()}`) as Array<{ id: string } & Record<string, unknown>>
+      // Hydrate authors with the feed in one request. This keeps the feed
+      // database-backed and prevents a temporary “Loading profile…” card for
+      // every Twitt while the client performs one request per author.
+      const authorIds = [...new Set(rows.map((item) => String(item.author_id || '')).filter(Boolean))]
+      const profiles = authorIds.length
+        ? await callRest(`profiles?uid=in.(${authorIds.map((id) => encodeURIComponent(id)).join(',')})&select=uid,display_name,username,photo_url,bio,active_status,hide_twitt_identity`) as Array<Record<string, unknown>>
+        : []
+      const profileByUid = new Map(profiles.map((profile) => [String(profile.uid), {
+        uid: String(profile.uid),
+        displayName: String(profile.display_name || 'Anonymous'),
+        username: String(profile.username || ''),
+        photoURL: String(profile.photo_url || ''),
+        bio: String(profile.bio || ''),
+        activeStatus: profile.active_status !== false,
+        hideTwittIdentity: profile.hide_twitt_identity === true,
+      }]))
       const ids = rows.map((item) => item.id)
       const likes = ids.length ? await callRest(`twitt_likes?select=twitt_id&user_id=eq.${encodeURIComponent(uid)}&twitt_id=in.(${ids.join(',')})`) as Array<{ twitt_id: string }> : []
       const seenRows = ids.length ? await callRest(`twitt_views?select=twitt_id&user_id=eq.${encodeURIComponent(uid)}&twitt_id=in.(${ids.join(',')})`) as Array<{ twitt_id: string }> : []
       const likedIds = new Set(likes.map((item) => item.twitt_id))
       const seenIds = new Set(seenRows.map((item) => item.twitt_id))
       const friendIds = new Set((body.friendIds || []).filter((id) => typeof id === 'string'))
-      const items: Array<Record<string, unknown> & { id: string; seen: boolean; friend: boolean }> = rows.map((item) => ({ ...item, liked: likedIds.has(item.id), seen: seenIds.has(item.id), friend: friendIds.has(String(item.author_id || '')) }))
+      const items: Array<Record<string, unknown> & { id: string; seen: boolean; friend: boolean }> = rows.map((item) => ({ ...item, author_profile: profileByUid.get(String(item.author_id || '')) || null, liked: likedIds.has(item.id), seen: seenIds.has(item.id), friend: friendIds.has(String(item.author_id || '')) }))
       if (mode === 'social') {
         items.sort((a, b) => {
           const seenOrder = Number(a.seen) - Number(b.seen)
