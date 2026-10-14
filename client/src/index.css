@@ -812,7 +812,7 @@ body{background:var(--cc-bg);color:var(--cc-text)}
 :root .twitt-author-avatar>img{position:absolute!important;inset:0!important;display:block!important;width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;object-fit:cover!important;border-radius:50%!important}
 :root .avatar>.active-dot{right:1px;bottom:1px;width:12px;height:12px;border-width:2px;z-index:2}
 :root .avatar:has(>.active-dot){overflow:visible!important}
-:root .avatar:has(>.active-dot)>.active-dot{right:-3px;bottom:-3px;z-index:5;box-shadow:0 0 0 1px var(--cc-bg)}
+:root .avatar:has(>.active-dot)>.active-dot{right:1px;bottom:1px;z-index:5;box-shadow:0 0 0 1px var(--cc-bg)}
 :root .group-avatar-active{isolation:isolate;overflow:visible!important}
 :root .group-avatar-active::after{right:-4px;bottom:-2px;z-index:5;box-shadow:0 0 0 1px var(--cc-bg)}
 
@@ -824,4 +824,4 @@ body{background:var(--cc-bg);color:var(--cc-text)}
 :root .avatar:has(>.active-dot){border-radius:50%!important;outline:none!important;box-shadow:0 0 0 1.5px var(--cc-online,#31c875)!important}
 .chat-header .profile-avatar{position:relative!important;width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;flex:0 0 44px!important;overflow:visible!important;border-radius:50%!important;z-index:6}
 .chat-header .chat-header-avatar{position:relative!important;overflow:visible!important;z-index:7}
-.chat-header .chat-header-avatar>.active-dot{right:-6px!important;bottom:-6px!important;z-index:20!important}
+.chat-header .chat-header-avatar>.active-dot{right:1px!important;bottom:1px!important;z-index:20!important}
