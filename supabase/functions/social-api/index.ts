@@ -165,7 +165,8 @@ Deno.serve(async (request) => {
       if (containsRestrictedContent(text)) return response({ error: 'Adult or explicit content is not allowed.' }, 400)
       if (attachmentNameIsRestricted(body.attachment)) return response({ error: 'Adult or explicit content is not allowed.' }, 400)
       if (mode === 'social') await callRpc('purge_expired_social_twitts', {}).catch(() => undefined)
-      const rows = await callRest('twitts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ author_id: uid, body: text, community: normalizedCommunity, feed_type: mode, expires_at: mode === 'social' ? new Date(Date.now() + 24 * 3_600_000).toISOString() : null, attachment: body.attachment || null }) })
+  const retentionMs = mode === 'social' ? 24 * 3_600_000 : 7 * 24 * 3_600_000
+  const rows = await callRest('twitts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ author_id: uid, body: text, community: normalizedCommunity, feed_type: mode, expires_at: new Date(Date.now() + retentionMs).toISOString(), attachment: body.attachment || null }) })
       return response({ id: rows?.[0]?.id || null })
     }
     if (!body.twittId) return response({ error: 'twittId is required' }, 400)

@@ -115,7 +115,8 @@ export async function createTwitt(uid: string, body: string, community: TwittCom
   const text = body.trim()
   if (!text || text.length > 280) throw new Error('Twitt must be between 1 and 280 characters.')
   assertSafeTwittContent(text, attachment)
-  const ref = await addDoc(collection(db, 'twitts'), { uid, body: text, community, feedType, ...(feedType === 'social' ? { expiresAt: new Date(Date.now() + 24 * 3_600_000) } : {}), likes: 0, comments: 0, views: 0, ...(attachment ? { attachment } : {}), createdAt: serverTimestamp() })
+  const retentionMs = feedType === 'social' ? 24 * 3_600_000 : 7 * 24 * 3_600_000
+  const ref = await addDoc(collection(db, 'twitts'), { uid, body: text, community, feedType, expiresAt: new Date(Date.now() + retentionMs), likes: 0, comments: 0, views: 0, ...(attachment ? { attachment } : {}), createdAt: serverTimestamp() })
   return ref.id
 }
 
