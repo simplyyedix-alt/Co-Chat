@@ -3017,10 +3017,10 @@ export default function App() {
               >
                 <span className={`settings-row-icon ${activeStatus ? "online" : ""}`}>●</span><span className="settings-option-copy"><b>Active status</b><small>Let friends see when you are available</small></span><span className={`settings-toggle ${activeStatus ? "on" : ""}`} aria-label={activeStatus ? "Active status on" : "Active status off"}><span /></span>
               </button>
-              <button type="button" onClick={() => setShowBlocklist((value) => !value)}>
+              <button type="button" aria-expanded={showBlocklist} aria-controls="settings-blocklist" onClick={() => setShowBlocklist((value) => !value)}>
                 <span className="settings-row-icon">⊘</span><span className="settings-option-copy"><b>Blocklist</b><small>Manage people you’ve blocked</small></span><span className="settings-value">{blockedUsers.length} blocked <span className="chevron">›</span></span>
               </button>
-              {showBlocklist && <div className="settings-blocklist" role="region" aria-label="Blocked people">{blockedProfiles.length ? blockedProfiles.map((profile) => <div className="settings-blocked-person" key={profile.uid}><Avatar profile={profile} className="avatar settings-blocked-avatar" /><span className="settings-blocked-copy"><b>{profile.displayName}</b><small>@{profile.username}</small></span><button type="button" className="secondary compact" onClick={() => void unblockFromSettings(profile)}>Unblock</button></div>) : <p>No blocked people yet.</p>}</div>}
+              {showBlocklist && <div id="settings-blocklist" className="settings-blocklist" role="region" aria-label="Blocked people">{blockedProfiles.length ? blockedProfiles.map((profile) => <div className="settings-blocked-person" key={profile.uid}><Avatar profile={profile} className="avatar settings-blocked-avatar" /><span className="settings-blocked-copy"><b>{profile.displayName}</b><small>@{profile.username}</small></span><button type="button" className="secondary compact" onClick={() => void unblockFromSettings(profile)}>Unblock</button></div>) : <p>No blocked people yet.</p>}</div>}
               <button type="button" className="settings-danger" onClick={logout}>
                 <span className="settings-row-icon">↪</span><span className="settings-option-copy"><b>Log out</b><small>Sign out of this device</small></span><span>›</span>
               </button>
