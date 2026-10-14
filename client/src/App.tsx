@@ -90,7 +90,7 @@ const initials = (name: string) =>
     .slice(0, 2)
     .toUpperCase() || "U";
 
-const VerifiedTick = () => <span className="verified-tick" title="Verified account" aria-label="Verified account"><svg viewBox="0 0 24 24" aria-hidden="true"><path className="verified-tick-shape" d="m12 1.45 2.05 1.25 2.38-.2 1.1 2.12 2.12 1.1-.2 2.38L20.7 10.1l-1.25 2.05 1.25 2.05-1.25 2.05.2 2.38-2.12 1.1-1.1 2.12-2.38-.2L12 22.95l-2.05-1.25-2.38.2-1.1-2.12-2.12-1.1.2-2.38L3.3 14.2l1.25-2.05L3.3 10.1l1.25-2.05-.2-2.38 2.12-1.1 1.1-2.12 2.38.2L12 1.45Z" /><path className="verified-tick-check" d="m7.15 12.15 3.1 3.08 6.6-6.58" /></svg></span>;
+const VerifiedTick = () => <span className="verified-tick" title="Verified account" aria-label="Verified account"><svg viewBox="0 0 24 24" aria-hidden="true"><path className="verified-tick-shape" d="M12 1.7l2.15 1.92 2.82-.54 1.34 2.53 2.7 1.02-.02 2.87 1.87 2.18-1.38 2.52.53 2.82-2.53 1.34-1.03 2.7-2.86-.02L12 22.3l-2.18-1.87-2.82.53-1.34-2.53-2.7-1.03.02-2.86-1.87-2.18 1.38-2.52-.53-2.82 2.53-1.34 1.03-2.7 2.86.02L12 1.7Z" /><path className="verified-tick-check" d="m7.15 12.15 3.1 3.08 6.6-6.58" /></svg></span>;
 const MediaIcon = () => <svg className="media-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8.5 12.5 5.8-5.8a3.2 3.2 0 0 1 4.5 4.5l-7.5 7.5a5 5 0 0 1-7.1-7.1l7.1-7.1" /><path d="m9.2 15.1 6.4-6.4" /></svg>;
 const formatTime = (value?: { toDate?: () => Date } | null) =>
   value?.toDate
@@ -935,7 +935,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
         const page = await loadTwittPage("all", remoteCursor, { feedType, friendIds });
         const now = Date.now();
         setAuthorLoading(true);
-        setPosts((current) => [...current, ...page.items.map((item) => ({ id: item.id, authorUid: item.uid, author: item.uid === auth?.currentUser?.uid ? "You" : "Anonymous", handle: "", avatar: item.uid === auth?.currentUser?.uid ? "YO" : "CM", body: item.body, likes: Math.max(0, item.likes), liked: Boolean(item.liked), comments: Math.max(0, item.comments), views: String(item.views), attachment: item.attachment, age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community, feedType: item.feedType, expiresAt: item.expiresAt, seen: item.seen }))]);
+        setPosts((current) => [...current, ...page.items.map((item) => ({ id: item.id, authorUid: item.uid, author: item.uid === auth?.currentUser?.uid ? "You" : "Anonymous", handle: "", avatar: DEFAULT_AVATAR_URL, body: item.body, likes: Math.max(0, item.likes), liked: Boolean(item.liked), comments: Math.max(0, item.comments), views: String(item.views), attachment: item.attachment, age: `${Math.max(1, Math.round((now - (item.createdAt?.toMillis?.() || now)) / 3_600_000))} hr`, createdAt: item.createdAt?.toMillis?.() || now, community: item.community, feedType: item.feedType, expiresAt: item.expiresAt, seen: item.seen }))]);
         setRemoteCursor(page.cursor);
         setRemoteHasMore(page.hasMore);
         setVisible((current) => current + page.items.length);
@@ -1061,20 +1061,6 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
     window.addEventListener('cochat-comment-created', onCommentCreated);
     return () => window.removeEventListener('cochat-comment-created', onCommentCreated);
   }, []);
-  useEffect(() => {
-    const cards = Array.from(document.querySelectorAll<HTMLElement>('.twitt-card'));
-    cards.forEach((card, index) => {
-      const post = filtered[index];
-      const photoURL = post ? authorProfiles[post.handle]?.photoURL : '';
-      const avatar = card.querySelector<HTMLElement>('.twitt-head > .avatar');
-      if (!avatar || !photoURL) return;
-      avatar.textContent = '';
-      const image = document.createElement('img');
-      image.src = photoURL;
-      image.alt = '';
-      avatar.appendChild(image);
-    });
-  }, [filtered, authorProfiles]);
   const dismissPost = async (post: TwittPreview) => {
     setPostMenu(null);
     setHiddenPosts((current) => current.includes(post.id) ? current : [...current, post.id]);
@@ -1188,7 +1174,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
       }
     }
     const profile = uid ? await getUserProfile(uid).catch(() => null) : null;
-    const post: TwittPreview = { id, authorUid: uid || "your_profile", author: "You", handle: profile?.username || "", avatar: "YO", body, likes: 0, comments: 0, views: "0", age: "now", createdAt: Date.now(), community: feedType === "social" ? "public" : draftCommunity, feedType, expiresAt: feedType === "social" ? new Date(Date.now() + 24 * 3_600_000).toISOString() : null, attachment };
+    const post: TwittPreview = { id, authorUid: uid || "your_profile", author: "You", handle: profile?.username || "", avatar: DEFAULT_AVATAR_URL, body, likes: 0, comments: 0, views: "0", age: "now", createdAt: Date.now(), community: feedType === "social" ? "public" : draftCommunity, feedType, expiresAt: feedType === "social" ? new Date(Date.now() + 24 * 3_600_000).toISOString() : null, attachment };
     setPosts((current) => [post, ...current]);
     setDraft(""); setDraftFile(null); setCameraDataUrl(null); setCameraFilter("none");
     setComposerOpen(false);
@@ -1208,7 +1194,7 @@ function TwittFeed({ initialCommunity = "all" }: { initialCommunity?: string }) 
     {commentError && <div className="notice twitt-sync-error">{commentError}<button className="icon" type="button" aria-label="Dismiss comment error" onClick={() => setCommentError("")}>×</button></div>}
     {remoteLoading && !posts.length && <div className="twitt-skeleton-list" aria-label="Loading Twitts"><article><span/><div><b/><i/></div></article><article><span/><div><b/><i/></div></article><article><span/><div><b/><i/></div></article></div>}
     {remoteLoading && <div className="twitt-feed-loading" role="status" aria-live="polite"><span className="loading-spinner" /> Loading moments…</div>}
-    <div className="twitt-list">{filtered.slice(0, visible).map((post) => <article className="twitt-card" key={post.id}><div className="twitt-head"><button className="avatar twitt-author-avatar" type="button" aria-label={`Open ${post.author}'s profile`} onClick={() => void openAuthorProfile(post.authorUid)}>{authorProfiles[post.authorUid]?.photoURL ? <img loading="lazy" decoding="async" src={authorProfiles[post.authorUid].photoURL} alt="" /> : <img loading="lazy" decoding="async" src={DEFAULT_AVATAR_URL} alt="" />}</button><div><strong>{post.author}</strong>{isModerator(post.authorUid) && <VerifiedTick />}<small>{post.handle ? `@${post.handle} · ` : ""}{post.age} · {post.community.toUpperCase()}</small></div><div className="twitt-actions"><button className="icon" aria-label="Twitt options" aria-expanded={postMenu === post.id} onClick={() => setPostMenu(postMenu === post.id ? null : post.id)}>•••</button>{postMenu === post.id && <div className="twitt-menu">{post.authorUid === auth?.currentUser?.uid ? <button type="button" className="danger" onClick={() => void removePost(post)}>Delete Twitt</button> : <button type="button" onClick={() => void dismissPost(post)}>Not interested</button>}<button type="button" onClick={() => setPostMenu(null)}>Cancel</button></div>}</div></div><p>{post.body}</p>{post.attachment && (post.attachment.type.startsWith("image/") ? <a className="twitt-media-preview" href={post.attachment.url} target="_blank" rel="noreferrer" download={post.attachment.name}><img loading="lazy" decoding="async" src={post.attachment.url} alt={post.attachment.name} /><span>Open / save image</span></a> : <a className="twitt-attachment" href={post.attachment.url} target="_blank" rel="noreferrer" download={post.attachment.name}>📄 {post.attachment.name} · Open / save</a>)}<div className="twitt-meta"><button className={post.liked ? "liked" : ""} aria-label={post.liked ? "Unlike Twitt" : "Like Twitt"} onClick={() => void handleLike(post)}><span className="like-icon" aria-hidden="true">♡</span> {post.likes}</button><button className="comment-action" aria-label="Open comments" onClick={() => void openComments(post.id)}><span className="comment-icon" aria-hidden="true" /> {post.comments}</button><span>◉ {post.views}</span><button className={following.includes(post.community) ? "followed" : ""} onClick={() => setFollowing((current) => current.includes(post.community) ? current.filter((id) => id !== post.community) : [...current, post.community])}>{following.includes(post.community) ? "Following" : `Follow ${post.community.toUpperCase()}`}</button></div></article>)}</div>
+    <div className="twitt-list">{filtered.slice(0, visible).map((post) => { const authorPhoto = authorProfiles[post.authorUid]?.photoURL || ""; const anonymousAvatar = !authorPhoto; return <article className="twitt-card" key={post.id}><div className="twitt-head"><button className={`avatar twitt-author-avatar${anonymousAvatar ? " is-anonymous" : ""}`} type="button" aria-label={anonymousAvatar && post.author === "Anonymous" ? "Open Anonymous profile" : `Open ${post.author}'s profile`} onClick={() => void openAuthorProfile(post.authorUid)}><img loading="lazy" decoding="async" src={authorPhoto || DEFAULT_AVATAR_URL} alt="" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = DEFAULT_AVATAR_URL; event.currentTarget.closest(".twitt-author-avatar")?.classList.add("is-anonymous"); }} /></button><div><strong>{post.author}</strong>{isModerator(post.authorUid) && <VerifiedTick />}<small>{post.handle ? `@${post.handle} · ` : ""}{post.age} · {post.community.toUpperCase()}</small></div><div className="twitt-actions"><button className="icon" aria-label="Twitt options" aria-expanded={postMenu === post.id} onClick={() => setPostMenu(postMenu === post.id ? null : post.id)}>•••</button>{postMenu === post.id && <div className="twitt-menu">{post.authorUid === auth?.currentUser?.uid ? <button type="button" className="danger" onClick={() => void removePost(post)}>Delete Twitt</button> : <button type="button" onClick={() => void dismissPost(post)}>Not interested</button>}<button type="button" onClick={() => setPostMenu(null)}>Cancel</button></div>}</div></div><p>{post.body}</p>{post.attachment && (post.attachment.type.startsWith("image/") ? <a className="twitt-media-preview" href={post.attachment.url} target="_blank" rel="noreferrer" download={post.attachment.name}><img loading="lazy" decoding="async" src={post.attachment.url} alt={post.attachment.name} /><span>Open / save image</span></a> : <a className="twitt-attachment" href={post.attachment.url} target="_blank" rel="noreferrer" download={post.attachment.name}>📄 {post.attachment.name} · Open / save</a>)}<div className="twitt-meta"><button className={post.liked ? "liked" : ""} aria-label={post.liked ? "Unlike Twitt" : "Like Twitt"} onClick={() => void handleLike(post)}><span className="like-icon" aria-hidden="true">♡</span> {post.likes}</button><button className="comment-action" aria-label="Open comments" onClick={() => void openComments(post.id)}><span className="comment-icon" aria-hidden="true" /> {post.comments}</button><span>◉ {post.views}</span><button className={following.includes(post.community) ? "followed" : ""} onClick={() => setFollowing((current) => current.includes(post.community) ? current.filter((id) => id !== post.community) : [...current, post.community])}>{following.includes(post.community) ? "Following" : `Follow ${post.community.toUpperCase()}`}</button></div></article>; })}</div>
     {commenting && posts.find((post) => post.id === commenting) && <CommentSheet post={posts.find((post) => post.id === commenting)!} comments={commentsByPost[commenting] || []} loading={commentLoading === commenting} hasMore={Boolean(commentMore[commenting])} names={commentNames} currentUid={auth?.currentUser?.uid} onClose={() => setCommenting(null)} onLoadMore={() => void loadMoreComments(commenting)} onSubmit={(body, file) => void submitComment(posts.find((post) => post.id === commenting)!, body, file)} onLike={(comment) => void likeComment(commenting, comment)} onDelete={(comment) => void removeComment(posts.find((post) => post.id === commenting)!, comment)} />}
     {!remoteLoading && !remoteError && !filtered.length && <div className="empty-state">No Twitts in {communityLabel} yet. Be the first to share something useful.</div>}
     {(visible < filtered.length || remoteHasMore) && <button className="load-more" type="button" onClick={() => void loadMore()} disabled={remoteLoading}>{remoteLoading ? "Loading Twitts…" : "Load 20 more Twitts"}</button>}
@@ -1816,17 +1802,33 @@ export default function App() {
   }, [showChatProfile, selected?.id, selected?.type, liveUser?.uid]);
   useEffect(() => {
     if (!liveUser || liveUser.uid === "preview") return;
-    listFriends(liveUser.uid)
-      .then(setFriendProfiles)
-      .catch(() => setFriendProfiles([]));
-    const timer = window.setInterval(() => {
+    let mounted = true;
+    const refreshFriends = () => {
+      if (document.visibilityState === "hidden") return;
       setPresenceNow(Date.now());
-      listFriends(liveUser.uid)
-        .then(setFriendProfiles)
+      void listFriends(liveUser.uid)
+        .then((friends) => {
+          if (mounted) setFriendProfiles(friends);
+        })
         .catch(() => undefined);
-    }, 30000);
-    return () => window.clearInterval(timer);
-  }, [liveUser?.uid]);
+    };
+    refreshFriends();
+    // Presence is a profile field, so conversation realtime events do not
+    // fire when someone comes online. Refresh while the app is visible so an
+    // open chat header reflects the other person's status promptly.
+    const timer = window.setInterval(refreshFriends, selected?.type === "direct" ? 10000 : 30000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refreshFriends();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", refreshFriends);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", refreshFriends);
+    };
+  }, [liveUser?.uid, selected?.type]);
   useEffect(() => {
     setShowChatProfile(false);
     setShowAddMembers(false);
@@ -1897,8 +1899,8 @@ export default function App() {
         id: profile.uid,
         name: profile.displayName,
         memberIds: [liveUser?.uid || "", profile.uid],
-        avatar: initials(profile.displayName),
-        photoURL: profile.photoURL || '',
+        avatar: DEFAULT_AVATAR_URL,
+        photoURL: profile.photoURL || DEFAULT_AVATAR_URL,
         lastMessage: "",
         type: "direct" as const,
         active: true,
@@ -2126,7 +2128,8 @@ export default function App() {
       openConversation({
         id,
         name: profile.displayName,
-        avatar: initials(profile.displayName),
+        avatar: DEFAULT_AVATAR_URL,
+        photoURL: profile.photoURL || DEFAULT_AVATAR_URL,
         memberIds: [liveUser.uid, profile.uid],
         lastMessage: "",
       });
@@ -2256,6 +2259,7 @@ export default function App() {
     : null;
   const selectedIsActive = selectedFriendProfile ? selectedFriendProfile.activeStatus !== false && presenceNow - (selectedFriendProfile.lastSeen?.toMillis() || 0) < 90000 : selected?.active;
   const selectedLastSeen = selectedFriendProfile?.lastSeen || selected?.lastSeen;
+  const selectedPhotoURL = selectedFriendProfile?.photoURL || selected?.photoURL;
   if (groupCall)
     return <main className="app"><GroupVoiceCall uid={liveUser.uid} callId={groupCall.id} groupName={groupCall.name} memberIds={groupCall.memberIds} callerId={groupCall.callerId} host={groupCall.host} onClose={closeGroupCall} /></main>;
   if (selected)
@@ -2271,7 +2275,7 @@ export default function App() {
             title={selected.type === "group" ? "Open group settings" : "Open profile"}
             onClick={() => setShowChatProfile(true)}
           >
-            <Avatar name={selected.name} photoURL={selected.photoURL} active={selectedIsActive} />
+            <Avatar name={selected.name} photoURL={selectedPhotoURL} active={selectedIsActive} />
           </button>
           <div>
             <strong>{selected.name}</strong>
