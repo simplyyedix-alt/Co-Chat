@@ -2315,10 +2315,9 @@ export default function App() {
             <strong>{selected.name}</strong>
             <small>
               {selected.type === "group"
-                ? (activeGroupCount > 0 && <span className="group-active-summary"><span className="presence-dot" />{activeGroupCount} Active now</span>)
+                ? (activeGroupCount > 0 && <span className="group-active-summary">{activeGroupCount} Active now</span>)
                 : selected.id.startsWith("preview-") ? "Preview conversation" : (
                 <span className={selectedIsActive ? "active-presence" : ""}>
-                  {selectedIsActive && <span className="presence-dot" aria-hidden="true" />}
                   {presenceLabel(selectedIsActive, selectedLastSeen)}
                 </span>
               )}
