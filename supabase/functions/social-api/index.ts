@@ -122,7 +122,7 @@ Deno.serve(async (request) => {
     if (body.action === 'feed') {
       const mode = body.mode === 'social' ? 'social' : 'study'
       if (mode === 'social') await callRpc('purge_expired_social_twitts', {}).catch(() => undefined)
-      const params = new URLSearchParams({ select: 'id,author_id,community,body,attachment,likes_count,comments_count,views_count,created_at,feed_type,expires_at', order: 'created_at.desc', limit: mode === 'social' ? '50' : '100' })
+      const params = new URLSearchParams({ select: 'id,author_id,community,body,attachment,likes_count,comments_count,views_count,created_at,feed_type,expires_at', order: 'created_at.desc', limit: '20' })
       params.set('feed_type', `eq.${mode}`)
       if (mode === 'social') params.set('expires_at', `gt.${new Date().toISOString()}`)
       if (body.community && body.community !== 'all') params.set('community', `eq.${body.community}`)
