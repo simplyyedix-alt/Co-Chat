@@ -649,7 +649,7 @@ button:disabled{cursor:not-allowed;opacity:.55;transform:none!important}
 .content>*{animation:premium-content-fade .24s ease-out both}
 @keyframes premium-content-fade{from{opacity:0}to{opacity:1}}
 .app{overflow:visible}
-.profile-sheet-backdrop{z-index:1000;align-items:center;padding:24px;overflow:auto;overscroll-behavior:contain}
+.profile-sheet-backdrop{z-index:2147483000!important;align-items:center;padding:24px;overflow:auto;overscroll-behavior:contain}
 .profile-sheet-backdrop .profile-sheet,.profile-sheet-backdrop .direct-chat-profile{max-height:calc(100dvh - 48px)}
 body:has(.profile-sheet-backdrop){overflow:hidden}
 .content:has(.profile-sheet-backdrop){position:relative;z-index:1000}
