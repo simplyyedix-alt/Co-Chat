@@ -16,7 +16,7 @@ export function avatarInitials(name: string) {
 
 // Resolve through the app's base URL so the fallback works on GitHub Pages
 // (`/Co-Chat/app/`) as well as local and Android builds.
-export const DEFAULT_AVATAR_URL = `${import.meta.env.BASE_URL}assets/co-chat-default-avatar.jpg`
+export const DEFAULT_AVATAR_URL = `${import.meta.env.BASE_URL}assets/co-chat-default-avatar.svg`
 
 // Google can return a generated initials avatar as a photoURL when the user
 // has not uploaded a profile picture. Treat that provider fallback as empty so

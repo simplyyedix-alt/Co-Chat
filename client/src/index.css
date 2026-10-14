@@ -815,3 +815,8 @@ body{background:var(--cc-bg);color:var(--cc-text)}
 :root .avatar:has(>.active-dot)>.active-dot{right:-3px;bottom:-3px;z-index:5;box-shadow:0 0 0 1px var(--cc-bg)}
 :root .group-avatar-active{isolation:isolate;overflow:visible!important}
 :root .group-avatar-active::after{right:-4px;bottom:-2px;z-index:5;box-shadow:0 0 0 1px var(--cc-bg)}
+
+/* Presence dots stay geometrically circular at every avatar size. */
+:root .avatar>.active-dot,
+:root .group-avatar-active::after{width:12px!important;height:12px!important;min-width:12px!important;min-height:12px!important;aspect-ratio:1/1;border-radius:50%!important;box-sizing:border-box;display:block}
+:root .avatar>.active-dot{border:2px solid var(--cc-surface)!important;background:var(--cc-online,#31c875)!important}
