@@ -657,6 +657,20 @@ button:disabled{cursor:not-allowed;opacity:.55;transform:none!important}
 body:has(.profile-sheet-backdrop){overflow:hidden}
 .content:has(.profile-sheet-backdrop){position:relative;z-index:1000}
 @media(max-width:440px){.profile-sheet-backdrop{align-items:center;padding:16px 10px}.profile-sheet-backdrop .profile-sheet,.profile-sheet-backdrop .direct-chat-profile{max-height:calc(100dvh - 32px);border-radius:24px}}
+
+/* Final premium finish: useful empty states and calmer loading feedback. */
+.empty-state{display:grid;justify-items:center;gap:8px;padding:30px 18px;line-height:1.45}
+.empty-state strong{color:var(--cc-text);font-size:15px;letter-spacing:-.01em}
+.empty-state>span:not(.empty-state-icon){max-width:280px;color:var(--cc-muted);font-size:12px}
+.empty-state-icon{width:42px;height:42px;display:grid;place-items:center;margin-bottom:2px;border:1px solid color-mix(in srgb,var(--cc-primary) 30%,var(--cc-border));border-radius:15px;background:color-mix(in srgb,var(--cc-primary) 13%,var(--cc-surface));color:var(--cc-primary);font-size:20px;box-shadow:0 10px 24px color-mix(in srgb,var(--cc-primary) 15%,transparent)}
+.empty-state .primary{margin-top:5px}
+.chat-skeleton,.twitt-skeleton-list article{position:relative;overflow:hidden}
+.chat-skeleton::after,.twitt-skeleton-list article::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(105deg,transparent 18%,color-mix(in srgb,#fff 22%,transparent) 48%,transparent 78%);animation:skeleton-sweep 1.6s ease-in-out infinite;pointer-events:none}
+@keyframes skeleton-sweep{to{transform:translateX(100%)}}
+.topbar-actions .profile-button{overflow:hidden;border:1px solid color-mix(in srgb,var(--cc-primary) 28%,var(--cc-border));box-shadow:0 6px 18px color-mix(in srgb,var(--cc-primary) 16%,transparent)}
+.topbar-actions .profile-button>.avatar{width:100%;height:100%;border-radius:inherit}
+.topbar-actions .profile-button:focus-visible{outline-offset:4px}
+@media(prefers-reduced-motion:reduce){.chat-skeleton::after,.twitt-skeleton-list article::after{animation:none;display:none}}
 @media(max-width:600px){
   [data-theme="dark"] .content{padding-left:14px;padding-right:14px}
   [data-theme="dark"] .chat-home-hero{padding:18px 16px;border-radius:20px}

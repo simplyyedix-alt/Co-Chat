@@ -2783,6 +2783,8 @@ export default function App() {
           <button className="icon camera-header-button" type="button" title="Open camera" aria-label="Open camera" onClick={() => { setPage("discover"); window.setTimeout(() => window.dispatchEvent(new Event("cochat-open-camera")), 120); }}>📷</button>
           <button
             className="avatar profile-button"
+            type="button"
+            aria-label="Open profile and settings"
             onClick={() => setPage("settings")}
           >
             <Avatar name={liveUser.displayName || liveUser.email || "U"} photoURL={liveUser.photoURL || undefined} />
@@ -2928,7 +2930,12 @@ export default function App() {
               {!conversationsLoading && !visible.filter((item) =>
                 page === "communities" ? item.type === "group" : item.type !== "group",
               ).length && (
-                <div className="empty-state"><strong>No chats yet.</strong><span>Find someone from People and start the conversation.</span></div>
+                <div className="empty-state">
+                  <span className="empty-state-icon" aria-hidden="true">✦</span>
+                  <strong>{page === "communities" ? "No groups yet." : "No chats yet."}</strong>
+                  <span>{page === "communities" ? "Create a private group and bring your people together." : "Find someone from People and start the conversation."}</span>
+                  {page === "chats" ? <button className="primary compact" type="button" onClick={() => setShowNew(true)}>Find someone</button> : <button className="primary compact" type="button" onClick={() => setShowGroup(true)}>Create a group</button>}
+                </div>
               )}
             </div>
             {conversationMenu && (
