@@ -16,7 +16,9 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  # GitHub Pages keeps a canceled deployment alive briefly. Queue releases so
+  # deploy-pages never races an in-progress deployment and returns HTTP 400.
+  cancel-in-progress: false
 
 jobs:
   deploy:
