@@ -90,7 +90,7 @@ const initials = (name: string) =>
     .slice(0, 2)
     .toUpperCase() || "U";
 
-const VerifiedTick = () => <span className="verified-tick" title="Verified account" aria-label="Verified account"><svg viewBox="0 0 24 24" aria-hidden="true"><path className="verified-tick-shape" d="M12 1.7l2.15 1.92 2.82-.54 1.34 2.53 2.7 1.02-.02 2.87 1.87 2.18-1.38 2.52.53 2.82-2.53 1.34-1.03 2.7-2.86-.02L12 22.3l-2.18-1.87-2.82.53-1.34-2.53-2.7-1.03.02-2.86-1.87-2.18 1.38-2.52-.53-2.82 2.53-1.34 1.03-2.7 2.86.02L12 1.7Z" /><path className="verified-tick-check" d="m7.3 12.15 3.05 3.02 6.35-6.48" /></svg></span>;
+const VerifiedTick = () => <span className="verified-tick" title="Verified account" aria-label="Verified account"><svg viewBox="0 0 24 24" aria-hidden="true"><path className="verified-tick-shape" d="m12 1.45 2.05 1.25 2.38-.2 1.1 2.12 2.12 1.1-.2 2.38L20.7 10.1l-1.25 2.05 1.25 2.05-1.25 2.05.2 2.38-2.12 1.1-1.1 2.12-2.38-.2L12 22.95l-2.05-1.25-2.38.2-1.1-2.12-2.12-1.1.2-2.38L3.3 14.2l1.25-2.05L3.3 10.1l1.25-2.05-.2-2.38 2.12-1.1 1.1-2.12 2.38.2L12 1.45Z" /><path className="verified-tick-check" d="m7.15 12.15 3.1 3.08 6.6-6.58" /></svg></span>;
 const MediaIcon = () => <svg className="media-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8.5 12.5 5.8-5.8a3.2 3.2 0 0 1 4.5 4.5l-7.5 7.5a5 5 0 0 1-7.1-7.1l7.1-7.1" /><path d="m9.2 15.1 6.4-6.4" /></svg>;
 const formatTime = (value?: { toDate?: () => Date } | null) =>
   value?.toDate
