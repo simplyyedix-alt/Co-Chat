@@ -665,3 +665,104 @@ body:has(.profile-sheet-backdrop){overflow:hidden}
   :root.dark .composer .primary{min-width:64px;padding-left:12px;padding-right:12px}
 }
 :root.dark .secondary:hover{background:#293241;border-color:#5e62a1}
+
+/* Android-friendly discover controls: preserve actions while reducing navigation chrome. */
+.compact-mode-switch,.compact-feed-tabs{gap:6px;padding:4px;border-radius:15px}
+.compact-mode-switch button,.compact-feed-tabs button{display:flex;align-items:center;justify-content:center;gap:7px;min-height:44px;padding:9px 12px}
+.compact-mode-switch button>span,.compact-feed-tabs button>span{font-size:16px;line-height:1;color:var(--cc-primary)}
+.compact-mode-switch small,.compact-feed-tabs small{font-size:10px}
+.discover-compose-fab{position:fixed;z-index:18;right:max(18px,calc((100vw - 760px)/2 + 18px));bottom:86px;display:inline-flex;align-items:center;gap:7px;min-height:48px;padding:0 16px;border:1px solid #ffffff2b;border-radius:999px;background:linear-gradient(135deg,var(--cc-primary),var(--cc-primary-2));color:#fff;font:inherit;font-weight:850;box-shadow:0 12px 34px #6b52df66;cursor:pointer}
+.discover-compose-fab span{font-size:22px;line-height:1}.discover-compose-fab small{font-size:12px}
+@media(max-width:560px){
+  .compact-mode-switch button,.compact-feed-tabs button{min-height:38px;padding:7px 8px;font-size:12px}
+  .compact-mode-switch small,.compact-feed-tabs small{display:none}
+  .discover-compose-fab{right:16px;bottom:calc(82px + env(safe-area-inset-bottom));width:52px;height:52px;min-height:52px;padding:0;justify-content:center;border-radius:18px}
+  .discover-compose-fab small{display:none}
+  .discover-compose-fab span{font-size:25px}
+}
+
+/* Final Android ergonomics pass. */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;overscroll-behavior-x:none}
+button,input,textarea,select{touch-action:manipulation}
+.native-android .content{padding-bottom:calc(112px + env(safe-area-inset-bottom))}
+.native-android .bottom-nav{z-index:40;min-height:64px;padding-top:8px;padding-bottom:max(10px,env(safe-area-inset-bottom));}
+.native-android .bottom-nav button{min-width:64px;min-height:48px}
+.native-android .discover-compose-fab{bottom:calc(92px + env(safe-area-inset-bottom));z-index:35}
+.native-android .twitt-composer{scroll-margin-top:12px;margin-bottom:8px}
+.native-android .task-sheet-backdrop,.native-android .profile-sheet-backdrop,.native-android .sneak-picker-backdrop{padding-top:max(12px,env(safe-area-inset-top));padding-bottom:max(12px,env(safe-area-inset-bottom))}
+@media(hover:none){
+  .chat-row:hover,.primary:hover,.secondary:hover,.avatar:hover{transform:none;box-shadow:none}
+}
+@media(max-width:360px){
+  .bottom-nav button{min-width:56px;font-size:10px}
+  .bottom-nav span{font-size:18px}
+  .topbar,.chat-header{padding-left:12px;padding-right:12px}
+  .content{padding-left:11px;padding-right:11px}
+  .discover-intro{padding:18px 16px}
+  .discover-intro h2{font-size:22px}
+  .discover-intro .primary{padding:10px 11px;font-size:11px}
+}
+
+/* Theme boundary: component rules consume these tokens; themes never style each
+   other. Add future themes as another root class with the same token contract. */
+[data-theme="light"]{
+  color-scheme:light;
+  --cc-bg:#f6f7fb;
+  --cc-surface:#ffffff;
+  --cc-surface-soft:#f3f4fa;
+  --cc-text:#172033;
+  --cc-muted:#667085;
+  --cc-border:#e1e5ee;
+  --cc-primary:#5b49d7;
+  --cc-primary-2:#9860e8;
+  --cc-danger:#c84761;
+  --cc-overlay:rgba(17,20,35,.44);
+  --premium-glow:#7c6cf0;
+  --premium-shadow:0 16px 42px rgba(45,35,105,.12);
+}
+[data-theme="dark"]{
+  color-scheme:dark;
+  --cc-bg:#080a0f;
+  --cc-surface:#12161e;
+  --cc-surface-soft:#181d27;
+  --cc-text:#f3f5fb;
+  --cc-muted:#98a2b8;
+  --cc-border:#293140;
+  --cc-primary:#7b6dff;
+  --cc-primary-2:#b16ff0;
+  --cc-danger:#ff7488;
+  --cc-overlay:rgba(4,6,12,.76);
+  --premium-glow:#8c7bff;
+  --premium-shadow:0 20px 58px rgba(0,0,0,.38);
+}
+body{background:var(--cc-bg);color:var(--cc-text)}
+.app{background:var(--cc-bg);color:var(--cc-text)}
+.topbar,.chat-header{background:color-mix(in srgb,var(--cc-surface) 94%,transparent);border-color:var(--cc-border)}
+.search,input,textarea,select{background:var(--cc-surface);color:var(--cc-text);border-color:var(--cc-border)}
+.search::placeholder,input::placeholder,textarea::placeholder{color:var(--cc-muted)}
+.bottom-nav{background:color-mix(in srgb,var(--cc-surface) 96%,transparent);border-color:var(--cc-border)}
+.chat-row,.history-profile,.community-create-card,.tool-grid article,.empty-state{background:var(--cc-surface);color:var(--cc-text);border-color:var(--cc-border)}
+.chat-copy span,.chat-row small,.person-profile p,.person-profile small{color:var(--cc-muted)}
+.modal,.task-sheet,.timer-setup-sheet,.person-profile,.profile-sheet,.conversation-menu,.comment-sheet,.media-preview-panel{background:var(--cc-surface);color:var(--cc-text);border-color:var(--cc-border)}
+.modal-backdrop,.task-sheet-backdrop,.profile-sheet-backdrop,.media-preview-backdrop{background:var(--cc-overlay)}
+.sneak-picker-backdrop{background:var(--cc-overlay)}
+.sneak-picker{background:var(--cc-surface);color:var(--cc-text);border-color:var(--cc-border);box-shadow:var(--premium-shadow)}
+.sneak-picker-search{background:var(--cc-surface-soft);color:var(--cc-text);border-color:var(--cc-border)}
+.sneak-friend-row{color:var(--cc-text)}
+.sneak-friend-row small,.sneak-picker header small,.sneak-picker footer span{color:var(--cc-muted)}
+.sneak-card{background:color-mix(in srgb,var(--cc-primary) 14%,var(--cc-surface));border-color:color-mix(in srgb,var(--cc-primary) 42%,var(--cc-border));color:var(--cc-text)}
+.notice{background:color-mix(in srgb,var(--cc-primary) 10%,var(--cc-surface));color:var(--cc-text);border-color:var(--cc-border)}
+.settings-list,.settings-profile-card{background:var(--cc-surface);border-color:var(--cc-border)}
+.settings-list>button{background:var(--cc-surface);color:var(--cc-text);border-color:var(--cc-border)!important}
+.settings-list>button:hover{background:var(--cc-surface-soft)}
+.primary{background:linear-gradient(135deg,var(--cc-primary),var(--cc-primary-2));color:#fff}
+.secondary{background:var(--cc-surface-soft);color:var(--cc-text);border-color:var(--cc-border)}
+.discover-compose-fab{background:linear-gradient(135deg,var(--cc-primary),var(--cc-primary-2));box-shadow:0 12px 34px color-mix(in srgb,var(--cc-primary) 42%,transparent)}
+[data-theme="light"] .app{background:radial-gradient(circle at 90% -8%,#7564e512,transparent 34%),var(--cc-bg)}
+[data-theme="light"] .hero-card,[data-theme="light"] .profile-card{background:linear-gradient(145deg,#f0edff,var(--cc-surface))}
+[data-theme="light"] .discover-intro,[data-theme="light"] .community-hero{background:linear-gradient(135deg,#ece9ff,#f3f6ff);color:var(--cc-text);border-color:#d9d4f4}
+[data-theme="light"] .discover-intro p,[data-theme="light"] .community-hero p{color:#59627a}
+[data-theme="light"] .twitt-card{background:var(--cc-surface);border-color:var(--cc-border);box-shadow:var(--premium-shadow)}
+[data-theme="light"] .feed-tabs,[data-theme="light"] .discovery-mode-tabs{background:var(--cc-surface-soft);border-color:var(--cc-border)}
+[data-theme="light"] .feed-tabs button.active,[data-theme="light"] .discovery-mode-tabs button.active{background:#e8e4ff;color:var(--cc-primary);box-shadow:0 5px 16px rgba(72,58,170,.12)}
+[data-theme="dark"] .sneak-picker,[data-theme="dark"] .modal,[data-theme="dark"] .task-sheet,[data-theme="dark"] .timer-setup-sheet,[data-theme="dark"] .person-profile,[data-theme="dark"] .profile-sheet{background:linear-gradient(155deg,#151a23,#11161e);color:var(--cc-text)}
