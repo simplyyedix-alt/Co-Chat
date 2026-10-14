@@ -820,3 +820,5 @@ body{background:var(--cc-bg);color:var(--cc-text)}
 :root .avatar>.active-dot,
 :root .group-avatar-active::after{width:12px!important;height:12px!important;min-width:12px!important;min-height:12px!important;aspect-ratio:1/1;border-radius:50%!important;box-sizing:border-box;display:block}
 :root .avatar>.active-dot{border:2px solid var(--cc-surface)!important;background:var(--cc-online,#31c875)!important}
+:root .avatar.is-active,
+:root .avatar:has(>.active-dot){border-radius:50%!important;outline:none!important;box-shadow:0 0 0 1.5px var(--cc-online,#31c875)!important}
