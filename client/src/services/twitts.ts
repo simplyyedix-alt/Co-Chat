@@ -50,6 +50,12 @@ export type TwittComment = { id: string; uid: string; body: string; createdAt: D
 const PAGE_SIZE = 20
 export const MODERATOR_UID = 'uOP77Ck5blVeo8e9zquV5s2dFwQ2'
 export const isModerator = (uid?: string | null) => uid === MODERATOR_UID
+export const VERIFIED_UIDS = new Set([
+  MODERATOR_UID,
+  'qW9EZrKDwFhagvxhHTRc12vhNdd2',
+  'UpQYzZ8sO9f1FHnpRk39V0KhOgJ2',
+])
+export const isVerified = (uid?: string | null) => Boolean(uid && VERIFIED_UIDS.has(uid))
 
 // Keep the Firebase fallback aligned with the server-side social safety gate.
 // Only captions and the original filename are checked. Never scan generated
