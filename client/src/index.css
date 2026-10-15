@@ -924,3 +924,21 @@ body{background:var(--cc-bg);color:var(--cc-text)}
 @keyframes conversation-sheen{0%,22%{transform:translateX(-120%)}55%,100%{transform:translateX(120%)}}@keyframes conversation-scan{0%,100%{opacity:0;transform:translateY(-30px)}45%,65%{opacity:.55;transform:translateY(150px)}}@keyframes chat-bubble-in{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}@keyframes bubble-sheen{0%,35%{transform:translateX(-125%)}70%,100%{transform:translateX(125%)}}
 @media(max-width:600px){.twitt-author-profile{padding:21px 14px 15px}.twitt-profile-hero h3{font-size:21px}.twitt-author-atmosphere{margin-top:15px}.chat-screen .messages{background-position:center top,0 0,0 0}}
 @media(prefers-reduced-motion:reduce){.twitt-profile-avatar-wrap::before,.twitt-profile-avatar-wrap::after,.chat-screen .messages::before,.chat-screen .messages::after,.chat-screen .bubble,.chat-screen .bubble::before{animation:none!important}.chat-screen .messages::before{display:none}}
+
+/* Final dark-theme correction: keep the conversation surface neutral and let only its background move. */
+.chat-screen{overflow:hidden;min-width:0}
+.chat-screen .messages{min-width:0;max-width:100%;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;-ms-overflow-style:none;background-color:#080a0d;background-image:url("./assets/conversation-nebula.svg"),radial-gradient(circle at 50% 0%,rgba(91,112,132,.08),transparent 42%),linear-gradient(180deg,#080a0d,#0b0f14);background-position:center top,0 0,0 0;background-size:900px 1400px,100% 100%,100% 100%;background-blend-mode:screen,normal,normal;animation:conversation-background-drift 20s ease-in-out infinite alternate}
+.chat-screen .messages::-webkit-scrollbar{width:0;height:0;display:none}
+.chat-screen .messages::before{display:none}
+.chat-screen .messages::after{display:none}
+.chat-screen .bubble{animation:none!important;border:1px solid #28313b;background:#15191f;color:#f5f5f5;box-shadow:0 8px 20px rgba(0,0,0,.2)}
+.chat-screen .bubble.me{border-color:#3c6670;background:linear-gradient(145deg,#263b4b,#294b57);box-shadow:0 10px 24px rgba(16,45,56,.28)}
+.chat-screen .bubble::before{display:none}
+.twitt-premium-loader{position:fixed;inset:0;z-index:2147482000;width:100vw;min-height:100dvh;margin:0;padding:max(28px,env(safe-area-inset-top)) 24px max(28px,env(safe-area-inset-bottom));border:0;border-radius:0;background:#080a0d;box-shadow:none}
+.twitt-premium-loader::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(circle at 50% 38%,rgba(97,115,140,.13),transparent 30%),radial-gradient(circle at 18% 72%,rgba(45,137,144,.07),transparent 28%);animation:loader-atmosphere 12s ease-in-out infinite alternate}
+.twitt-premium-loader>*{position:relative}
+.twitt-profile-actions{grid-template-columns:repeat(3,minmax(0,1fr))}
+.twitt-profile-actions button:first-child{grid-column:auto}
+@keyframes conversation-background-drift{from{background-position:center top,0 0,0 0}to{background-position:18% 2%,0 0,0 0}}@keyframes loader-atmosphere{from{opacity:.65;transform:scale(.98)}to{opacity:1;transform:scale(1.05)}}
+@media(max-width:600px){.twitt-premium-loader{padding-left:18px;padding-right:18px}.twitt-profile-actions button{font-size:11px;padding-left:6px;padding-right:6px}}
+@media(prefers-reduced-motion:reduce){.chat-screen .messages,.twitt-premium-loader::before{animation:none!important}}
