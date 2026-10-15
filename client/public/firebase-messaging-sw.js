@@ -32,6 +32,15 @@ self.addEventListener('notificationclick', (event) => {
       client.postMessage(message)
       return client.focus()
     }
-    return self.clients.openWindow(new URL('./', self.registration.scope).toString())
+    return self.clients.openWindow(new URL('./', self.registration.scope).toString()).then((openedClient) => {
+      // Deliver the deep-link action after a cold start as well. Without this,
+      // the notification closes but the newly opened app never receives the
+      // conversation id because its listener is not installed yet.
+      if (openedClient) {
+        openedClient.postMessage(message)
+        setTimeout(() => openedClient.postMessage(message), 500)
+      }
+      return openedClient
+    })
   }))
 })

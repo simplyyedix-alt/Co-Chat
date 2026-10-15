@@ -64,7 +64,7 @@ async function ensureNativeListeners() {
       const key = typeof data.messageId === 'string' && data.messageId
         ? `${data.conversationId || title}:${data.messageAt || data.messageId}`
         : `${data.conversationId || title}:${body}`
-      notifyIncomingMessage(title, body, key)
+      notifyIncomingMessage(title, body, key, typeof data.conversationId === 'string' ? data.conversationId : undefined)
       return
     }
     const tag = typeof data.messageId === 'string'
@@ -127,13 +127,33 @@ function displayOnce(key: string) {
   recentNotificationKeys.set(key, now)
   return true
 }
-export function notifyIncomingMessage(title: string, body: string, dedupeKey = `${title}:${body}`) {
+export function notifyIncomingMessage(title: string, body: string, dedupeKey = `${title}:${body}`, conversationId?: string) {
   if (!displayOnce(dedupeKey)) return
-  if (isNativeAndroid()) { void showNativeNotification(title, body, { tag: `cochat-message-${dedupeKey}`, data: { type: 'message' } }); return }
+  const data = { type: 'message', ...(conversationId ? { conversationId } : {}) }
+  if (isNativeAndroid()) { void showNativeNotification(title, body, { tag: `cochat-message-${dedupeKey}`, data }); return }
   // Each message gets its own tag. Reusing one tag makes browsers replace the
   // previous notification, which looked like missed messages to users.
   const tag = `cochat-message-${dedupeKey}`.slice(0, 180)
-  void showWebNotification(title, { body, icon: assetUrl('assets/logo.svg'), tag })
+  void showWebNotification(title, { body, icon: assetUrl('assets/logo.svg'), tag, data })
+}
+export async function clearConversationNotifications(conversationId: string) {
+  if (!conversationId) return
+  if (isNativeAndroid()) {
+    try {
+      const { notifications } = await LocalNotifications.getDeliveredNotifications()
+      const matching = notifications.filter((item) => {
+        const extra = asData(item.extra)
+        return extra.conversationId === conversationId || String(extra.tag || '').includes(`cochat-message-${conversationId}:`)
+      })
+      if (matching.length) await LocalNotifications.removeDeliveredNotifications({ notifications: matching })
+    } catch { /* A remote FCM notification is auto-cleared by Android when tapped. */ }
+    return
+  }
+  try {
+    const registration = await navigator.serviceWorker?.ready
+    const notifications = registration ? await registration.getNotifications() : []
+    notifications.filter((item) => asData(item.data).conversationId === conversationId).forEach((item) => item.close())
+  } catch { /* Notifications may be unavailable in this browser. */ }
 }
 export function notifyIncomingCall(name: string, callId: string, group = false) {
   const title = group ? 'Incoming group call' : 'Incoming call'; const body = `${name} is calling you`

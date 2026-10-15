@@ -202,14 +202,6 @@ export function watchIncomingConversationEvents(uid: string, callback: (event: I
       if (!conversationId || !senderId || senderId === uid || !messageAt) return
       callback({ conversationId, senderId, message: String(row.message || ''), messageAt })
     })
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, (payload) => {
-      const row = payload.new as Record<string, unknown>
-      const senderId = String(row.last_sender_id || '')
-      const conversationId = String(row.id || '')
-      const messageAt = String(row.last_message_at || '')
-      if (!conversationId || !senderId || senderId === uid || !messageAt) return
-      callback({ conversationId, senderId, message: String(row.last_message || ''), messageAt })
-    })
     .subscribe()
   return () => { void supabase?.removeChannel(channel) }
 }

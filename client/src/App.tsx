@@ -70,7 +70,7 @@ import {
 } from "./services/chat";
 import { attachTwittCommentMedia, attachTwittMedia, createTwitt as createRemoteTwitt, createTwittComment, deleteTwitt, deleteTwittComment, hideTwitt, isModerator, isVerified, loadTwittComments, loadTwittPage, recordTwittView, restrictTwittUser, toggleTwittCommentLike, toggleTwittLike, type TwittAttachment, type TwittAuthorProfile, type TwittComment, type TwittRecord } from "./services/twitts";
 import { StorageManager } from "./services/storageManager";
-import { clearStudyTimerNotification, listenNotificationActions, notifyIncomingCall, notifyIncomingMessage, notifyStudyTimer, notifyStudyTimerComplete, registerFcmNotifications } from "./services/notifications";
+import { clearConversationNotifications, clearStudyTimerNotification, listenNotificationActions, notifyIncomingCall, notifyIncomingMessage, notifyStudyTimer, notifyStudyTimerComplete, registerFcmNotifications } from "./services/notifications";
 import "./index.css";
 import "./group-friend.css";
 import "./community-feed.css";
@@ -1323,7 +1323,6 @@ export default function App() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const conversationsRef = useRef<Conversation[]>([]);
   const [conversationsLoading, setConversationsLoading] = useState(true);
-  const notificationConversationSeen = useRef<Record<string, number>>({});
   useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
   const [selected, setSelected] = useState<Conversation | null>(null);
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
@@ -1657,16 +1656,6 @@ export default function App() {
     const stopWatching = watchConversations(uid, (items) => {
       setConversationsLoading(false);
       setConversations(items);
-      if (!notificationsEnabled) return;
-      const seen = notificationConversationSeen.current;
-      for (const item of items) {
-        const messageAt = item.lastMessageAt?.toMillis() || 0;
-        const previous = seen[item.id];
-        seen[item.id] = messageAt;
-        if (!previous || messageAt <= previous || item.lastSenderId === uid || !item.lastMessage) continue;
-        const body = item.lastMessage === "Sneak" ? "Sent you a Sneak" : item.lastMessage;
-        notifyIncomingMessage(item.name || "New Co-Chat message", body, `${item.id}:${messageAt}`);
-      }
     });
     return () => { window.clearTimeout(loadingTimeout); stopWatching?.(); };
   }, [liveUser?.uid, notificationsEnabled]);
@@ -1679,10 +1668,17 @@ export default function App() {
     return watchIncomingConversationEvents(liveUser.uid, (event) => {
       const body = event.message === "Sneak" ? "Sent you a Sneak" : event.message;
       if (!body) return;
+      if (selected?.id === event.conversationId && document.visibilityState === "visible") {
+        void clearConversationNotifications(event.conversationId);
+        return;
+      }
+      // FCM owns delivery while the web app is hidden or closed. Letting the
+      // realtime listener also notify in that state creates duplicate alerts.
+      if (document.visibilityState !== "visible") return;
       const conversation = conversationsRef.current.find((item) => item.id === event.conversationId);
-      notifyIncomingMessage(conversation?.name || "New Co-Chat message", body, `${event.conversationId}:${event.messageAt}`);
+      notifyIncomingMessage(conversation?.name || "New Co-Chat message", body, `${event.conversationId}:${event.messageAt}`, event.conversationId);
     });
-  }, [liveUser?.uid, notificationsEnabled]);
+  }, [liveUser?.uid, notificationsEnabled, selected?.id]);
   useEffect(() => {
     if (!liveUser || liveUser.uid === "preview") return;
     return watchFriendRequests(liveUser.uid, (items) => {
@@ -1974,6 +1970,15 @@ export default function App() {
       setPage("chats");
       setShowFriendRequests(true);
     }
+    if (event.data?.type === "message" && event.action === "open") {
+      const conversationId = typeof event.data.conversationId === "string" ? event.data.conversationId : "";
+      if (conversationId) {
+        void clearConversationNotifications(conversationId);
+        setPage("chats");
+        const conversation = conversationsRef.current.find((item) => item.id === conversationId);
+        if (conversation) openConversation(conversation);
+      }
+    }
   }), [incomingCall, liveUser, incomingCallerName]);
   if (loading)
     return (
@@ -2086,6 +2091,7 @@ export default function App() {
   const openConversation = (conversation: Conversation) => {
     conversationOpeningAt.current = Date.now();
     setConversationOpening(true);
+    void clearConversationNotifications(conversation.id);
     pendingMessages.current = {};
     setConversations((items) => items.map((item) => item.id === conversation.id ? { ...item, unreadCount: 0 } : item));
     setMessages([]);
@@ -2953,39 +2959,43 @@ export default function App() {
               )}
             </div>
             {conversationMenu && (
-              <div
-                className="conversation-menu"
-                role="dialog"
-                aria-label="Conversation actions"
-              >
-                <button
-                  className="icon close-profile"
-                  type="button"
-                  onClick={() => setConversationMenu(null)}
+              <div className="conversation-menu-backdrop" onClick={() => setConversationMenu(null)}>
+                <div
+                  className="conversation-menu"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Conversation actions"
+                  onClick={(event) => event.stopPropagation()}
                 >
-                  ×
-                </button>
-                <strong>{conversationMenu.name}</strong>
-                <button
-                  className="secondary"
-                  type="button"
-                  onClick={() => {
-                    openConversation(conversationMenu);
-                    setConversationMenu(null);
-                  }}
-                >
-                  Open chat
-                </button>
-                <button
-                  className="danger"
-                  type="button"
-                  onClick={async () => {
-                    setDeleteTarget(conversationMenu);
-                    setConversationMenu(null);
-                  }}
-                >
-                  Delete conversation
-                </button>
+                  <button
+                    className="icon close-profile"
+                    type="button"
+                    onClick={() => setConversationMenu(null)}
+                  >
+                    ×
+                  </button>
+                  <strong>{conversationMenu.name}</strong>
+                  <button
+                    className="secondary"
+                    type="button"
+                    onClick={() => {
+                      openConversation(conversationMenu);
+                      setConversationMenu(null);
+                    }}
+                  >
+                    Open chat
+                  </button>
+                  <button
+                    className="danger"
+                    type="button"
+                    onClick={() => {
+                      setDeleteTarget(conversationMenu);
+                      setConversationMenu(null);
+                    }}
+                  >
+                    Delete conversation
+                  </button>
+                </div>
               </div>
             )}
             {deleteTarget && (
