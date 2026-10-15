@@ -1,0 +1,36 @@
+<svg width="900" height="1200" viewBox="0 0 900 1200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="violet" x1="60" y1="0" x2="820" y2="1200" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A990FF" stop-opacity=".28"/>
+      <stop offset=".52" stop-color="#4E6BFF" stop-opacity=".08"/>
+      <stop offset="1" stop-color="#2AD1E8" stop-opacity=".2"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="150" y1="900" x2="800" y2="150" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#37D8E9" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#37D8E9" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#B38CFF" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="orb" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(450 330) rotate(90) scale(260)">
+      <stop stop-color="#8D78FF" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#8D78FF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="450" cy="330" r="260" fill="url(#orb)"/>
+  <g opacity=".42" stroke="url(#violet)">
+    <ellipse cx="450" cy="460" rx="355" ry="138" stroke-width="1" transform="rotate(-18 450 460)"/>
+    <ellipse cx="450" cy="460" rx="295" ry="108" stroke-width="1" transform="rotate(28 450 460)"/>
+    <ellipse cx="450" cy="460" rx="405" ry="175" stroke-width=".7" transform="rotate(62 450 460)"/>
+  </g>
+  <path d="M-40 920C150 780 250 1010 438 856C610 715 724 918 950 740" stroke="url(#cyan)" stroke-width="2" stroke-linecap="round">
+    <animate attributeName="d" dur="12s" repeatCount="indefinite" values="M-40 920C150 780 250 1010 438 856C610 715 724 918 950 740;M-40 850C160 1000 270 730 450 900C625 1045 770 770 950 880;M-40 920C150 780 250 1010 438 856C610 715 724 918 950 740"/>
+  </path>
+  <g fill="#B9AAFF">
+    <circle cx="148" cy="240" r="3"><animate attributeName="opacity" values=".15;1;.15" dur="3.7s" repeatCount="indefinite"/></circle>
+    <circle cx="760" cy="332" r="2"><animate attributeName="opacity" values="1;.15;1" dur="4.4s" repeatCount="indefinite"/></circle>
+    <circle cx="690" cy="780" r="3"><animate attributeName="opacity" values=".2;1;.2" dur="5.2s" repeatCount="indefinite"/></circle>
+    <circle cx="220" cy="900" r="2"><animate attributeName="opacity" values="1;.2;1" dur="4.8s" repeatCount="indefinite"/></circle>
+  </g>
+  <g stroke="#8D78FF" stroke-linecap="round" opacity=".62">
+    <path d="M110 560h18M119 551v18"/><path d="M755 560h22M766 549v22"/><path d="M190 1040h16M198 1032v16"/>
+  </g>
+</svg>
