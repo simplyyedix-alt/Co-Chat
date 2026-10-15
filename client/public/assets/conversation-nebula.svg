@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1400" fill="none">
+  <defs>
+    <radialGradient id="violet" cx="0" cy="0" r="1" gradientTransform="translate(430 280) rotate(90) scale(310 410)">
+      <stop stop-color="#9f7bff" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#9f7bff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="cyan" cx="0" cy="0" r="1" gradientTransform="translate(710 980) rotate(90) scale(260 290)">
+      <stop stop-color="#42d9ee" stop-opacity=".14"/>
+      <stop offset="1" stop-color="#42d9ee" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="thread" x1="40" y1="0" x2="820" y2="1400" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#b99aff" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#b99aff" stop-opacity=".26"/>
+      <stop offset="1" stop-color="#42d9ee" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="430" cy="280" rx="410" ry="310" fill="url(#violet)"/>
+  <ellipse cx="710" cy="980" rx="290" ry="260" fill="url(#cyan)"/>
+  <path d="M-80 440C160 280 270 650 500 520s250-400 520-230" stroke="url(#thread)" stroke-width="1.5" stroke-dasharray="3 18" opacity=".6">
+    <animate attributeName="stroke-dashoffset" values="0;-120" dur="16s" repeatCount="indefinite"/>
+  </path>
+  <path d="M-100 970c260-210 390 140 600-10 170-122 260-80 470 30" stroke="url(#thread)" stroke-width="1" stroke-dasharray="2 22" opacity=".42">
+    <animate attributeName="stroke-dashoffset" values="0;160" dur="19s" repeatCount="indefinite"/>
+  </path>
+  <g fill="#d9cbff">
+    <circle cx="146" cy="208" r="2" opacity=".75"><animate attributeName="opacity" values=".2;1;.2" dur="3.2s" repeatCount="indefinite"/></circle>
+    <circle cx="745" cy="392" r="1.8" opacity=".55"><animate attributeName="opacity" values=".1;.85;.1" dur="4.1s" repeatCount="indefinite" begin=".7s"/></circle>
+    <circle cx="250" cy="760" r="1.6" opacity=".7"><animate attributeName="opacity" values=".25;1;.25" dur="3.7s" repeatCount="indefinite" begin="1.2s"/></circle>
+    <circle cx="780" cy="1190" r="2" opacity=".55"><animate attributeName="opacity" values=".1;.8;.1" dur="4.5s" repeatCount="indefinite" begin=".4s"/></circle>
+  </g>
+</svg>
