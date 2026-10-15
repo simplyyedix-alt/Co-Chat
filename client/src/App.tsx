@@ -2535,15 +2535,21 @@ export default function App() {
           />
         )}
         {encryptionNoticeVisible && <div className="conversation-security" role="status">
-          <span aria-hidden="true">🔒</span>
-          <span><strong>Private conversation</strong> · securing your connection…</span>
+          <span className="conversation-security-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7.5 10V7.8a4.5 4.5 0 0 1 9 0V10"/><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M12 14v2"/></svg></span>
+          <span className="conversation-security-copy"><strong>Private conversation</strong><small>Preparing a secure session</small></span>
+          <span className="conversation-security-signal" aria-hidden="true"><i/><i/><i/></span>
         </div>}
         {conversationOpening ? (
           <section className="conversation-opening" aria-live="polite" aria-label={`Opening conversation with ${selected.name}`}>
-            <span className="conversation-opening-lock" aria-hidden="true">🔒</span>
-            <div className="conversation-opening-spinner" aria-hidden="true" />
-            <strong>Opening your private conversation</strong>
-            <small>Securing the connection and loading messages…</small>
+            <div className="conversation-opening-visual" aria-hidden="true">
+              <span className="conversation-opening-ring ring-one" />
+              <span className="conversation-opening-ring ring-two" />
+              <span className="conversation-opening-spark spark-one">✦</span>
+              <span className="conversation-opening-spark spark-two">·</span>
+              <span className="conversation-opening-lock"><svg className="conversation-lock-svg" viewBox="0 0 48 48"><path d="M15 21v-5.5a9 9 0 0 1 18 0V21"/><rect x="10" y="20" width="28" height="20" rx="5"/><circle cx="24" cy="29" r="2.2"/><path d="M24 31.5v3.5"/></svg></span>
+            </div>
+            <div className="conversation-opening-copy"><span className="conversation-opening-eyebrow">PRIVATE SESSION</span><strong>Unlocking your conversation</strong><small>Securing the connection and loading messages…</small></div>
+            <div className="conversation-opening-steps" aria-hidden="true"><span className="active"><i/>Identity</span><b/><span><i/>Session</span><b/><span><i/>Messages</span></div>
           </section>
         ) : <section className="messages" ref={messagesViewportRef} onScroll={(event) => {
           const container = event.currentTarget;
