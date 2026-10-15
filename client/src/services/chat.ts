@@ -236,18 +236,7 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
       const lastSeenMs = lastSeen?.toMillis() || 0
       const active = profile.activeStatus !== false && lastSeenMs > 0 && Date.now() - lastSeenMs < 90000
       return { ...item, name: profile.displayName || item.name, username: profile.username || item.username, photoURL: profile.photoURL || item.photoURL, lastSeen, active }
-    })).then(async enriched => {
-      // Firebase is the source of truth for friendships. Ensure every accepted
-      // friend has a direct Supabase chat membership, including friendships
-      // created before the chat migration.
-      const friends = await listFriends(uid)
-      const existingPairs = new Set(enriched.filter(item => item.type === 'direct').map(item => [...item.memberIds].sort().join(':')))
-      const missing = friends.filter(friend => !existingPairs.has([uid, friend.uid].sort().join(':')))
-      if (missing.length) {
-        await Promise.all(missing.map(friend => createConversation(uid, friend)))
-        callback(await listSupabaseConversations(uid))
-      } else callback(enriched)
-    }).catch(() => callback(items))
+    })).then(enriched => callback(enriched)).catch(() => callback(items))
   })
   if (!db) return undefined
   const q = query(collection(db, 'conversations'), where('memberIds', 'array-contains', uid), limit(50))

@@ -163,7 +163,8 @@ button:disabled{cursor:not-allowed;opacity:.55;transform:none!important}
 @media(max-width:600px){
   .topbar,.chat-header{position:sticky}
   .content{padding-top:16px}
-  .modal-backdrop,.task-sheet-backdrop{align-items:end}
+  .modal-backdrop{align-items:center}
+  .task-sheet-backdrop{align-items:end}
   .modal{max-height:calc(92dvh - env(safe-area-inset-top));border-radius:24px 24px 18px 18px}
   .settings-page{padding-bottom:22px}
 }

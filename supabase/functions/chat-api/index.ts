@@ -376,17 +376,20 @@ Deno.serve(async (request) => {
     if (action === 'delete-conversation') {
       const conversationId = String(body?.conversationId || '')
       if (!conversationId) return response({ error: 'Conversation is required.' }, 400)
-      const memberships = await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(user.uid)}&select=uid`)
-      if (memberships?.length) {
-        await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&uid=eq.${encodeURIComponent(user.uid)}`, { method: 'PATCH', body: JSON.stringify({ hidden_at: new Date().toISOString(), unread_count: 0 }) })
-        return response({ deleted: true, hidden: true })
-      }
+      const memberships = await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}&select=uid`)
+      const memberUids = Array.isArray(memberships) ? memberships.map((item: Record<string, unknown>) => String(item.uid || '')).filter(Boolean) : []
+      const isMember = memberUids.includes(user.uid)
       const owned = await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}&created_by=eq.${encodeURIComponent(user.uid)}&select=id&limit=1`)
-      if (owned?.length) {
-        await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: 'DELETE' })
-        return response({ deleted: true })
+      if (!isMember && !owned?.length) {
+        // The client may be holding a stale empty contact row. Treat removal
+        // as idempotent so it can disappear locally without resurrecting.
+        return response({ deleted: true, missing: true })
       }
-      return response({ error: 'You cannot delete this conversation.' }, 403)
+      await rest(`messages?conversation_id=eq.${encodeURIComponent(conversationId)}`, { method: 'DELETE' })
+      await rest(`conversation_members?conversation_id=eq.${encodeURIComponent(conversationId)}`, { method: 'DELETE' })
+      await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: 'DELETE' })
+      runInBackground(broadcastConversationChange(memberUids, { conversationId, deleted: true, senderId: user.uid, message: '', messageAt: new Date().toISOString() }))
+      return response({ deleted: true })
     }
     if (action === 'mark-read') {
       const conversationId = String(body?.conversationId || '')
