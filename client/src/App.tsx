@@ -1327,8 +1327,14 @@ export default function App() {
   useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
   const [selected, setSelected] = useState<Conversation | null>(null);
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
+  const swipePages = ["chats", "study", "communities", "discover", "settings"] as const;
   const handleChatTouchStart = (event: ReactTouchEvent<HTMLElement>) => {
     if (!isNativeAndroid) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("button,a,input,textarea,select,[contenteditable='true'],[role='dialog']")) {
+      swipeStart.current = null;
+      return;
+    }
     const touch = event.changedTouches[0];
     swipeStart.current = { x: touch.clientX, y: touch.clientY };
   };
@@ -1339,7 +1345,16 @@ export default function App() {
     const touch = event.changedTouches[0];
     const dx = touch.clientX - start.x;
     const dy = touch.clientY - start.y;
-    if (dx > 72 && Math.abs(dx) > Math.abs(dy) * 1.35) setSelected(null);
+    if (Math.abs(dx) <= 72 || Math.abs(dx) <= Math.abs(dy) * 1.35) return;
+    if (selected) {
+      if (dx > 0) setSelected(null);
+      return;
+    }
+    const currentIndex = swipePages.indexOf(page as typeof swipePages[number]);
+    if (currentIndex < 0) return;
+    const nextIndex = currentIndex + (dx < 0 ? 1 : -1);
+    const nextPage = swipePages[nextIndex];
+    if (nextPage) setPage(nextPage);
   };
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const messagesViewportRef = useRef<HTMLElement | null>(null);
@@ -2742,7 +2757,7 @@ export default function App() {
       </main>
     );
   return (
-    <main className={`app page-${page}${isNativeAndroid ? " native-android" : ""}`}>
+    <main className={`app page-${page}${isNativeAndroid ? " native-android" : ""}`} onTouchStart={handleChatTouchStart} onTouchEnd={handleChatTouchEnd}>
       <header className="topbar">
         {page === "settings" ? (
           <div className="settings-topbar-title">

@@ -392,6 +392,7 @@ button:disabled{cursor:not-allowed;opacity:.55;transform:none!important}
 /* Native Android interaction polish: keep the browser UI unchanged. */
 .native-android {
   overscroll-behavior-x: contain;
+  touch-action: pan-y;
 }
 
 .native-android .bottom-nav {
