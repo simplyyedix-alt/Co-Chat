@@ -2961,16 +2961,20 @@ export default function App() {
                 >
                   Open chat
                 </button>
-                <button
-                  className="danger"
-                  type="button"
-                  onClick={async () => {
-                    setDeleteTarget(conversationMenu);
-                    setConversationMenu(null);
-                  }}
-                >
-                  Remove conversation
-                </button>
+                {Boolean(conversationMenu.lastMessage || conversationMenu.lastMessageAt) ? (
+                  <button
+                    className="danger"
+                    type="button"
+                    onClick={async () => {
+                      setDeleteTarget(conversationMenu);
+                      setConversationMenu(null);
+                    }}
+                  >
+                    Remove conversation
+                  </button>
+                ) : (
+                  <small className="conversation-menu-note">No conversation to remove yet.</small>
+                )}
               </div>
             )}
             {deleteTarget && (

@@ -96,11 +96,12 @@ async function notifyMessageRecipients(targetUids: string[], senderName: string,
       ? `${configuredFcmUrl.replace(/\/$/, '')}/fcm`
       : configuredFcmUrl)
     : `${base}/functions/v1/fcm-notifications`
-  await fetch(fcmUrl, {
+  const result = await fetch(fcmUrl, {
     method: 'POST',
     headers: { ...serverKeyHeaders(serviceKey), 'Content-Type': 'application/json', 'x-internal-notifications-secret': secret },
     body: JSON.stringify({ targetUids, title: senderName || 'New Co-Chat message', body: message || '📎 Attachment', data: { type: 'message', conversationId, messageId, messageAt, ...extraData } }),
   })
+  if (!result.ok) console.error('FCM relay rejected notification', result.status, (await result.text().catch(() => '')).slice(0, 500))
 }
 
 // Supabase Edge Functions can keep non-critical work alive after the HTTP
@@ -485,6 +486,15 @@ async function tokensForUser(uid: string, accessToken: string): Promise<Firestor
   })
 }
 
+async function registerToken(uid: string, token: string, platform: string, accessToken: string) {
+  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/users/${encodeURIComponent(uid)}/fcmTokens/${encodeURIComponent(token)}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: { token: { stringValue: token }, platform: { stringValue: platform }, updatedAt: { timestampValue: new Date().toISOString() } } }),
+  })
+  if (!response.ok) throw new Error(`FCM token registration failed (${response.status})`)
+}
+
 async function sendToToken(token: string, title: string, body: string, data: Record<string, string>, accessToken: string) {
   const response = await fetch(`https://fcm.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/messages:send`, {
     method: 'POST',
@@ -500,9 +510,18 @@ async function sendToToken(token: string, title: string, body: string, data: Rec
 
 async function handleFcm(request: Request) {
   if (request.method !== 'POST') return json({ error: 'POST required' }, 405)
-  if (!internalSecret || request.headers.get('x-internal-notifications-secret') !== internalSecret) return json({ error: 'Unauthorized' }, 401)
   try {
     const input = await request.json().catch(() => null) as PushRequest | null
+    if (input?.action === 'register-token') {
+      const uid = await verifyFirebaseToken(request)
+      const token = String(input.token || '').trim()
+      const platform = String(input.platform || 'android').slice(0, 20)
+      if (!uid) return json({ error: 'Invalid Firebase identity token' }, 401)
+      if (!token) return json({ error: 'FCM token is required' }, 400)
+      await registerToken(uid.uid, token, platform, await googleAccessToken())
+      return json({ registered: true })
+    }
+    if (!internalSecret || request.headers.get('x-internal-notifications-secret') !== internalSecret) return json({ error: 'Unauthorized' }, 401)
     const targetUids = [...new Set(Array.isArray(input?.targetUids) ? input.targetUids.map(String).filter(Boolean).slice(0, 100) : [])]
     const title = String(input?.title || 'Co-Chat').slice(0, 100)
     const body = String(input?.body || 'You have a new message.').slice(0, 2000)
@@ -511,6 +530,7 @@ async function handleFcm(request: Request) {
     if (!targetUids.length) return json({ sent: 0 })
     const accessToken = await googleAccessToken()
     const recipientTokens = (await Promise.all(targetUids.map((uid) => tokensForUser(uid, accessToken)))).flat()
+    console.log('FCM notification fanout', { targets: targetUids.length, tokens: recipientTokens.length })
     const outcomes = await Promise.all(recipientTokens.map((item) => sendToToken(item.token, title, body, data, accessToken)))
     return json({ sent: outcomes.filter((result) => result.ok).length, attempted: outcomes.length })
   } catch (error) {

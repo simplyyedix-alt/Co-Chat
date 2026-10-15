@@ -171,28 +171,40 @@ export function clearStudyTimerNotification() {
 }
 async function saveTokenThroughBackend(token: string, platform: 'web' | 'android') {
   if (!auth?.currentUser) return false
-  const base = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '')
-  if (!base) return false
   const idToken = await auth.currentUser.getIdToken()
-  const response = await fetch(`${base}/functions/v1/fcm-notifications`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'register-token', token, platform }),
-  })
-  return response.ok
+  const cloudflare = String(import.meta.env.VITE_CHAT_API_URL || 'https://divine-meadow-8139.simplyyedix.workers.dev').replace(/\/$/, '')
+  const supabase = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '')
+  const endpoints = [
+    `${cloudflare}/fcm`,
+    supabase ? `${supabase}/functions/v1/fcm-notifications` : '',
+  ].filter((value, index, items) => value && items.indexOf(value) === index)
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'register-token', token, platform }),
+      })
+      if (response.ok) return true
+    } catch { /* Try the authenticated Supabase fallback. */ }
+  }
+  return false
 }
 async function saveToken(token: string, platform: 'web' | 'android') {
   if (!auth?.currentUser) return false
+  // Register through the primary notification backend first. This avoids
+  // making delivery depend on whether the client can write Firestore tokens.
+  if (await saveTokenThroughBackend(token, platform)) return true
   try {
     if (db) {
       await setDoc(doc(db, 'users', auth.currentUser.uid, 'fcmTokens', encodeURIComponent(token)), { token, platform, updatedAt: serverTimestamp() }, { merge: true })
       return true
     }
-  } catch { /* The backend registration path handles projects with older rules. */ }
-  return saveTokenThroughBackend(token, platform)
+  } catch { /* Firestore is a last-resort compatibility path. */ }
+  return false
 }
 export async function registerFcmNotifications(enabled = true) {
-  if (!enabled || !app || !auth?.currentUser || !db) return false
+  if (!enabled || !app || !auth?.currentUser) return false
   if (isNativeAndroid()) {
     if (!(await ensureNativeNotifications())) return false
     const permission = await PushNotifications.checkPermissions(); const granted = permission.receive === 'granted' ? permission : await PushNotifications.requestPermissions()

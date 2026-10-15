@@ -90,11 +90,12 @@ async function notifyMessageRecipients(targetUids: string[], senderName: string,
   const serviceKey = supabaseServerKey()
   const secret = Deno.env.get('INTERNAL_NOTIFICATIONS_SECRET') || ''
   if (!base || !serviceKey || !secret || !targetUids.length) return
-  await fetch(`${base}/functions/v1/fcm-notifications`, {
+  const result = await fetch(`${base}/functions/v1/fcm-notifications`, {
     method: 'POST',
     headers: { ...serverKeyHeaders(serviceKey), 'Content-Type': 'application/json', 'x-internal-notifications-secret': secret },
     body: JSON.stringify({ targetUids, title: senderName || 'New Co-Chat message', body: message || '📎 Attachment', data: { type: 'message', conversationId, messageId, messageAt, ...extraData } }),
   })
+  if (!result.ok) console.error('FCM relay rejected notification', result.status, (await result.text().catch(() => '')).slice(0, 500))
 }
 
 // Supabase Edge Functions can keep non-critical work alive after the HTTP
