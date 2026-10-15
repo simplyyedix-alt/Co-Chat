@@ -3331,7 +3331,7 @@ function FriendZone({
           <Avatar profile={focused} className="avatar large" />
           <span className="settings-eyebrow">CO-CHAT PROFILE</span>
           <h3>{focused.displayName}{isVerified(focused.uid) && <VerifiedTick />}</h3>
-          <p>@{focused.username}{isVerified(focused.uid) && <VerifiedTick />}</p>
+          <p>@{focused.username}</p>
           <div className="public-profile-atmosphere">
             <div className="public-profile-level"><span className="profile-rank-badge">I</span><div><b>Bronze I</b><small>Study level · building momentum</small></div><span className="profile-online-pill">{focused.activeStatus === false ? "Offline" : "Available"}</span></div>
             <div className="public-profile-stats"><span><b>0h</b><small>study logged</small></span><span><b>0</b><small>day streak</small></span><span><b>New</b><small>member</small></span></div>
@@ -3597,7 +3597,7 @@ function SearchPanel({
           <Avatar profile={focused} className="avatar large" />
           <span className="settings-eyebrow">CO-CHAT PROFILE</span>
           <h3>{focused.displayName}{isVerified(focused.uid) && <VerifiedTick />}</h3>
-          <p>@{focused.username}{isVerified(focused.uid) && <VerifiedTick />}</p>
+          <p>@{focused.username}</p>
           <div className="public-profile-atmosphere">
             <div className="public-profile-level"><span className="profile-rank-badge">I</span><div><b>Bronze I</b><small>Study level · building momentum</small></div><span className="profile-online-pill">{focused.activeStatus === false ? "Offline" : "Available"}</span></div>
             <div className="public-profile-stats"><span><b>0h</b><small>study logged</small></span><span><b>0</b><small>day streak</small></span><span><b>New</b><small>member</small></span></div>
