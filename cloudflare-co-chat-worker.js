@@ -265,6 +265,10 @@ async function handleChat(request) {
       const conversationId = String(body?.conversationId || "");
       if (!conversationId || !await member(conversationId, user.uid)) return response({ error: "Conversation access denied" }, 403);
       const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1e3).toISOString();
+      await rest(`messages?conversation_id=eq.${encodeURIComponent(conversationId)}&created_at=lt.${encodeURIComponent(cutoff)}&select=id`, { method: "DELETE" });
+      const latest = await rest(`messages?conversation_id=eq.${encodeURIComponent(conversationId)}&select=text,attachment,sender_id,created_at&order=created_at.desc&limit=1`);
+      const latestItem = latest?.[0];
+      await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}`, { method: "PATCH", body: JSON.stringify({ last_message: latestItem ? String(latestItem.text || "") || (latestItem.attachment ? "\u{1F4CE} Attachment" : "") : "", last_sender_id: latestItem?.sender_id || null, last_message_at: latestItem?.created_at || null }) });
       const requestedSince = typeof body?.since === "string" ? new Date(body.since) : null;
       const since = requestedSince && !Number.isNaN(requestedSince.getTime()) ? requestedSince.toISOString() : cutoff;
       const rows = await rest(`messages?conversation_id=eq.${encodeURIComponent(conversationId)}&created_at=gte.${encodeURIComponent(since)}&select=id,conversation_id,sender_id,text,attachment,sneak,reply_to,seen_by,hidden_for,created_at&order=created_at.asc&limit=100`);
