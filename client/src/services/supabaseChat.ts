@@ -169,7 +169,7 @@ export function watchConversations(uid: string, callback: (items: Conversation[]
   const startFallback = () => { if (fallbackTimer === null) fallbackTimer = window.setInterval(refresh, 10000) }
   const stopFallback = () => { if (fallbackTimer !== null) { window.clearInterval(fallbackTimer); fallbackTimer = null } }
   const fallbackStart = window.setTimeout(startFallback, 5000)
-  const channel = supabase?.channel(`chat-conversations:${uid}`)
+  const channel = supabase?.channel(`chat-conversation-list:${uid}`)
     .on('broadcast', { event: 'conversation' }, refresh)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_members', filter: `uid=eq.${uid}` }, refresh)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, refresh)

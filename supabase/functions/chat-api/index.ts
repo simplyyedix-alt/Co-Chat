@@ -73,7 +73,7 @@ async function broadcastConversationChange(memberUids: string[], payload: Record
   const base = Deno.env.get('SUPABASE_URL') || ''
   const key = supabaseServerKey()
   if (!base || !key) return
-  await Promise.all(memberUids.filter(Boolean).map((uid) => fetch(`${base}/realtime/v1/api/broadcast/${encodeURIComponent(`chat-conversations:${uid}`)}/events/conversation`, {
+  await Promise.all(memberUids.filter(Boolean).flatMap((uid) => [`chat-conversation-list:${uid}`, `chat-conversations:${uid}`]).map((topic) => fetch(`${base}/realtime/v1/api/broadcast/${encodeURIComponent(topic)}/events/conversation`, {
     method: 'POST',
     headers: { ...serverKeyHeaders(key), 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
